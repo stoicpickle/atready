@@ -188,7 +188,7 @@ start the other branch.
    Treat root inventory annotations as another separately authorized mutation. Set them only from
    a protected note-only declaration using `inventory annotate set --annotation-file <path>` or
    explicit `--annotation-stdin`; clear them with value-free `inventory annotate clear`. Preview
-   first and show only the fixed note effect, target, revision, and plan token—never the value,
+   first and show only the fixed note effect, target, revision, and plan token. Never show the value,
    excerpt, length, or direct hash. Apply only after approval with the same set declaration (or the
    same clear operation), `--apply`, `--expect-revision`, and `--expect-plan`. Annotation apply uses
    the same private backup, operation manifest, lock, and atomic replacement path as resource edits.

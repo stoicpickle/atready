@@ -29,7 +29,7 @@ Depending on what the user supplies, a planning session may handle:
 - a capability inventory, including resource names, access state, costs,
   qualitative quota, optional measured capacity, suitability notes, and verification dates;
 - an optional local discovery result containing one allowlisted executable name, its resolved
-  local path, and—only when separately requested—one bounded version line;
+  local path, and one bounded version line if separately requested;
 - planning preferences and routing constraints;
 - project goals, constraints, and excerpts the user chooses to provide; and
 - generated plans, explanations, and copy-ready handoff packets.

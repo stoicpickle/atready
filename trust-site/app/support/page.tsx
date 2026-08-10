@@ -13,7 +13,7 @@ export default function SupportPage() {
         <PolicyHeading
           code="support document 04"
           title="Support"
-          description="What to prepare when something goes wrong—and which public support pieces are not active yet."
+          description="What to prepare when something goes wrong and which public support pieces are not active yet."
         />
         <div className="notice">
           <strong>Public support is not active.</strong> AtReady is still in private
@@ -41,7 +41,7 @@ export default function SupportPage() {
                 <li>Operating system, Python version, and the host surface used.</li>
                 <li>The smallest command or prompt that reproduces the issue.</li>
                 <li>Expected behavior and actual behavior.</li>
-                <li>Synthetic input only—remove real resource names, projects, paths, and accounts.</li>
+                <li>Use synthetic input only. Remove real resource names, projects, paths, and accounts.</li>
               </ul>
             </section>
             <section className="prose-section">

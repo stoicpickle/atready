@@ -11,15 +11,15 @@ It does not run the work, contact your tools, or spend your credits. You stay in
 ![AtReady welcome screen](https://raw.githubusercontent.com/stoicpickle/atready/main/docs/assets/atready-cli.png)
 
 > **Public beta:** AtReady works today, but its setup and language will keep improving as people try
-> it. Expect changes—and please share what feels confusing or unnecessary.
+> it. Expect changes. Please share what feels confusing or unnecessary.
 
 > **[Try AtReady and tell me how it went](https://github.com/stoicpickle/atready/blob/main/docs/TRY_ATREADY.md)**
-> —one short install, demo, resource, and planning journey for first-time users.
+> One short install, demo, resource, and planning journey for first-time users.
 
 ## The idea in one minute
 
 Maybe you have Codex, CodeRabbit, Cursor, a design subscription, and a small amount of image credit.
-A project comes along. Instead of forgetting what is available—or trying to use everything—AtReady
+A project comes along. Instead of forgetting what is available or trying to use everything, AtReady
 helps answer:
 
 - Which resources are actually useful for this plan?
@@ -32,7 +32,7 @@ AtReady turns those answers into an advisory route and inert handoff notes. Noth
 ## Try the synthetic demo
 
 This example uses bundled fake data and does not touch a personal inventory. After installing
-AtReady, run it from a separate working directory—not the cloned AtReady source repository.
+AtReady, run it from a separate working directory instead of the cloned AtReady source repository.
 
 ```bash
 atready demo inventory > inventory.yaml
@@ -48,7 +48,7 @@ The result looks like this:
 ```text
 Resource plan: Synthetic CLI Release
 Goal: Ship a tested local CLI without network access or telemetry.
-1 step - 1 assigned - no open gaps
+1 step · 1 assigned · no open gaps
 
 Watch
 - This uses a demo inventory. Its contents are not verified as resources you can
@@ -135,8 +135,8 @@ atready inventory add \
   --verified-on "$today"
 ```
 
-Those readiness, cost, data, and date fields are declarations about your setup—not facts AtReady
-silently verifies. The advanced preview shows the complete proposed change, an expected revision,
+Those readiness, cost, data, and date fields are declarations about your setup. AtReady does not
+silently verify them. The advanced preview shows the complete proposed change, an expected revision,
 and a plan token. Nothing is saved until you repeat the command with `--apply`, the exact revision,
 and the exact plan token. Guided and advanced setup both create a private exact-byte backup and
 atomically replace the inventory; both report durability uncertainty instead of pretending a write

@@ -38,8 +38,8 @@ selected resource, adjust a score, or invent a model choice in prose.
 - If the selected resource is model-specific, name that exact resource and use the catalog role
   only as a dated explanation alongside the user's declared scores.
 - If the selected resource is generic, leave its model unspecified. When model choice materially
-  affects the requested work, list confirmation of the current model as a decision—not an assumed
-  assignment.
+  affects the requested work, list confirmation of the current model as a decision instead of an
+  assumed assignment.
 - Prefer a user-confirmed deep-reasoning entry for genuinely ambiguous, long-horizon, architectural,
   investigative, or cross-domain work only when its declared capabilities and project gates support
   that selection.

@@ -16,7 +16,7 @@ export default function TermsPage() {
           description="The responsibilities and limits that accompany AtReady’s advisory planning output."
         />
         <div className="notice">
-          <strong>Draft—not in force.</strong> Maintainer and owner approval, publisher identity,
+          <strong>Draft. Not in force.</strong> Maintainer and owner approval, publisher identity,
           final effective date, and public URL are required before this can serve as public legal
           copy.
         </div>

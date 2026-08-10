@@ -170,7 +170,7 @@ def _welcome_text(*, color: bool, block_art: bool) -> str:
             "Plan with what you have at the ready.",
             "",
             "Turn a rough plan and your available tools into a clear workstream route.",
-            "AtReady suggests where each resource fits - and what should stay out.",
+            "AtReady suggests where each resource fits and what should stay out.",
             "It never runs a tool, spends a credit, or starts the work.",
             "",
             "A resource is a tool, agent, service, app, or person AtReady may consider.",

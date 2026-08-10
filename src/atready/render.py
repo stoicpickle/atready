@@ -114,7 +114,7 @@ def render_summary(plan: RoutePlan, *, goal: str | None = None, width: int = 100
         )
     _append_wrapped(
         lines,
-        f"{len(plan.assignments)} {step_label} - {assigned_count} assigned - {gap_label}",
+        f"{len(plan.assignments)} {step_label} · {assigned_count} assigned · {gap_label}",
         width=width,
     )
 
@@ -421,7 +421,7 @@ def render_markdown(plan: RoutePlan) -> str:
             )
         if assignment.alternate:
             lines.append(
-                f"Alternate: **{_text(assignment.alternate.resource_name)}** — "
+                f"Alternate: **{_text(assignment.alternate.resource_name)}**. "
                 f"{_text(assignment.alternate_activation_condition or '')}"
             )
         for gap in assignment.unresolved_gaps:

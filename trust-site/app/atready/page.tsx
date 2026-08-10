@@ -44,7 +44,7 @@ export default function AtReadyPage() {
             <p className="hero-copy">
               AtReady is a small planning companion for Codex. It considers the resources
               you chose to declare, suggests where they fit, explains why, and prepares handoff
-              text for review—without contacting or running those resources.
+              text for review without contacting or running those resources.
             </p>
             <div className="button-row">
               <Link className="button" href="/surfaces">

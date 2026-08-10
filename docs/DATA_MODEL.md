@@ -73,8 +73,8 @@ batch, merge document, second YAML document, unknown field, or unknown version
 fails closed. JSON is accepted as a YAML subset. Input transport, pathname,
 comments, and key order are not persisted or plan-bound; the fully validated,
 default-materialized candidate is. Semantically identical file/stdin declarations
-therefore produce the same candidate, while any changed persisted value—including
-a hidden note—requires a new preview. A note-bearing declaration also fails when
+therefore produce the same candidate. Any changed persisted value, including a hidden note,
+requires a new preview. A note-bearing declaration also fails when
 the target inventory is `legacy-unblinded`; the nonce is inventory state and is
 never accepted through a resource declaration.
 
@@ -197,9 +197,9 @@ the private-backup atomic replacement engine. Output reveals only the value-free
 
 ## Backup states
 
-Backups are exact prior inventory bytes—including any revision privacy nonce—addressed by their
-full SHA-256 revision. They live under a hashed logical-target namespace adjacent to the active
-inventory. Darwin resolves the physical directory-entry spelling through the opened file
+Backups contain the exact prior inventory bytes, including any revision privacy nonce. They are
+addressed by their full SHA-256 revision. They live under a hashed logical-target namespace
+adjacent to the active inventory. Darwin resolves the physical directory-entry spelling through the opened file
 descriptor. Other supported filesystems use the normalized resolved target name rather than a
 replaceable inode, but first require a fully ASCII basename containing a letter and prove the
 directory's required case behavior by toggling every cased position separately. Each exact variant

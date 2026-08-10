@@ -55,9 +55,9 @@ body:
     attributes:
       label: 4. How easy was the resource plan to understand?
       options:
-        - Very easy — I knew what to do next
-        - Mostly easy — one or two details were unclear
-        - Difficult — I had to interpret the result
+        - Very easy. I knew what to do next
+        - Mostly easy. One or two details were unclear
+        - Difficult. I had to interpret the result
         - I did not reach a resource plan
     validations:
       required: true

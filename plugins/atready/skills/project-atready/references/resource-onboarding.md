@@ -267,7 +267,7 @@ The entire first response still stays under 250 words and presents only the curr
 
 Keep one generic provider resource when the configured model is automatic, unknown, or immaterial.
 When confirmed model choices are independently selectable and materially different, offer one
-separate resource at a time—for example `cursor-composer-2-5`, `cursor-grok-4-5`,
+separate resource at a time. For example: `cursor-composer-2-5`, `cursor-grok-4-5`,
 `opencode-deepseek-v4-flash-free`, or `grok-4-5`. Each requires its own user-confirmed capabilities,
 scores, readiness, policy, preview, and apply approval. Never infer a score from vendor copy, a
 benchmark, `Flash`, `Fast`, `Thinking`, or a model's position in a provider list.

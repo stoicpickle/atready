@@ -3,8 +3,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "AtReady — Product & Trust",
-    template: "%s — AtReady",
+    default: "AtReady | Product & Trust",
+    template: "%s | AtReady",
   },
   description:
     "AtReady product, privacy, security, support, terms, and supported-surface information.",

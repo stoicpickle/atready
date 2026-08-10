@@ -74,8 +74,8 @@ release deliberately changes the product boundary:
 6. CLI reads are limited to bounded answers entered after explicit TTY-only `atready add`, explicit
    inventory/project/resource-declaration paths, explicit non-interactive resource stdin, the
    resolved default inventory path, one explicitly requested profile-allowlisted executable check,
-   and—only for explicit backup commands—the adjacent target-scoped backup
-   namespace. The host skill may read only project-relevant files needed for the
+   and the adjacent target-scoped backup namespace for explicit backup commands. The host skill may
+   read only project-relevant files needed for the
    requested plan; it does not crawl unrelated directories, the home directory,
    or environment/MCP configuration.
 7. Public examples and tests use synthetic projects, inventories, and resource metadata. They

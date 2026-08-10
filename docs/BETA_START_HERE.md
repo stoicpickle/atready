@@ -1,7 +1,7 @@
 # AtReady private beta: start here
 
-AtReady is a small planning companion for Codex. Once you know what you want to make—but
-before implementation begins—bring it a goal, rough plan, or written plan. It compactly shapes only
+AtReady is a small planning companion for Codex. Once you know what you want to make, bring it a
+goal, rough plan, or written plan before implementation begins. It compactly shapes only
 the workstreams it needs and suggests where your saved tools, services, subscriptions, and agents
 fit. It recommends and prepares; it does not log in to, contact, or run saved resources for project
 work. The optional, separately authorized version check does execute one exact external CLI with

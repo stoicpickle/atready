@@ -42,7 +42,7 @@ def test_summary_is_concise_plain_language_and_preserves_route_truth() -> None:
     rendered = render_summary(plan, goal=project.goal, width=80)
 
     assert "Resource plan: Synthetic Web Product" in rendered
-    assert "4 steps - 4 assigned - no open gaps" in rendered
+    assert "4 steps · 4 assigned · no open gaps" in rendered
     assert "Use: Synthetic Codex Seat" in rendered
     assert "Best eligible match after applying the project constraints." in rendered
     assert "Deliver: Tested web application." in rendered
@@ -56,6 +56,7 @@ def test_summary_is_concise_plain_language_and_preserves_route_truth() -> None:
     assert plan.plan_id not in rendered
     assert plan.inventory_fingerprint not in rendered
     assert "handoff packet" not in rendered
+    assert " - " not in rendered
 
     for assignment in plan.assignments:
         assert rendered.count(f"Use: {assignment.primary.resource_name}") == 1
@@ -96,7 +97,7 @@ def test_summary_uses_singular_gaps_without_repeating_the_reason() -> None:
 
     rendered = render_summary(plan, width=80)
 
-    assert "1 step - 0 assigned - 1 open gap" in rendered
+    assert "1 step · 0 assigned · 1 open gap" in rendered
     assert "Use: Unassigned" in rendered
     assert rendered.count("Exact synthetic gap reason.") == 1
 

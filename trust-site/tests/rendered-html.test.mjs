@@ -32,12 +32,12 @@ test("root directs visitors to the product route", async () => {
 });
 
 for (const [path, title] of [
-  ["/atready", "Product — AtReady"],
-  ["/support", "Support — AtReady"],
-  ["/privacy", "Privacy — AtReady"],
-  ["/terms", "Terms — AtReady"],
-  ["/security", "Security — AtReady"],
-  ["/surfaces", "Supported surfaces — AtReady"],
+  ["/atready", "Product | AtReady"],
+  ["/support", "Support | AtReady"],
+  ["/privacy", "Privacy | AtReady"],
+  ["/terms", "Terms | AtReady"],
+  ["/security", "Security | AtReady"],
+  ["/surfaces", "Supported surfaces | AtReady"],
 ]) {
   test(`${path} renders the shared trust shell`, async () => {
     const response = await render(path);

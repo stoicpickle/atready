@@ -168,7 +168,7 @@ def route_overview() -> Image.Image:
         size=13,
         anchor="ra",
     )
-    # A small geometric index—not an airline or aircraft mark.
+    # A small geometric index, not an airline or aircraft mark.
     draw.ellipse((912, 39, 949, 76), fill=TRANSIT_BLUE)
     draw.ellipse((954, 39, 991, 76), fill=SIGNAL_RED)
     draw.ellipse((996, 39, 1033, 76), fill=WHITE)
