@@ -1,7 +1,7 @@
 {
   "name": "atready",
   "version": "0.1.5",
-  "description": "Bring AtReady a goal or rough plan before implementation and see where your saved resources fit.",
+  "description": "Add declared resources through a preview-first conversation, then plan around what you have.",
   "author": {
     "name": "stoicpickle",
     "url": "https://github.com/stoicpickle"
@@ -17,7 +17,7 @@
   "interface": {
     "displayName": "AtReady",
     "shortDescription": "Plan with what's at the ready",
-    "longDescription": "AtReady is a small planning companion for supported Codex surfaces. Bring it a goal, rough plan, or written plan before implementation. It visibly shapes the minimum useful workstreams, suggests where your saved tools, services, subscriptions, and agents fit, explains its choices, and prepares handoffs for review without contacting or running routed project resources. This local-first release requires a separately installed compatible project-atready runtime and local file access.",
+    "longDescription": "AtReady is a small resource and planning companion for supported Codex surfaces. Add one declared tool, service, subscription, person, or agent through a conversational no-write preview and a separate exact save approval. Then bring AtReady a goal, rough plan, or written plan before implementation to shape the minimum useful workstreams, suggest where saved tools, services, subscriptions, people, and agents fit, and explain its choices without contacting or running routed project resources. This local-first release requires a separately installed compatible project-atready runtime and local file access.",
     "developerName": "stoicpickle",
     "category": "Developer Tools",
     "capabilities": [

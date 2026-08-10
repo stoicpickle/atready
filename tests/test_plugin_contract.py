@@ -259,11 +259,18 @@ def test_plugin_is_minimal_skill_only_and_independently_versioned() -> None:
     assert len(interface["displayName"]) <= 30
     assert len(interface["shortDescription"]) <= 30
     assert interface["shortDescription"] == "Plan with what's at the ready"
-    assert "small planning companion" in interface["longDescription"]
+    assert "small resource and planning companion" in interface["longDescription"]
+    assert "conversational no-write preview" in interface["longDescription"]
+    assert "separate exact save approval" in interface["longDescription"]
     assert "goal, rough plan, or written plan before implementation" in interface["longDescription"]
     assert "minimum useful workstreams" in interface["longDescription"]
-    assert "saved tools, services, subscriptions, and agents fit" in interface["longDescription"]
+    assert (
+        "saved tools, services, subscriptions, people, and agents fit"
+        in interface["longDescription"]
+    )
     assert "without contacting or running routed project resources" in interface["longDescription"]
+    assert "separately installed compatible project-atready runtime" in interface["longDescription"]
+    assert "local file access" in interface["longDescription"]
     assert interface["defaultPrompt"] and all(
         isinstance(value, str) and value.strip() for value in interface["defaultPrompt"]
     )

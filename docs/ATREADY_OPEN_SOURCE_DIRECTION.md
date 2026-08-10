@@ -73,6 +73,18 @@ The beta is successful when testers can install without maintainer intervention,
 resources without exposing credentials, bring a real rough plan, understand the recommendation,
 and choose to use AtReady again. A completed installation alone is not product validation.
 
+## Deferred public demo clip
+
+Return to Screen Studio when the next public demo is ready. The target is a roughly 20 second real
+screen recording for X, not a generated interface mockup. Show a synthetic pixel game request,
+Codex invoking AtReady, and the actual compact resource plan using examples such as Codex and Retro
+Diffusion. Keep `SYNTHETIC EXAMPLE` visible, use provider names as plain text without logos or an
+endorsement claim, and end on the no execution boundary.
+
+Use the Intel build of Screen Studio on the current iMac, record at 1080p, and free comfortable
+working storage before capture and export. Prepare the exact synthetic roster, prompt, output,
+timing, and X copy before purchasing a month or beginning production.
+
 ## Stop or reconsider
 
 Reconsider the name if a closer functional product appears or practical trademark/package/listing

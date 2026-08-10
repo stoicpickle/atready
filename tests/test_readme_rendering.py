@@ -107,6 +107,30 @@ def test_readme_skill_copy_is_guarded_before_the_first_write() -> None:
     assert "keep any existing destination unchanged by default" in " ".join(readme.split())
 
 
+def test_readme_powershell_skill_copy_preserves_existing_paths_and_reparse_points() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    blocks = re.findall(r"```powershell\n(.*?)\n```", readme, flags=re.DOTALL)
+    skill_blocks = [block for block in blocks if "$skillDest = Join-Path $HOME" in block]
+
+    assert len(skill_blocks) == 1
+    block = skill_blocks[0]
+    inspect = (
+        "$existingSkill = Get-Item -LiteralPath $skillDest -Force -ErrorAction SilentlyContinue"
+    )
+    guard = "if ($null -ne $existingSkill) {"
+    create = "New-Item -ItemType Directory -Force -Path $skillParent"
+    copy = "Copy-Item -Recurse -LiteralPath $skillSource -Destination $skillDest"
+    for command in (inspect, guard, create, copy):
+        assert command in block
+    assert block.index(inspect) < block.index(guard)
+    assert block.index(guard) < block.index(create)
+    assert block.index(guard) < block.index(copy)
+    before_guard = block[: block.index(guard)]
+    assert "New-Item" not in before_guard
+    assert "Copy-Item" not in before_guard
+    assert "existing Windows link or\nreparse point" in readme
+
+
 def test_front_page_review_is_a_pre_review_and_pre_commit_gate() -> None:
     agent_guide = AGENT_GUIDE.read_text(encoding="utf-8")
     front_page_guide = FRONT_PAGE_GUIDE.read_text(encoding="utf-8")

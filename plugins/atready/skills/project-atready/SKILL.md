@@ -1,14 +1,116 @@
 ---
 name: project-atready
-description: Turn a rough project goal or loose plan into a resource-fit plan grounded in the user's declared AtReady roster. Use only when the user explicitly invokes AtReady or asks AtReady to match saved resources to project steps before implementation. Do not activate for ordinary project planning, casual tool mentions, roster maintenance, or project execution.
+description: Add one user-declared resource to an AtReady roster through a conversational preview-and-save flow, or turn a rough project goal into a resource-fit plan grounded in the saved roster. Use when the user explicitly invokes AtReady to add, onboard, register, or save a resource, or asks AtReady to match saved resources to project steps before implementation. Do not activate for ordinary project planning, casual tool mentions, unrelated inventory editing, or project execution.
 ---
 
 # AtReady
 
-Use AtReady at the planning pivot: the user has a goal or rough plan and wants to know where their
-saved resources fit before implementation starts. The deterministic CLI owns eligibility,
-assignments, gaps, dispositions, and handoff packets. Your job is to translate the user's plan into
-bounded inputs and explain the CLI result without changing it.
+Use AtReady for one of two explicit jobs: add one declared resource to the local roster, or plan
+where saved resources fit before implementation. Route an add, onboard, register, or save request
+to resource intake before considering planning. The deterministic CLI owns roster mutations,
+eligibility, assignments, gaps, dispositions, and handoff packets.
+
+Resolve the directory containing this `SKILL.md` once, without searching elsewhere, and replace
+`/absolute/path/to/project-atready` below with that exact directory. Use an already-installed
+Python 3.11 or newer interpreter to run only its bundled launcher. Never invoke a bare `atready`
+command or bypass the launcher. The launcher uses an already-installed trusted `uv`, offline and
+without configuration files, resolves its exact tool bin, verifies the runtime contract before
+delegation, and never searches `PATH` for `atready`.
+
+## Resource intake workflow
+
+Use this branch before planning when the user asks to add one resource. Read
+[resource-onboarding.md](references/resource-onboarding.md) completely and follow its Quick Setup
+or Detailed Setup contract.
+
+### 1. Check the local boundary
+
+Proceed only when the host grants approved local command execution and filesystem access. Otherwise
+say that this chat can prepare the entry but cannot save the local roster, and direct the user to
+run `atready add` in a local terminal. Do not imply that the roster changed.
+
+Resolve the target and declaration contract through the launcher exactly once:
+
+```bash
+python3 "/absolute/path/to/project-atready/scripts/atready.py" config path
+python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+  inventory validate /absolute/path/to/inventory.yaml
+python3 "/absolute/path/to/project-atready/scripts/atready.py" schema resource-declaration
+```
+
+Use a user-provided inventory path when present; otherwise use the exact `config path` result. If
+the inventory is missing, ask whether to create one empty personal roster at that exact path, then
+stop. The add request does not authorize initialization. After separate approval, run only:
+
+```bash
+python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+  init --path /absolute/path/to/inventory.yaml --json
+```
+
+Continue only when the receipt names the exact path, says `inventory_kind: personal`, reports zero
+resources, and reports `revision_protection: nonce-v1-present`. If an inventory already exists or is
+invalid, never overwrite it; report the problem and use the documented local recovery path. Keep
+provider discovery, computer scans, account inspection, billing checks, credentials, tokens, and
+private notes outside this workflow. Use only facts the user states. Handle one resource at a time.
+
+### 2. Gather and recap
+
+Ask one friendly, consolidated intake card, using a matching catalog profile only as editable
+suggestions. Accept corrections and `unknown` values. Recap the complete routing-visible entry in
+plain language. Treat answers as facts, not authorization. Ask whether to create the exact no-write
+preview, then stop.
+
+### 3. Preview, approve, and save
+
+After explicit preview authorization, create one fresh unpredictable temporary directory outside
+every repository and register exact cleanup for success and error paths immediately. On POSIX, use
+a restrictive creation mask, create the directory as `0700`, create the declaration exclusively as
+`0600`, and verify its owner, type, link count, modes, and absence of a macOS extended ACL before
+writing or use. Use equivalent
+native controls elsewhere and stop if they cannot be established. Run the launcher without
+`--apply`:
+
+```bash
+python3 "/absolute/path/to/project-atready/scripts/atready.py" inventory add \
+  --path /absolute/path/to/inventory.yaml \
+  --resource-file /absolute/path/to/declaration.yaml --json
+```
+
+Show the actual CLI preview without changing its fields. Remove only the exact temporary
+declaration and exact empty directory; report any retained path if cleanup fails. Ask `Save exactly
+this entry?`, naming the target and change, then stop. A general request to add a resource is not
+authorization to save it.
+
+After a separate exact-save authorization, recreate the same protected declaration and run:
+
+```bash
+python3 "/absolute/path/to/project-atready/scripts/atready.py" inventory add \
+  --path /absolute/path/to/inventory.yaml \
+  --resource-file /absolute/path/to/declaration.yaml \
+  --apply \
+  --expect-revision PREVIEW_EXPECT_REVISION \
+  --expect-plan PREVIEW_EXPECT_PLAN --json
+```
+
+Use only the preview's exact revision and plan token. Treat any changed declaration, target,
+revision, or plan as a new preview. Remove the exact temporary input and empty directory on every
+path, reporting any retained path, then run:
+
+```bash
+python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+  inventory validate /absolute/path/to/inventory.yaml --strict --json
+python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+  inventory list /absolute/path/to/inventory.yaml --json
+```
+
+Call the save verified only when the receipt says `applied: true`, names the intended resource ID,
+has `replacement_verified: true`, has `revision` equal to `candidate_revision`, has no warnings,
+has `observed_revision_protection`, and, on POSIX, has `directory_synced: true`. Require the list to
+show the intended resource ID and the same revision. Report strict-mode unknown or stale warnings as
+selection-fact gaps rather than storage corruption. Return the receipt and validation result in
+plain language. If apply or validation is uncertain, report the exact status without claiming
+success or retrying the apply. Do not use the planning output contract, `Plan`, or `Resource fit`
+headings for roster work. Do not append the routing boundary sentence because no route occurred.
 
 ## Planning workflow
 
@@ -31,9 +133,7 @@ project execution.
 
 ### 2. Load the exact declared roster
 
-Resolve the directory containing this `SKILL.md` once, without searching elsewhere, and replace
-`/absolute/path/to/project-atready` below with that exact directory. Use an already-installed
-Python 3 interpreter to run only the bundled launcher:
+Run the bundled launcher:
 
 ```bash
 python3 "/absolute/path/to/project-atready/scripts/atready.py" config path
@@ -44,18 +144,11 @@ python3 "/absolute/path/to/project-atready/scripts/atready.py" \
 ```
 
 Use a user-provided inventory path when present; otherwise use the exact path returned by
-`config path`. Never invoke a bare `atready` command or bypass the launcher. The launcher uses an
-already-installed trusted `uv`, offline and without configuration files, resolves its exact tool
-bin, verifies the runtime contract before delegation, and never searches `PATH` for `atready`.
+`config path`.
 
 If the launcher, trusted `uv`, compatible runtime, or inventory is unavailable, read
 [runtime-setup.md](references/runtime-setup.md). Explain the exact setup problem and stop without
-claiming that a roster was loaded. If the roster is empty, direct the user to `atready add` in their
-terminal and stop.
-
-For this public beta, direct roster initialization, addition, replacement, removal, annotations,
-and backup recovery to the CLI. Treat those as separate preview-first tasks, never as permission
-granted by a planning request.
+claiming that a roster was loaded. If the roster is empty, offer the resource intake workflow.
 
 The snapshot is sanitized, but its resource names and usage facts can still be sensitive and may
 enter the user's configured host/model context. Keep credentials, private notes, revision nonces,
@@ -115,9 +208,10 @@ Before responding, remove only the exact temporary file and exact empty temporar
 cleanup fails, report the retained path. Local cleanup does not erase content already processed or
 retained by the host, model provider, logs, backups, or sync systems.
 
-End every planning response with exactly: `No routed project resources were contacted or run.`
-Then stop. A resource-fit plan is advice, not authorization. Wait for a separate implementation
-instruction before any project work or handoff execution.
+Only after the `route` command succeeds, end the planning response with exactly:
+`No routed project resources were contacted or run.` Then stop. A resource-fit plan is advice, not
+authorization. Wait for a separate implementation instruction before project work or handoff
+execution.
 
 ## Boundaries
 

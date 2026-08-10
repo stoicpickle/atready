@@ -134,7 +134,13 @@ def _next_action(plan: RoutePlan, *, has_gaps: bool) -> str:
     return "Review the assignments. Use --format markdown for scores and full handoff details."
 
 
-def render_summary(plan: RoutePlan, *, goal: str | None = None, width: int = 100) -> str:
+def render_summary(
+    plan: RoutePlan,
+    *,
+    goal: str | None = None,
+    width: int = 100,
+    include_next_action: bool = True,
+) -> str:
     """Render a concise, width-aware human route without audit-only details."""
 
     width = max(width, 20)
@@ -318,13 +324,14 @@ def render_summary(plan: RoutePlan, *, goal: str | None = None, width: int = 100
             )
 
     lines.append("")
-    _append_wrapped(
-        lines,
-        _next_action(plan, has_gaps=bool(gaps)),
-        width=width,
-        initial_indent="Next: ",
-        subsequent_indent="      ",
-    )
+    if include_next_action:
+        _append_wrapped(
+            lines,
+            _next_action(plan, has_gaps=bool(gaps)),
+            width=width,
+            initial_indent="Next: ",
+            subsequent_indent="      ",
+        )
     _append_wrapped(
         lines,
         "AtReady made this plan only.",

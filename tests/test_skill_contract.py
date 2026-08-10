@@ -112,13 +112,14 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert re.search(r"(?m)^\s*atready(?:\s|$)", body) is None
     assert "config path" in body
     assert "inventory validate /absolute/path/to/inventory.yaml" in body
+    assert "init --path /absolute/path/to/inventory.yaml --json" in body
     assert "inventory snapshot /absolute/path/to/inventory.yaml --format json" in body
     assert "project template" in body
     assert "project validate /absolute/path/to/project.yaml" in body
     assert "--inventory /absolute/path/to/inventory.yaml" in body
     assert "--format json" in body
     assert "## Planning workflow" in body
-    assert "at the planning pivot" in normalized_body
+    assert "Use AtReady for one of two explicit jobs" in normalized_body
     assert "natural-language goal, loose plan, or existing brief" in normalized_body
     assert "A formal project file is not a prerequisite" in normalized_body
     assert "smallest useful ordered steps" in normalized_body
@@ -127,9 +128,17 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "explicit request to use AtReady with their saved roster" in body
     assert "authorizes only the bounded, read-only inventory checks" in normalized_body
     assert "planning authorization never authorizes credential access" in normalized_body
-    assert "direct the user to `atready add`" in normalized_body
-    assert "direct roster initialization, addition, replacement, removal" in normalized_body
-    assert "separate preview-first tasks" in normalized_body
+    assert "already-installed Python 3.11 or newer interpreter" in normalized_body
+    assert "## Resource intake workflow" in body
+    assert "before planning when the user asks to add one resource" in normalized_body
+    assert "approved local command execution and filesystem access" in normalized_body
+    assert "schema resource-declaration" in body
+    assert "inventory add" in body
+    assert "--resource-file /absolute/path/to/declaration.yaml --json" in body
+    assert "--expect-revision" in body
+    assert "--expect-plan" in body
+    assert "inventory validate /absolute/path/to/inventory.yaml --strict --json" in body
+    assert "inventory list /absolute/path/to/inventory.yaml --json" in body
     assert "private notes, revision nonces" in normalized_body
     assert "fresh unpredictable temporary directory" in normalized_body
     assert "`0700` directory" in normalized_body
@@ -145,10 +154,12 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "only when explicitly requested" in normalized_body
     assert "A resource-fit plan is advice, not authorization" in normalized_body
     assert "Do not activate for ordinary project planning" in metadata["description"]
-    assert "rough project goal or loose plan" in metadata["description"]
+    assert "Add one user-declared resource" in metadata["description"]
+    assert "add, onboard, register, or save a resource" in metadata["description"]
+    assert "rough project goal" in metadata["description"]
     assert "explicitly invokes AtReady" in metadata["description"]
-    assert len(text.splitlines()) <= 150
-    assert len(text.split()) <= 1_500
+    assert len(text.splitlines()) <= 225
+    assert len(text.split()) <= 1_600
     assert (SKILL / "scripts" / "atready.py").is_file()
     assert (SKILL / "references" / "routing-rules.md").is_file()
     assert (SKILL / "references" / "output-contract.md").is_file()
@@ -164,8 +175,28 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     normalized = " ".join(reference.split())
     folded = normalized.casefold()
 
-    assert "[resource-onboarding.md](references/resource-onboarding.md)" not in body
-    assert "direct the user to `atready add`" in " ".join(body.split())
+    assert "[resource-onboarding.md](references/resource-onboarding.md)" in body
+    body_normalized = " ".join(body.split())
+    assert "one friendly, consolidated intake card" in body_normalized
+    assert "Use only facts the user states" in body_normalized
+    assert "Handle one resource at a time" in body_normalized
+    assert "The add request does not authorize initialization" in body_normalized
+    assert "ask whether to create one empty personal roster" in body_normalized
+    assert "never overwrite it" in body_normalized
+    assert "Keep provider discovery, computer scans, account inspection" in body_normalized
+    assert "credentials, tokens, and private notes outside this workflow" in body_normalized
+    assert "direct the user to run `atready add` in a local terminal" in body_normalized
+    assert "Show the actual CLI preview without changing its fields" in body_normalized
+    assert "After a separate exact-save authorization" in body_normalized
+    assert "create the declaration exclusively as `0600`" in body_normalized
+    assert "owner, type, link count, modes, and absence of a macOS extended ACL" in body_normalized
+    assert "receipt says `applied: true`" in body_normalized
+    assert "has `observed_revision_protection`" in body_normalized
+    assert "same revision" in body_normalized
+    assert "without claiming success or retrying the apply" in body_normalized
+    assert "Return the receipt and validation result" in body_normalized
+    assert "Do not use the planning output contract" in body_normalized
+    assert "Do not append the routing boundary sentence" in body_normalized
     assert "one resource at a time" in folded
     assert "keep additional resources in a names-only queue" in folded
     assert "**Quick Setup**" in reference

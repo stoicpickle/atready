@@ -29,19 +29,27 @@ helps answer:
 
 AtReady turns those answers into an advisory route and inert handoff notes. Nothing is dispatched.
 
-## Try the synthetic demo
+## Install and try AtReady
 
-This example uses bundled fake data and does not touch a personal inventory. After installing
-AtReady, run it from a separate working directory instead of the cloned AtReady source repository.
+You need Python 3.11 or newer and
+[uv](https://docs.astral.sh/uv/getting-started/installation/). Install AtReady directly from its
+public GitHub repository:
 
 ```bash
-atready demo inventory > inventory.yaml
-atready project template > project.yaml
-atready route \
-  --project project.yaml \
-  --inventory inventory.yaml \
-  --allow-demo
+uv tool install git+https://github.com/stoicpickle/atready.git
 ```
+
+If your terminal says `atready` was not found, run `uv tool update-shell`, close and reopen the
+terminal, then try again.
+
+Run the demo:
+
+```bash
+atready demo
+```
+
+The demo uses bundled fake data. It does not read or change your personal resource list, create
+files, use the network, or contact or run any resource.
 
 The result looks like this:
 
@@ -64,44 +72,30 @@ Other resources
 - Not needed for this plan: Synthetic Asset Studio
 - Blocked by a project rule: Synthetic Interactive Debugger
 
-Next: Review the assignments. Use --format markdown for scores and full handoff
-      details.
 AtReady made this plan only.
+
+Ready to try your own roster?
+1. atready init
+2. atready add
+3. atready plan
 No routed project resources were contacted or run.
 ```
 
-## Install the source beta
-
-AtReady currently installs from this repository. You need Python 3.11 or newer and
-[uv](https://docs.astral.sh/uv/getting-started/installation/).
-
-```bash
-git clone https://github.com/stoicpickle/atready.git
-cd atready
-uv tool install .
-atready
-cd ..
-mkdir atready-first-test
-cd atready-first-test
-```
-
-The bare `atready` command opens a short welcome screen with a safe demo path. Run
-`atready --help` to see every command. The final three commands create a sibling working folder so
-demo files and personal project briefs stay outside the source checkout.
-
-## Use your own resources
+## Your next three steps
 
 AtReady keeps your declared resources in a local inventory file. A resource can be an AI coding
 agent, a reviewer, a creative app, a service, a subscription, a person, or anything else that may
 help with a project.
 
-Start an empty inventory:
+### 1. Create your resource list
 
 ```bash
 atready init
 ```
 
-Then use the guided Quick Add flow:
+This creates an empty local list. If you already have one, AtReady leaves it in place.
+
+### 2. Add one resource
 
 ```bash
 atready add
@@ -113,6 +107,18 @@ scan your computer, inspect accounts, contact providers, or run the resource. Qu
 friendly recap, asks before generating the complete no-write preview, then requires a separate
 exact `save <resource-id>` confirmation before writing. Cancelling before that confirmation changes
 nothing.
+
+### 3. Plan a small project
+
+```bash
+atready plan
+```
+
+Describe a goal and one to three steps. AtReady asks only for the details that can change which
+resources fit, shows what it understood, and returns a plan you can accept, change, or ignore. It
+does not write a project file, contact a resource, spend a credit, or run work.
+
+## Reusable and scripted workflows
 
 For scripts or detailed setup, the existing preview/apply command remains available:
 
@@ -146,19 +152,6 @@ If the typed command feels too long, AtReady also accepts one protected YAML or 
 through `--resource-file` or `--resource-stdin`. The
 [resource intake guide](https://github.com/stoicpickle/atready/blob/main/plugins/atready/skills/project-atready/references/resource-onboarding.md)
 explains the same fields in friendlier language.
-
-## Route a real plan
-
-For the shortest path, start the guided planner:
-
-```bash
-atready plan
-```
-
-It asks for a goal, one to three steps, the result and check for each step, the declared
-capabilities and minimum strength each step needs, and the project constraints that can change
-which resources qualify. It shows what it understood before routing. The guided planner does not
-write a project file, contact a resource, spend a credit, or run work.
 
 For a reusable or scripted plan, create a starter project file:
 
@@ -205,13 +198,15 @@ use. “Local-first” does not mean model processing is automatically local.
 
 ## Optional Codex skill
 
-The CLI is the product. This repository also includes an optional Codex skill that can turn a rough
-project idea into the same CLI-grounded resource plan conversationally. The skill does not replace
-the CLI's validation or routing engine, and it directs roster changes back to the CLI.
+The CLI is the product. This repository also includes an optional Codex skill that can add one
+declared resource through a conversational no-write preview and separate save approval, or turn a
+rough project idea into the same CLI-grounded resource plan. The skill does not replace the CLI's
+validation, mutation, or routing engine. It uses the bundled launcher only when Codex has approved
+local execution and file access; otherwise it directs the same task to `atready add` in a terminal.
 
 Codex discovers personal skills under `~/.agents/skills`. After installing AtReady, keep any
-existing destination unchanged by default. The following guarded setup copies the bundled skill
-only when that destination is absent:
+existing destination unchanged by default. On macOS or Linux, this guarded setup copies the
+bundled skill only when that destination is absent:
 
 ```bash
 atready_skill_dest="$HOME/.agents/skills/project-atready"
@@ -221,6 +216,23 @@ else
   mkdir -p "$HOME/.agents/skills"
   cp -R "$(atready skill path)" "$atready_skill_dest"
 fi
+atready skill status
+```
+
+On Windows PowerShell, use the same keep-existing rule, including for an existing Windows link or
+reparse point:
+
+```powershell
+$skillDest = Join-Path $HOME ".agents\skills\project-atready"
+$skillParent = Split-Path -Parent $skillDest
+$existingSkill = Get-Item -LiteralPath $skillDest -Force -ErrorAction SilentlyContinue
+if ($null -ne $existingSkill) {
+  Write-Host "Keeping existing skill: $skillDest"
+} else {
+  New-Item -ItemType Directory -Force -Path $skillParent | Out-Null
+  $skillSource = atready skill path
+  Copy-Item -Recurse -LiteralPath $skillSource -Destination $skillDest
+}
 atready skill status
 ```
 
@@ -240,6 +252,7 @@ publication.
 ```text
 atready                         Show the welcome screen
 atready --help                  List commands
+atready demo                    Run the complete fake example
 atready init                    Create an empty personal inventory
 atready add                     Add one resource through guided setup
 atready plan                    Make a guided resource plan
@@ -271,10 +284,11 @@ The quickest way to help is to complete the
 [first-time test journey](https://github.com/stoicpickle/atready/blob/main/docs/TRY_ATREADY.md), then
 [share first-use feedback](https://github.com/stoicpickle/atready/issues/new?template=first-use-feedback.yml).
 
-If you want to work on the project itself, run these commands from the cloned `atready` source
-checkout:
+If you want to work on the project itself, clone the source and install its development tools:
 
 ```bash
+git clone https://github.com/stoicpickle/atready.git
+cd atready
 uv sync --all-groups
 uv run ruff check .
 uv run ruff format --check .

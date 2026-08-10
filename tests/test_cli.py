@@ -28,7 +28,7 @@ def test_bare_cli_is_a_plain_language_welcome(capsys) -> None:
     assert "Turn a rough plan and your available tools" in captured.out
     assert "Create your roster  atready init" in captured.out
     assert "Add a resource      atready add" in captured.out
-    assert "Try the safe demo   atready demo inventory > inventory.yaml" in captured.out
+    assert "Try the safe demo   atready demo" in captured.out
     assert "never runs a tool, spends a credit, or starts the work" in captured.out
     assert " - " not in captured.out
     assert "\033[" not in captured.out
