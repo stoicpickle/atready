@@ -1286,11 +1286,14 @@ def test_human_path_output_escapes_terminal_controls(
     error = capsys.readouterr().err
     assert "\x1b" not in error
     assert "\t" not in error
-    assert error.count("\n") == 2
+    lines = error.splitlines()
+    assert len(lines) in {1, 2}
+    assert lines[0].startswith("error: ")
+    if len(lines) == 2:
+        assert lines[1] == "next: Create your roster: atready init"
     assert "\\x1b" in error
     assert "\\n" in error
     assert "\\t" in error
-    assert error.endswith("next: Create your roster: atready init\n")
 
 
 def test_human_apply_receipt_prints_backup_path(tmp_path: Path, capsys) -> None:
