@@ -641,7 +641,9 @@ def main_smoke() -> None:
         )
         if _file_tree(installed_skill_root) != _file_tree(canonical_skill_root):
             raise AssertionError("installed wheel skill differs from the canonical plugin skill")
-        skill_body = installed_skill.read_text(encoding="utf-8")
+        skill_contract_text = "\n".join(
+            path.read_text(encoding="utf-8") for path in sorted(installed_skill_root.rglob("*.md"))
+        )
         required_recovery_contract = (
             "inventory backup rollback",
             "inventory backup delete",
@@ -657,9 +659,9 @@ def main_smoke() -> None:
             "Maintenance or recovery:",
             "Do not combine setup and routing merely because both are available",
             "No routed project resources were contacted or run.",
-            "skill invocation authorizes planning only",
+            "Ask for a separate implementation instruction before",
         )
-        normalized_skill_body = " ".join(skill_body.split())
+        normalized_skill_body = " ".join(skill_contract_text.split())
         missing_contract = [
             phrase for phrase in required_recovery_contract if phrase not in normalized_skill_body
         ]
