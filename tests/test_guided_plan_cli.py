@@ -238,7 +238,7 @@ def test_help_is_progressive_and_complete_help_remains_available(capsys) -> None
     assert "plan      Make a resource plan" in beginner
     assert "Advanced command names:" in beginner
     assert "doctor  runtime  config  resource  skill  schema" in beginner
-    assert "demo inventory  Try AtReady with synthetic data" in beginner
+    assert "demo      Run a complete synthetic resource plan" in beginner
 
     headings = {"Get started:", "Manage:", "More:", "Advanced command names:"}
     displayed_commands: set[str] = set()

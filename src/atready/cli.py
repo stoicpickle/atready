@@ -61,7 +61,7 @@ from atready.models import (
     SessionAvailability,
 )
 from atready.paths import create_private_file, resolve_paths
-from atready.project import project_from_path
+from atready.project import project_from_path, project_from_text
 from atready.render import render_markdown, render_summary
 from atready.resource_input import (
     ParsedResourceDeclaration,
@@ -131,7 +131,7 @@ Get started:
   init      Create your local resource roster
   add       Add one resource with guided, preview-first setup
   plan      Make a resource plan through a guided conversation
-  demo inventory  Try AtReady with synthetic data
+  demo      Run a complete synthetic resource plan
 
 Manage:
   inventory Inspect or maintain your roster
@@ -223,7 +223,7 @@ def _welcome_text(*, color: bool, block_art: bool) -> str:
             "GET STARTED",
             "  Create your roster  atready init",
             "  Add a resource      atready add",
-            "  Try the safe demo   atready demo inventory > inventory.yaml",
+            "  Try the safe demo   atready demo",
             "  See every command   atready --help",
         ]
     )
@@ -445,8 +445,16 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
     init_parser.set_defaults(handler=_handle_init)
 
-    demo_parser = commands.add_parser("demo", help="Print explicit synthetic demonstration data")
-    demo_commands = demo_parser.add_subparsers(dest="demo_command", required=True)
+    demo_parser = commands.add_parser(
+        "demo",
+        help="Run a complete synthetic resource plan",
+        description=(
+            "Run the bundled synthetic inventory and project entirely in memory. "
+            "No files are written and no resources are contacted or run."
+        ),
+    )
+    demo_parser.set_defaults(handler=_handle_demo_route)
+    demo_commands = demo_parser.add_subparsers(dest="demo_command")
     demo_inventory_parser = demo_commands.add_parser(
         "inventory", help="Print the bundled synthetic inventory without writing it"
     )
@@ -879,6 +887,7 @@ _HELP_TOPICS = {
     "planning": """PLANNING
 
 For a first plan:
+  0. See the complete flow: atready demo
   1. Create your roster:  atready init
   2. Add a resource:      atready add
   3. Make a plan:         atready plan
@@ -1603,6 +1612,37 @@ def _handle_runtime_contract(args: argparse.Namespace) -> int:
         print("Network accessed: false")
         print("Writes performed: false")
     return 0
+
+
+_NO_EXECUTION_BOUNDARY = "No routed project resources were contacted or run."
+
+
+def _handle_demo_route(args: argparse.Namespace) -> int:
+    del args
+    today = date.today()
+    project = project_from_text(starter_project(today))
+    catalog = InventoryCatalog.from_text(demo_inventory(today), today=project.as_of)
+    plan = route(catalog.inventory, project, allow_demo=True)
+    rendered = render_summary(
+        plan,
+        goal=project.goal,
+        width=80,
+        include_next_action=False,
+    )
+    boundary = _NO_EXECUTION_BOUNDARY + "\n"
+    if not rendered.endswith(boundary):
+        raise RuntimeError("compact route output is missing its execution boundary")
+
+    print(rendered.removesuffix(boundary), end="")
+    print("\nReady to try your own roster?")
+    print("1. atready init")
+    print("2. atready add")
+    print("3. atready plan")
+    print(_NO_EXECUTION_BOUNDARY)
+    has_gap = any(
+        assignment.primary is None or assignment.unresolved_gaps for assignment in plan.assignments
+    )
+    return 3 if has_gap else 0
 
 
 def _handle_demo_inventory(args: argparse.Namespace) -> int:

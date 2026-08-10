@@ -17,11 +17,12 @@ state; it never grants permission.
 | Install or update AtReady | Explicit user-controlled setup | The Codex plugin and Python local runtime are separate, independently versioned artifacts. A reviewed beta helper or documented manual commands may install both only when the user runs them; the plugin itself never installs, upgrades, or repairs the runtime and declares no apps, MCP servers, connectors, or hooks |
 | Read an inventory or preferences file | User-supplied only | The user selects or provides the file; no home-directory search |
 | Read one resource declaration | Explicit guided terminal answers, typed arguments, protected file path, or explicit non-interactive stdin | Guided Quick Add reads bounded answers only from the attached terminal and never asks for credentials or private notes. Structured modes read one versioned, bounded resource envelope; file contents/stdin stay out of AtReady argv, but terminal answers, typed arguments, the file path, and routing-visible preview can be retained elsewhere |
+| Prepare a resource addition in a Codex conversation | Explicit resource-add request | When the current host grants the installed skill local execution and filesystem access, the request authorizes only bounded reads of the selected local inventory, resource schema, and optional built-in profile plus conversational intake and recap. Rendering the exact CLI preview requires approval of that recap. The skill asks only for routing-visible, non-secret facts supplied or confirmed by the user. It does not scan the computer, inspect accounts, contact a provider, read credentials, check billing or quota, or persist the proposal |
 | List or inspect a built-in resource profile | Explicit profile command | Read-only bounded package data containing editable label/unit suggestions, optional provider-specific workflow/question guidance, dated unverified model-routing proposals, and an exact executable probe; profiles are not inventory or provider facts |
 | Locate one profiled local executable | Separate exact-profile discovery approval | Bounded lookup of one profile's canonical executable and small platform-scoped exact alias allowlist, or user-supplied exact-path resolution, does not execute the program; different files under multiple allowed names fail as ambiguous, and the sanitized result writes no inventory and remains an unconfirmed proposal |
 | Inspect that executable's version | Second explicit version-probe approval | Runs the resolved external program with fixed arguments, no shell, and bounded time/output; AtReady writes no inventory and uses no network itself, but the external program's network/write side effects are not evaluated |
-| Create an empty personal inventory | Explicit `init` only | Exclusive create with one OS-CSPRNG revision privacy nonce; never overwrites an existing file or prints the nonce |
-| Add a resource to a personal inventory | Explicit preview, then explicit save/apply | Guided Quick Add requires an attached terminal, a complete recap, preview approval, the existing complete no-write preview, and an exact `save <resource-id>` confirmation. Advanced apply requires the previewed revision and plan token. Both bind operation, canonical physical target and identities, and candidate; create a target-scoped private exact-byte backup; refuse demo inventories; and refuse private notes on an unblinded target |
+| Create an empty personal inventory | Explicit `init` or a separate exact conversational create approval | The resource-add request alone does not authorize initialization. Conversational setup must name the exact path and stop for approval. Creation is exclusive, includes one OS-CSPRNG revision privacy nonce, never overwrites an existing file, and never prints the nonce |
+| Add a resource to a personal inventory | Explicit preview, then separate explicit save/apply approval | Conversational add may prepare and display the same complete no-write preview, but the initial resource-add request does not authorize persistence. Saving requires the user to approve that exact preview in a later message. Guided Quick Add requires an attached terminal, a complete recap, preview approval, and an exact `save <resource-id>` confirmation. Advanced apply requires the previewed revision and plan token. Every path authorizes one preview-bound write, binds operation, canonical physical target and identities, and candidate; creates a target-scoped private exact-byte backup; refuses demo inventories; and refuses private notes on an unblinded target |
 | Replace one resource in a personal inventory | Explicit preview, then explicit apply | Complete same-ID replacement only, never merge or rename; preview shows redacted before/after fields, defaults, and note effect; apply binds the complete candidate and creates an exact-byte safety backup |
 | Remove one resource from a personal inventory | Explicit preview, then explicit apply | One exact resource ID only, never bulk or pattern based; preview shows the redacted resource and note presence; apply creates an exact-byte safety backup before replacement |
 | Set or clear a root inventory annotation | Explicit protected declaration preview for set, value-free preview for clear, then explicit apply | Set accepts protected file/stdin only; both reject no-ops, bind the hidden value or absence to the revision and plan token, print only a value-free effect, and use the shared backup, manifest, lock, and atomic replacement engine |
@@ -71,6 +72,11 @@ context to a hosted model. Granting the host filesystem or network access does
 not expand AtReady's product contract. Users and implementers must not
 infer AtReady authorization from broader host capabilities.
 
+Conversational resource intake is available only when the current Codex host grants the installed
+skill the required local execution and filesystem access. A ChatGPT surface without that local
+capability may help draft the non-sensitive entry, but it cannot claim to have read or changed the
+user's local roster. It must direct the user to the local `atready add` flow to preview and save.
+
 ## Local files
 
 Inventory and preference data should live outside public repositories in a
@@ -98,6 +104,14 @@ redirected/non-interactive input before reading, never performs discovery, and n
 credentials or private notes. Terminal history, recording, scrollback, invoking hosts, and model
 context remain separate disclosure surfaces. The answers are validated through the same resource
 schema as advanced input before a no-write plan is produced.
+
+Conversational add follows the same data and mutation boundary. The skill may collect only the
+routing-visible facts needed by the public resource schema, and may use a built-in profile only as
+editable suggestion copy. Those answers and the sanitized preview can enter the configured
+host/model context. The first request authorizes intake and recap only. The skill must obtain
+explicit approval before rendering the exact CLI preview, stop after displaying it, and obtain a
+later approval before applying it. Declining, changing, or failing to approve performs no inventory
+write.
 
 An explicit resource or inventory-annotation declaration file is read-only input, not
 AtReady-owned storage. AtReady never copies, modifies, deletes, or retains it. On POSIX,

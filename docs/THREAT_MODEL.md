@@ -1,6 +1,6 @@
 # Threat Model
 
-Last reviewed: 2026-08-09
+Last reviewed: 2026-08-10
 
 ## Scope
 
@@ -17,22 +17,34 @@ authorization may run fixed version arguments without a shell; the external prog
 write side effects are not evaluated. All resulting evidence remains an unconfirmed proposal. The
 Codex plugin and Python local runtime are separate artifacts: the plugin delegates only after a
 strict, value-free compatibility handshake proves the required runtime contract and features. It
-never installs or updates the runtime.
+never installs or updates the runtime. On a Codex host with approved local execution and filesystem
+access, an explicit resource-add request may authorize bounded inventory/schema/profile reads and
+conversational intake and recap. Rendering the exact CLI preview requires approval of that recap,
+and a later explicit approval is required before one exact preview-bound inventory write. This does
+not add scanning, provider contact, account inspection, credential access, or network authority.
+If the selected roster is missing, creating one empty roster requires its own exact path approval;
+the resource-add request does not authorize initialization.
 
 ## System boundary
 
 The relevant data flow is:
 
-1. A user creates or selects local inventory and preference data.
+1. A user creates or selects local inventory and preference data. A conversational resource-add
+   flow may create a missing empty roster only after a separate exact path approval.
 2. The user may declare one resource through bounded guided terminal answers, typed arguments, a
-   protected versioned file, or explicit non-interactive stdin.
-3. Before declaration, the user may authorize exact-profile executable location without execution;
+   protected versioned file, explicit non-interactive stdin, or bounded non-sensitive answers in a
+   Codex conversation. The conversational request authorizes only selected local
+   inventory/schema/profile reads, intake, and recap.
+3. After approving the recap and reviewing the complete no-write resource preview, the user may
+   separately approve one exact preview-bound save. Without that approval, no inventory write
+   occurs.
+4. Before declaration, the user may authorize exact-profile executable location without execution;
    after reviewing the resolved path and fixed arguments, they may separately authorize optional
-  version execution. They then confirm or reject any proposal-only evidence.
-4. The user supplies a project request and any project context they choose.
-5. An AI host may load that material into a selected model.
-6. AtReady produces a plan and copy-ready handoffs for human review.
-7. No project-work request or handoff is sent to an inventoried resource or executed by AtReady.
+   version execution. They then confirm or reject any proposal-only evidence.
+5. The user supplies a project request and any project context they choose.
+6. An AI host may load that material into a selected model.
+7. AtReady produces a plan and copy-ready handoffs for human review.
+8. No project-work request or handoff is sent to an inventoried resource or executed by AtReady.
 
 The AI host and model provider are outside the AtReady product boundary.
 They are still part of the user's end-to-end privacy decision because hosted
@@ -73,6 +85,10 @@ to secure or audit that provider.
 
 - Recommendation, authorization, credential access, and execution are separate
   states.
+- A conversational resource-add request authorizes bounded local reads, intake, and recap only.
+  Rendering the exact CLI preview requires approval of the recap. One exact preview-bound write
+  requires a later, separate, explicit save approval enforced by the local runtime rather than
+  inferred from model output.
 - Model output is never a security decision or execution authority.
 - User/imported text is treated as untrusted data even when it resembles an
   instruction.
@@ -113,6 +129,10 @@ to secure or audit that provider.
 | Threat | Impact | v0.1 control |
 | --- | --- | --- |
 | Secret or private project data appears in a plan | Disclosure through a host, copied handoff, log, or public commit | The schema rejects secret-like field names and documentation prohibits secret values, but value scanning is not a guarantee; examples are synthetic; users and hosts must minimize supplied context and review output |
+| A resource-add request is treated as permission to create a roster | Unexpected local file creation | A missing roster requires a separate conversational approval naming the exact path. Initialization uses exclusive create, refuses an existing target, and returns a bounded receipt before intake continues |
+| A conversational add request is treated as permission to preview or save | Unreviewed disclosure or unintended inventory mutation | The request authorizes bounded selected-inventory/schema/profile reads, intake, and recap only. The skill must obtain approval before rendering the complete candidate and stop after it; the runtime accepts a write only after a later explicit approval bound to that exact preview, revision, target, and candidate |
+| Conversational resource intake exposes or invents account facts | Disclosure through host/model retention or misleading routing state | The skill asks only for routing-visible non-secret facts, treats built-in profiles as editable suggestions, and requires user confirmation. It performs no scan, provider contact, credential access, account inspection, or billing/quota check. Sanitized answers and previews may enter the configured host/model context |
+| A host without local execution is mistaken for a successful local save | False persistence claim or missing roster entry | The skill must fail closed when local runtime/filesystem access is unavailable, may provide drafting help only, and directs the user to local `atready add`; it must not claim to have read or changed the local roster |
 | Direct or indirect prompt injection in inventory or project text | Manipulated recommendations or attempted disclosure | External text is data, not authority; generated actions are display-only; the model has no AtReady execution capability |
 | Command injection through a resource field or generated verification step | Local code execution | No generated command is automatically run; helper code must not evaluate fields or invoke a shell with untrusted text |
 | Broad filesystem or environment discovery exposes credentials | Disclosure of local configuration or access state | No PATH printing/enumeration, directory crawl, package-manager query, environment-variable enumeration, MCP inspection, or arbitrary search exists; local discovery may consult the current PATH only to resolve one profile's small ordered set of exact executable names, while exact-path mode avoids PATH lookup |
