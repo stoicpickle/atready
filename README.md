@@ -86,14 +86,20 @@ Start an empty inventory:
 atready init
 ```
 
-See the built-in resource profiles:
+Then use the guided Quick Add flow:
 
 ```bash
-atready resource profiles
-atready resource profile codex
+atready add
 ```
 
-Add one resource by previewing it first:
+AtReady offers editable starter profiles and asks for routing and safety declarations. `Not sure`
+is valid for readiness; whether the resource requires internet needs a yes/no answer. It does not
+scan your computer, inspect accounts, contact providers, or run the resource. Quick Add shows a
+friendly recap, asks before generating the complete no-write preview, then requires a separate
+exact `save <resource-id>` confirmation before writing. Cancelling before that confirmation changes
+nothing.
+
+For scripts or detailed setup, the existing preview/apply command remains available:
 
 ```bash
 today="$(date +%F)"
@@ -115,11 +121,11 @@ atready inventory add \
 ```
 
 Those readiness, cost, data, and date fields are declarations about your setup—not facts AtReady
-silently verifies. The preview shows the complete proposed change, an expected revision, and a plan
-token. Nothing is saved until you repeat the command with `--apply`, the exact revision, and the
-exact plan token. This extra step is intentional: it makes inventory changes visible and
-reversible. On apply, AtReady creates a private exact-byte backup and atomically replaces the
-inventory; it reports any durability uncertainty instead of pretending the write was fully proven.
+silently verifies. The advanced preview shows the complete proposed change, an expected revision,
+and a plan token. Nothing is saved until you repeat the command with `--apply`, the exact revision,
+and the exact plan token. Guided and advanced setup both create a private exact-byte backup and
+atomically replace the inventory; both report durability uncertainty instead of pretending a write
+was fully proven.
 
 If the typed command feels too long, AtReady also accepts one protected YAML or JSON declaration
 through `--resource-file` or `--resource-stdin`. The

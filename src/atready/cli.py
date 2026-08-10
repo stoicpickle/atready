@@ -53,6 +53,7 @@ from atready.models import (
     InteractionMode,
     Inventory,
     InventoryAnnotationDeclaration,
+    InventoryKind,
     QuotaStatus,
     ResourceDeclaration,
     SessionAvailability,
@@ -67,6 +68,7 @@ from atready.resource_input import (
     load_resource_declaration_file,
     load_resource_declaration_stdin,
     parse_resource_mapping,
+    resource_intake_review,
 )
 from atready.routing import route
 from atready.runtime_contract import doctor_payload, runtime_contract_payload
@@ -74,22 +76,35 @@ from atready.templates import demo_inventory, starter_inventory, starter_project
 from atready.yamlio import dumps_yaml
 
 _MAX_CAPACITY_NUMBER_CHARACTERS = 64
+_MAX_GUIDED_INPUT_CHARACTERS = 512
 _RUNTIME_FEATURE_ID = re.compile(r"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$")
 _PLUGIN_VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.!+_-]{0,63}$")
-
-_WORDMARK = (
-    "    _  _____ ____  _____    _    ______   __",
-    "   / \\|_   _|  _ \\| ____|  / \\  |  _ \\ \\ / /",
-    "  / _ \\ | | | |_) |  _|   / _ \\ | | | | \\ V / ",
-    " / ___ \\| | |  _ <| |___ / ___ \\| |_| |  | |  ",
-    "/_/   \\_\\_| |_| \\_\\_____/_/   \\_\\____/   |_|  ",
+_DATA_SENSITIVITY_LADDER: tuple[DataClass, ...] = (
+    DataClass.PUBLIC,
+    DataClass.INTERNAL,
+    DataClass.PRIVATE,
+    DataClass.SENSITIVE,
 )
+if len(_DATA_SENSITIVITY_LADDER) != len(set(_DATA_SENSITIVITY_LADDER)) or set(
+    _DATA_SENSITIVITY_LADDER
+) != set(DataClass):
+    raise RuntimeError("guided data-sensitivity ladder must contain every DataClass exactly once")
+
+_BLOCK_GLYPHS = {
+    "A": (" ▉▉▉▉ ", "▉▉  ▉▉", "▉▉▉▉▉▉", "▉▉  ▉▉", "▉▉  ▉▉"),
+    "T": ("▉▉▉▉▉▉", "  ▉▉  ", "  ▉▉  ", "  ▉▉  ", "  ▉▉  "),
+    "R": ("▉▉▉▉▉ ", "▉▉  ▉▉", "▉▉▉▉▉ ", "▉▉ ▉▉ ", "▉▉  ▉▉"),
+    "E": ("▉▉▉▉▉▉", "▉▉    ", "▉▉▉▉▉ ", "▉▉    ", "▉▉▉▉▉▉"),
+    "D": ("▉▉▉▉▉ ", "▉▉  ▉▉", "▉▉  ▉▉", "▉▉  ▉▉", "▉▉▉▉▉ "),
+    "Y": ("▉▉  ▉▉", " ▉▉ ▉▉", "  ▉▉  ", "  ▉▉  ", "  ▉▉  "),
+}
+_WORDMARK = tuple(" ".join(_BLOCK_GLYPHS[letter][row] for letter in "ATREADY") for row in range(5))
 _TOOLBOX = (
-    "       ________     ",
-    "   ___/  ____  \\___ ",
-    "  |   | |____| |   |",
-    "  |    TOOL KIT    |",
-    "  |________________|",
+    "      ▉▉▉▉▉▉▉▉      ",
+    "     ▉▉      ▉▉     ",
+    "  ▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉  ",
+    "  ▉▉  TOOL KIT  ▉▉  ",
+    "  ▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉  ",
 )
 _GRADIENT_STOPS = ((24, 76, 174), (124, 82, 184), (224, 65, 55))
 
@@ -121,9 +136,30 @@ def _colorize_banner_line(value: str) -> str:
     return "".join(output)
 
 
-def _welcome_text(*, color: bool) -> str:
+def _shadowed_art(lines: tuple[str, ...]) -> tuple[str, ...]:
+    width = max(len(line) for line in lines) + 1
+    canvas = [[" "] * width for _ in range(len(lines) + 1)]
+    for column, character in enumerate(lines[-1]):
+        if character == "▉":
+            canvas[-1][column + 1] = "#"
+    for row, line in enumerate(lines):
+        for column, character in enumerate(line):
+            if character != " ":
+                canvas[row][column] = character
+    return tuple("".join(line).rstrip() for line in canvas)
+
+
+def _welcome_text(*, color: bool, block_art: bool) -> str:
+    if block_art:
+        wordmark_lines = _shadowed_art(_WORDMARK)
+        toolbox_lines = _shadowed_art(_TOOLBOX)
+    else:
+        wordmark_lines = tuple(line.replace("▉", "#") for line in _WORDMARK)
+        toolbox_lines = tuple(line.replace("▉", "#") for line in _TOOLBOX)
+    wordmark_width = max(len(line) for line in wordmark_lines)
     banner = [
-        f"{wordmark}  {toolbox}" for wordmark, toolbox in zip(_WORDMARK, _TOOLBOX, strict=True)
+        f"{wordmark:<{wordmark_width}}  {toolbox}"
+        for wordmark, toolbox in zip(wordmark_lines, toolbox_lines, strict=True)
     ]
     if color:
         banner = [_colorize_banner_line(line) for line in banner]
@@ -137,12 +173,13 @@ def _welcome_text(*, color: bool) -> str:
             "AtReady suggests where each resource fits - and what should stay out.",
             "It never runs a tool, spends a credit, or starts the work.",
             "",
-            "TRY IT WITH SAFE DEMO DATA",
-            "  $ atready demo inventory > inventory.yaml",
-            "  $ atready project template > project.yaml",
-            "  $ atready route --project project.yaml --inventory inventory.yaml --allow-demo",
+            "A resource is a tool, agent, service, app, or person AtReady may consider.",
             "",
-            "Next: atready --help",
+            "GET STARTED",
+            "  Create your roster  atready init",
+            "  Add a resource      atready add",
+            "  Try the safe demo   atready demo inventory > inventory.yaml",
+            "  See every command   atready --help",
         ]
     )
 
@@ -155,7 +192,14 @@ def _handle_welcome(args: argparse.Namespace) -> int:
         and os.environ.get("TERM") != "dumb"
         and sys.stdout.isatty()
     )
-    print(_welcome_text(color=use_color))
+    encoding = getattr(sys.stdout, "encoding", None) or "ascii"
+    try:
+        "▉".encode(encoding)
+    except (LookupError, UnicodeEncodeError):
+        block_art = False
+    else:
+        block_art = True
+    print(_welcome_text(color=use_color, block_art=block_art))
     return 0
 
 
@@ -258,6 +302,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Color mode for the welcome wordmark",
     )
     welcome_parser.set_defaults(handler=_handle_welcome)
+
+    guided_add_parser = commands.add_parser(
+        "add",
+        help="Add one resource with guided, preview-first setup",
+        description=(
+            "Add one resource to your local inventory. AtReady asks for planning facts, shows "
+            "a no-write preview, then asks separately before saving. It does not scan your "
+            "computer, inspect an account, contact the resource, or run it."
+        ),
+    )
+    guided_add_parser.add_argument(
+        "--path", type=Path, help="Inventory path; defaults to user config"
+    )
+    guided_add_parser.add_argument(
+        "--profile", help="Optional exact bundled profile ID or alias to start from"
+    )
+    guided_add_parser.set_defaults(handler=_handle_guided_add)
 
     doctor_parser = commands.add_parser(
         "doctor",
@@ -925,6 +986,289 @@ def _resource_input(args: argparse.Namespace) -> ParsedResourceDeclaration:
     return _resource_from_args(args)
 
 
+class _GuidedAddCancelledError(Exception):
+    """Internal control flow for an intentional pre-commit cancellation."""
+
+
+def _guided_terminal_available() -> bool:
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _guided_read(prompt: str, *, default: str | None = None) -> str:
+    suffix = f" [{default}]" if default is not None else ""
+    sys.stdout.write(f"{prompt}{suffix}: ")
+    sys.stdout.flush()
+    value = sys.stdin.readline(_MAX_GUIDED_INPUT_CHARACTERS + 2)
+    if value == "":
+        raise EOFError
+    if len(value.rstrip("\r\n")) > _MAX_GUIDED_INPUT_CHARACTERS:
+        raise ConfigurationError("guided answer is too long; nothing was saved")
+    value = value.rstrip("\r\n").strip()
+    return default if not value and default is not None else value
+
+
+def _guided_yes_no(prompt: str, *, default: bool | None = None) -> bool:
+    label = "Y/n" if default is True else "y/N" if default is False else "yes/no"
+    while True:
+        answer = _guided_read(f"{prompt} [{label}]").casefold()
+        if not answer and default is not None:
+            return default
+        if answer in {"y", "yes"}:
+            return True
+        if answer in {"n", "no"}:
+            return False
+        print("Please answer yes or no.")
+
+
+def _guided_choice(
+    prompt: str,
+    choices: dict[str, str],
+    *,
+    default: str | None = None,
+) -> str:
+    while True:
+        answer = _guided_read(prompt, default=default).casefold()
+        if answer in choices:
+            return choices[answer]
+        print("Choose one of: " + ", ".join(choices))
+
+
+def _guided_csv(prompt: str, *, default: tuple[str, ...] = ()) -> tuple[str, ...]:
+    while True:
+        shown_default = ", ".join(default) if default else None
+        answer = _guided_read(prompt, default=shown_default)
+        values = tuple(dict.fromkeys(item.strip() for item in answer.split(",") if item.strip()))
+        if values:
+            return values
+        print("Enter at least one comma-separated ID.")
+
+
+def _guided_slug_proposal(name: str) -> str:
+    proposal = re.sub(r"[^a-z0-9._-]+", "-", name.casefold()).strip("-._")
+    return proposal[:64] or "resource"
+
+
+def _guided_strength(capability: str, *, label: str | None = None) -> float:
+    display = f"{label} ({capability})" if label and label != capability else capability
+    choices = {"basic": 0.4, "solid": 0.65, "strong": 0.8, "exceptional": 0.95}
+    while True:
+        answer = _guided_read(
+            f"Strength for {display} [basic/solid/strong/exceptional/0.0-1.0]"
+        ).casefold()
+        if answer in choices:
+            return choices[answer]
+        try:
+            score = float(answer)
+        except ValueError:
+            score = -1.0
+        if math.isfinite(score) and 0.0 <= score <= 1.0:
+            return score
+        print("Use basic, solid, strong, exceptional, or a score from 0.0 to 1.0.")
+
+
+def _guided_profile(query: str | None) -> Any | None:
+    if query is not None:
+        return resource_profile(query)
+    profiles = resource_profiles()
+    print("Starter profiles (editable proposals, not facts about your setup):")
+    for index, profile in enumerate(profiles, start=1):
+        print(f"  {index}. {profile.name} ({profile.id})")
+    print(f"  {len(profiles) + 1}. Something else")
+    choices = {str(index): profile for index, profile in enumerate(profiles, start=1)}
+    while True:
+        answer = _guided_read(f"Choose a resource [1-{len(profiles) + 1}]")
+        if answer == str(len(profiles) + 1):
+            return None
+        if answer in choices:
+            return choices[answer]
+        print("Choose one number from the list.")
+
+
+def _guided_resource_from_profile(profile: Any | None) -> ParsedResourceDeclaration:
+    while True:
+        if profile is None:
+            print("Use short lowercase IDs such as 'coding-agent' and 'code-review'.")
+            name = _guided_read("Resource name")
+            if not name:
+                print("Enter a resource name.")
+                continue
+            resource_id = _guided_read("Stable resource ID", default=_guided_slug_proposal(name))
+            categories = _guided_csv("Category IDs, comma-separated (example: coding-agent)")
+            capability_ids = _guided_csv("Capability IDs, comma-separated (example: code-review)")
+            labels: dict[str, str] = {}
+        else:
+            print(f"Found starter profile: {profile.name}")
+            print("These labels are editable suggestions, not facts about your setup.")
+            name = _guided_read("Name", default=profile.name)
+            resource_id = _guided_read("Stable resource ID", default=profile.id)
+            categories = _guided_csv(
+                "Category IDs, comma-separated",
+                default=tuple(item.id for item in profile.category_suggestions),
+            )
+            capability_ids = _guided_csv(
+                "Capability IDs, comma-separated",
+                default=tuple(item.id for item in profile.capability_suggestions),
+            )
+            labels = {item.id: item.label for item in profile.capability_suggestions}
+        try:
+            parse_resource_mapping(
+                {
+                    "id": resource_id,
+                    "name": name,
+                    "categories": list(categories),
+                    "capabilities": {item: 0.5 for item in capability_ids},
+                }
+            )
+        except ConfigurationError as exc:
+            print(f"Please correct those identity fields: {_terminal_safe(exc)}")
+            continue
+        break
+
+    capabilities = {
+        capability: _guided_strength(capability, label=labels.get(capability))
+        for capability in capability_ids
+    }
+    print(
+        "Workflow choices: codex = Codex can call it here; terminal = terminal command; "
+        "separate = separate app, service, or bot; manual = you operate it manually."
+    )
+    interaction_answer = _guided_choice(
+        "How do you use it? [codex/terminal/separate/manual]",
+        {
+            "terminal": InteractionMode.LOCAL_CLI.value,
+            "codex": InteractionMode.CODEX_CALLABLE.value,
+            "separate": InteractionMode.EXTERNAL_AGENT.value,
+            "manual": InteractionMode.MANUAL.value,
+        },
+        default="manual",
+    )
+    interaction = interaction_answer
+    access_status = _guided_choice(
+        "Usable access? [yes/limited/no/not sure]",
+        {
+            "yes": AccessStatus.ACTIVE.value,
+            "limited": AccessStatus.LIMITED.value,
+            "no": AccessStatus.INACTIVE.value,
+            "not sure": AccessStatus.UNKNOWN.value,
+            "unknown": AccessStatus.UNKNOWN.value,
+        },
+        default="not sure",
+    )
+    current_session = _guided_choice(
+        "Available for this task now? [yes/no/not sure]",
+        {
+            "yes": SessionAvailability.AVAILABLE.value,
+            "no": SessionAvailability.UNAVAILABLE.value,
+            "not sure": SessionAvailability.UNKNOWN.value,
+            "unknown": SessionAvailability.UNKNOWN.value,
+        },
+        default="not sure",
+    )
+    quota = _guided_choice(
+        "Usage room remaining? [plenty/some/none/not sure]",
+        {
+            "plenty": QuotaStatus.AMPLE.value,
+            "some": QuotaStatus.LIMITED.value,
+            "none": QuotaStatus.EXHAUSTED.value,
+            "not sure": QuotaStatus.UNKNOWN.value,
+            "unknown": QuotaStatus.UNKNOWN.value,
+        },
+        default="not sure",
+    )
+    basis = _guided_choice(
+        "How do you know? [observed/judgment/vendor/not sure]",
+        {
+            "observed": ConfidenceBasis.OBSERVED.value,
+            "judgment": ConfidenceBasis.USER_JUDGMENT.value,
+            "vendor": ConfidenceBasis.VENDOR_CLAIM.value,
+            "not sure": ConfidenceBasis.UNKNOWN.value,
+            "unknown": ConfidenceBasis.UNKNOWN.value,
+        },
+        default="judgment",
+    )
+    verified_on: date | None = None
+    if basis != ConfidenceBasis.UNKNOWN.value or access_status in {
+        AccessStatus.ACTIVE.value,
+        AccessStatus.LIMITED.value,
+    }:
+        while True:
+            checked = _guided_read("Last checked [today/YYYY-MM-DD/not sure]", default="today")
+            if checked.casefold() == "today":
+                verified_on = date.today()
+                break
+            if checked.casefold() in {"not sure", "unknown"}:
+                if access_status in {AccessStatus.ACTIVE.value, AccessStatus.LIMITED.value}:
+                    print("Active or limited access needs a real checked date.")
+                    continue
+                basis = ConfidenceBasis.UNKNOWN.value
+                break
+            try:
+                verified_on = _date_value(checked)
+            except argparse.ArgumentTypeError:
+                print("Use today, not sure, or an ISO date such as 2026-08-09.")
+                continue
+            break
+
+    data_ceiling = _guided_choice(
+        "Most sensitive project data allowed [public/internal/private/sensitive]",
+        {item.value: item.value for item in _DATA_SENSITIVITY_LADDER},
+        default=DataClass.PUBLIC.value,
+    )
+    data_values = tuple(item.value for item in _DATA_SENSITIVITY_LADDER)
+    allowed_data = data_values[: data_values.index(data_ceiling) + 1]
+    requires_network = _guided_yes_no("Does using it require internet access?")
+    billing = _guided_choice(
+        "How is it paid for? [free/owned/subscription/usage/not sure]",
+        {
+            "free": BillingModel.FREE.value,
+            "owned": BillingModel.OWNED.value,
+            "subscription": BillingModel.SUBSCRIPTION.value,
+            "usage": BillingModel.USAGE.value,
+            "not sure": BillingModel.UNKNOWN.value,
+            "unknown": BillingModel.UNKNOWN.value,
+        },
+        default="not sure",
+    )
+    cost = _guided_choice(
+        "Relative cost per use [low/medium/high/very high/not sure]",
+        {
+            "low": "0.25",
+            "medium": "0.5",
+            "high": "0.75",
+            "very high": "0.95",
+            "not sure": "",
+        },
+        default="not sure",
+    )
+
+    economics: dict[str, Any] = {
+        "billing": billing,
+        "quota": quota,
+    }
+    if cost:
+        economics["marginal_cost"] = float(cost)
+
+    value: dict[str, Any] = {
+        "id": resource_id,
+        "name": name,
+        "categories": list(categories),
+        "capabilities": capabilities,
+        "access": {
+            "status": access_status,
+            "interaction": interaction,
+            "current_session": current_session,
+        },
+        "economics": economics,
+        "policy": {
+            "allowed_data_classes": list(allowed_data),
+            "approval_required": True,
+            "requires_network": requires_network,
+        },
+        "provenance": {"basis": basis, "last_verified": verified_on},
+    }
+    return parse_resource_mapping(value)
+
+
 def _handle_init(args: argparse.Namespace) -> int:
     path = _inventory_path(args.path)
     create_private_file(path, starter_inventory())
@@ -946,7 +1290,7 @@ def _handle_init(args: argparse.Namespace) -> int:
             "Revision privacy state: nonce-v1-present "
             "(freshly generated; the nonce value is not printed)"
         )
-        print("Add declared resources with 'atready inventory add'; never include credentials.")
+        print("Next: add your first resource with 'atready add'; never include credentials.")
     return 0
 
 
@@ -1353,52 +1697,45 @@ def _handle_inventory_annotation_clear(args: argparse.Namespace) -> int:
     return _handle_inventory_annotation(args, None)
 
 
-def _handle_inventory_add(args: argparse.Namespace) -> int:
-    _require_preview_apply_contract(args, subject="addition")
-    parsed = _resource_input(args)
-    resource = parsed.resource
-    plan = plan_add_resource(
-        _inventory_path(args.path),
-        resource,
-        defaulted_fields=parsed.defaulted_fields,
-    )
-    if not args.apply:
-        result = plan.preview()
-        if args.json:
-            print(json.dumps(result, indent=2, sort_keys=True))
-        else:
-            print("Inventory addition preview (no files changed)")
-            print(f"Target: {_terminal_safe(result['target'])}")
-            print(f"Resource: {result['resource_id']}")
-            print(
-                f"Resource count: {result['resource_count_before']} -> "
-                f"{result['resource_count_after']}"
-            )
-            print(f"Expected revision: {result['expect_revision']}")
-            print(f"Expected plan: {result['expect_plan']}")
-            print("Candidate resource (all persisted routing fields):")
-            print(json.dumps(result["resource"], indent=2, sort_keys=True))
-            if result["private_notes_present"]:
-                print(
-                    "Private notes: present; value omitted and bound to this plan. "
-                    "Review it in the declaration source before approval."
-                )
-            else:
-                print("Private notes: absent; that state is bound to this plan.")
-            if result["defaulted_fields"]:
-                print("Defaulted fields: " + ", ".join(result["defaulted_fields"]))
-            _print_intake_review(result["intake_review"])
-            print("Applying will canonicalize YAML and create a private exact-byte backup.")
-            print(
-                "Rerun with --apply --expect-revision <revision> --expect-plan <plan> "
-                "after reviewing this preview."
-            )
-        return 0
+def _print_inventory_add_preview(result: dict[str, Any], *, guided: bool = False) -> None:
+    print("Inventory addition preview (no files changed)")
+    print(f"Target: {_terminal_safe(result['target'])}")
+    print(f"Resource: {result['resource_id']}")
+    print(f"Resource count: {result['resource_count_before']} -> {result['resource_count_after']}")
+    print(f"Expected revision: {result['expect_revision']}")
+    print(f"Expected plan: {result['expect_plan']}")
+    print("Candidate resource (all persisted routing fields):")
+    print(json.dumps(result["resource"], indent=2, sort_keys=True))
+    if result["private_notes_present"]:
+        print(
+            "Private notes: present; value omitted and bound to this plan. "
+            "Review it in the declaration source before approval."
+        )
+    else:
+        print("Private notes: absent; that state is bound to this plan.")
+    if result["defaulted_fields"]:
+        print("Defaulted fields: " + ", ".join(result["defaulted_fields"]))
+    _print_intake_review(result["intake_review"])
+    print("Applying will canonicalize YAML and create a private exact-byte backup.")
+    if not guided:
+        print(
+            "Rerun with --apply --expect-revision <revision> --expect-plan <plan> "
+            "after reviewing this preview."
+        )
 
+
+def _commit_inventory_add(
+    plan: Any,
+    resource: Any,
+    *,
+    expected_revision: str,
+    expected_plan: str,
+    json_output: bool,
+) -> int:
     receipt = commit_add_resource(
         plan,
-        expected_revision=args.expect_revision,
-        expected_plan=args.expect_plan,
+        expected_revision=expected_revision,
+        expected_plan=expected_plan,
     )
     result = receipt.as_dict()
     result["resource_id"] = resource.id
@@ -1416,7 +1753,7 @@ def _handle_inventory_add(args: argparse.Namespace) -> int:
         or bool(receipt.warnings)
         or (os.name == "posix" and not receipt.directory_synced)
     )
-    if args.json:
+    if json_output:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
         print(f"Added resource {resource.id!r} to {_terminal_safe(receipt.target)}")
@@ -1441,6 +1778,260 @@ def _handle_inventory_add(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
     return 4 if uncertain else 0
+
+
+def _print_guided_recap(parsed: ParsedResourceDeclaration, target: Path) -> None:
+    resource = parsed.resource
+    review = resource_intake_review(resource, parsed.defaulted_fields).as_dict()
+    data_ceiling = max(
+        resource.policy.allowed_data_classes,
+        key=_DATA_SENSITIVITY_LADDER.index,
+    )
+    print("\nREVIEW WHAT ATREADY UNDERSTOOD")
+    print(f"Resource: {_terminal_safe(resource.name)} ({_terminal_safe(resource.id)})")
+    print("Categories: " + ", ".join(_terminal_safe(item) for item in resource.categories))
+    print(
+        "Capabilities: "
+        + ", ".join(
+            f"{_terminal_safe(name)} {score:.2f}" for name, score in resource.capabilities.items()
+        )
+    )
+    print(
+        "Readiness: "
+        f"{resource.access.status.value}; {resource.access.current_session.value}; "
+        f"usage {resource.economics.quota.value}; {resource.access.interaction.value}"
+    )
+    print(
+        "Safety: data up to "
+        f"{data_ceiling.value}; "
+        f"internet {'required' if resource.policy.requires_network else 'not required'}; "
+        "separate approval required"
+    )
+    cost_is_default = "economics.marginal_cost" in parsed.defaulted_fields
+    cost_label = "baseline default" if cost_is_default else "declared"
+    print(
+        f"Cost: {resource.economics.billing.value}; "
+        f"relative cost {resource.economics.marginal_cost:.2f} ({cost_label})"
+    )
+    print(
+        f"Evidence: {resource.provenance.basis.value}; "
+        f"checked {resource.provenance.last_verified or 'unknown'}"
+    )
+    print("Quick defaults: eight comparison ratings at 0.5; manual text handoff; no private note")
+    print(f"Selection facts: {review['selection_fact_status']}")
+    if review["selection_fact_status"] == "requires-verification":
+        labels = {
+            "access.status": "access",
+            "access.current_session": "current availability",
+            "economics.quota": "usage room",
+            "provenance.basis": "evidence basis",
+            "provenance.last_verified": "checked date",
+        }
+        unresolved = ", ".join(
+            labels.get(path, path) for path in review["unverified_selection_facts"]
+        )
+        print(
+            f"AtReady will not normally select this resource until these facts are confirmed: "
+            f"{unresolved}. A project can separately allow unverified resources."
+        )
+    print(f"Inventory: {_terminal_safe(target)}")
+    print("These are your declarations; AtReady did not verify them. No files changed.")
+
+
+def _print_guided_inventory_add_preview(result: dict[str, Any]) -> None:
+    resource = result["resource"]
+    access = resource["access"]
+    economics = resource["economics"]
+    policy = resource["policy"]
+    provenance = resource["provenance"]
+    handoff = resource["handoff"]
+    print("COMPLETE NO-WRITE PREVIEW")
+    print("Target:")
+    print(f"  {_terminal_safe(result['target'])}")
+    print(
+        f"Resource: {_terminal_safe(resource['name'])} "
+        f"({_terminal_safe(resource['id'])}); "
+        f"count {result['resource_count_before']} -> {result['resource_count_after']}"
+    )
+    print("Categories: " + ", ".join(_terminal_safe(item) for item in resource["categories"]))
+    print("Capabilities:")
+    for name, score in resource["capabilities"].items():
+        print(f"  {_terminal_safe(name)}: {score:.2f}")
+    print(f"Access: {access['status']}; {access['current_session']}; {access['interaction']}")
+    capacity = economics.get("capacity")
+    capacity_label = "none" if capacity is None else json.dumps(capacity, sort_keys=True)
+    cost_label = (
+        "baseline default"
+        if "economics.marginal_cost" in result["defaulted_fields"]
+        else "declared"
+    )
+    print(
+        f"Billing: {economics['billing']}; relative cost "
+        f"{economics['marginal_cost']:.2f} ({cost_label})"
+    )
+    print(f"Usage: quota {economics['quota']}; exact capacity {_terminal_safe(capacity_label)}")
+    rating_items = [f"{name} {score:.2f}" for name, score in resource["ratings"].items()]
+    print("Comparison ratings:")
+    for offset in range(0, len(rating_items), 2):
+        print("  " + ", ".join(rating_items[offset : offset + 2]))
+    print(
+        "Allowed data: "
+        + ", ".join(_terminal_safe(item) for item in policy["allowed_data_classes"])
+    )
+    print(f"Internet required: {str(policy['requires_network']).lower()}")
+    print(f"Separate approval required: {str(policy['approval_required']).lower()}")
+    print(
+        "Provenance: "
+        f"{provenance['basis']}; last checked {provenance['last_verified'] or 'unknown'}"
+    )
+    print(
+        f"Handoff: {_terminal_safe(handoff['method'])}; instructions "
+        f"{'present' if handoff.get('instructions') else 'none'}"
+    )
+    print(
+        "Best for: "
+        + (", ".join(_terminal_safe(item) for item in resource["best_for"]) or "none declared")
+    )
+    print(
+        "Avoid for: "
+        + (", ".join(_terminal_safe(item) for item in resource["avoid_for"]) or "none declared")
+    )
+    print("Private notes: absent")
+    print("Defaults used:")
+    scoring_defaults = "comparison ratings"
+    if "economics.marginal_cost" in result["defaulted_fields"]:
+        scoring_defaults += ", relative cost"
+    print(f"  {scoring_defaults}, and handoff shown above")
+    print("  advisory lists empty; exact capacity absent")
+    review = result["intake_review"]
+    print(f"Selection facts: {review['selection_fact_status']}")
+    print("Route eligibility: not evaluated")
+    print("Expected revision:")
+    print(f"  {result['expect_revision']}")
+    print("Expected plan:")
+    print(f"  {result['expect_plan']}")
+    print("On save: private exact-byte backup + atomic inventory replacement.")
+    print("No files changed.")
+
+
+def _handle_guided_add(args: argparse.Namespace) -> int:
+    if not _guided_terminal_available():
+        raise ConfigurationError(
+            "'atready add' is interactive and requires a terminal; "
+            "use 'atready inventory add --help' for non-interactive input"
+        )
+
+    target = _inventory_path(args.path)
+    try:
+        target.lstat()
+    except FileNotFoundError:
+        safe_target = _terminal_safe(target)
+        failure = ConfigurationError(f"personal inventory does not exist: {safe_target}")
+        failure.add_note(f"Create it first with: atready init --path {safe_target}")
+        raise failure from None
+    except OSError:
+        pass
+    current = read_inventory_file(target)
+    if current.inventory.inventory_kind is not InventoryKind.PERSONAL:
+        raise ConfigurationError("demo inventories are read-only; initialize a personal inventory")
+    try:
+        target = current.path.resolve(strict=True)
+    except OSError:
+        raise ConfigurationError("cannot resolve the inventory's canonical path") from None
+
+    commit_started = False
+    try:
+        print("ADD A RESOURCE")
+        print(f"Inventory: {_terminal_safe(target)}")
+        print(
+            "AtReady will use only what you declare. It will not scan apps, inspect accounts, "
+            "contact providers, or run this resource."
+        )
+        print("Do not enter credentials or private notes.")
+        if not _guided_yes_no("Use this inventory?", default=True):
+            raise _GuidedAddCancelledError
+
+        profile = (
+            resource_profile(args.profile) if args.profile is not None else _guided_profile(None)
+        )
+        parsed = _guided_resource_from_profile(profile)
+        print(
+            "\nQuick Add defaults: eight comparison ratings at 0.5, ask before use, "
+            "manual text handoff, no private note."
+        )
+        if not _guided_yes_no("Use these Quick Add defaults?", default=True):
+            print("Use 'atready inventory add --help' for detailed setup. No files changed.")
+            return 0
+
+        _print_guided_recap(parsed, target)
+        if not _guided_yes_no("Preview this addition?", default=False):
+            raise _GuidedAddCancelledError
+
+        plan = plan_add_resource(
+            target,
+            parsed.resource,
+            defaulted_fields=parsed.defaulted_fields,
+        )
+        preview = plan.preview()
+        print()
+        _print_guided_inventory_add_preview(preview)
+        confirmation = _guided_read(
+            f"Type 'save {parsed.resource.id}' to save exactly this preview"
+        )
+        if confirmation != f"save {parsed.resource.id}":
+            raise _GuidedAddCancelledError
+
+        commit_started = True
+        return _commit_inventory_add(
+            plan,
+            parsed.resource,
+            expected_revision=preview["expect_revision"],
+            expected_plan=preview["expect_plan"],
+            json_output=False,
+        )
+    except _GuidedAddCancelledError:
+        print("Cancelled. No files changed.")
+        return 0
+    except EOFError:
+        print("error: guided input ended before saving; no files changed", file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        print(file=sys.stderr)
+        if commit_started:
+            print(
+                "error: interrupted while saving; state may be uncertain. Inspect the inventory "
+                "and backups before retrying.",
+                file=sys.stderr,
+            )
+        else:
+            print("Cancelled. No files changed.", file=sys.stderr)
+        return 130
+
+
+def _handle_inventory_add(args: argparse.Namespace) -> int:
+    _require_preview_apply_contract(args, subject="addition")
+    parsed = _resource_input(args)
+    resource = parsed.resource
+    plan = plan_add_resource(
+        _inventory_path(args.path),
+        resource,
+        defaulted_fields=parsed.defaulted_fields,
+    )
+    if not args.apply:
+        result = plan.preview()
+        if args.json:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            _print_inventory_add_preview(result)
+        return 0
+
+    return _commit_inventory_add(
+        plan,
+        resource,
+        expected_revision=args.expect_revision,
+        expected_plan=args.expect_plan,
+        json_output=args.json,
+    )
 
 
 def _handle_inventory_replace(args: argparse.Namespace) -> int:

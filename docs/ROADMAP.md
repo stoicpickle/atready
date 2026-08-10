@@ -5,9 +5,9 @@ AtReady expands trust only after the preceding local boundary is proven.
 ## v0.1: deterministic local router
 
 - Versioned private inventory and project contracts.
-- Empty personal initialization plus preview-first resource listing, addition, complete same-ID
-  replacement, and exact-ID removal through typed flags or versioned argv-safe declarations where
-  applicable.
+- Empty personal initialization plus TTY-only guided Quick Add, preview-first resource listing,
+  advanced addition, complete same-ID replacement, and exact-ID removal through typed flags or
+  versioned argv-safe declarations where applicable.
 - Init-generated revision privacy nonces that blind exact revision/backup hashes against hidden-note
   guessing while remaining outside normal output and routing state.
 - Target-scoped backup listing/inspection; exact-byte rollback that is preview-first,

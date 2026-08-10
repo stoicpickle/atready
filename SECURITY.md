@@ -71,10 +71,10 @@ release deliberately changes the product boundary:
 4. No secret value is required in an inventory, preference, example, test
    fixture, log, or generated plan.
 5. Generated commands are never passed automatically to a shell or tool.
-6. CLI reads are limited to explicit inventory/project/resource-declaration
-   paths, explicit non-interactive resource stdin, the resolved default inventory
-   path, one explicitly requested profile-allowlisted executable check, and—only for explicit
-   backup commands—the adjacent target-scoped backup
+6. CLI reads are limited to bounded answers entered after explicit TTY-only `atready add`, explicit
+   inventory/project/resource-declaration paths, explicit non-interactive resource stdin, the
+   resolved default inventory path, one explicitly requested profile-allowlisted executable check,
+   and—only for explicit backup commands—the adjacent target-scoped backup
    namespace. The host skill may read only project-relevant files needed for the
    requested plan; it does not crawl unrelated directories, the home directory,
    or environment/MCP configuration.

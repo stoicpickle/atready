@@ -85,6 +85,13 @@ always reports `route_eligibility_evaluated: false`. The review is explanatory o
 additional persisted or authorization-bearing input. Project requirements, capability fit, cost
 limits, and provenance freshness are evaluated only during routing.
 
+TTY-only `atready add` is a guided adapter for the same contract. It collects bounded terminal
+answers, validates proposed identity/category/capability fields before continuing, materializes one
+complete `Resource`, and passes that candidate through the same preview and commit engine. Profile
+labels remain editable proposals. The terminal conversation is not persisted separately, and the
+exact `save <resource-id>` phrase authorizes only the complete preview already displayed in that
+process.
+
 ## Resource profiles and local observations
 
 `atready resource profiles` and `atready resource profile PROFILE_ID` expose the

@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).parents[1]
 SCREENSHOT = ROOT / "docs" / "assets" / "atready-cli.png"
-EXPECTED_SIZE = (1644, 878)
+EXPECTED_SIZE = (1364, 990)
 
 
 def _verify(path: Path) -> subprocess.CompletedProcess[str]:
@@ -34,7 +34,7 @@ def test_committed_cli_screenshot_satisfies_the_image_contract() -> None:
     assert "satisfies the committed image contract" in result.stdout
 
     with Image.open(SCREENSHOT) as image:
-        assert image.size == (1644, 878)
+        assert image.size == EXPECTED_SIZE
         assert image.mode == "RGBA"
 
 

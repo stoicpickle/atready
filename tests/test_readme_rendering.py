@@ -11,6 +11,9 @@ import pytest
 
 ROOT = Path(__file__).parents[1]
 SCRIPT = ROOT / "scripts" / "verify_readme_rendering.py"
+AGENT_GUIDE = ROOT / "AGENTS.md"
+FRONT_PAGE_GUIDE = ROOT / "docs" / "FRONT_PAGE_REVIEW.md"
+PR_TEMPLATE = ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
 
 
 @pytest.fixture(scope="module")
@@ -80,3 +83,24 @@ def test_current_readme_rendering_is_channel_safe() -> None:
 
     assert result.returncode == 0, result.stderr
     assert result.stdout == ""
+
+
+def test_front_page_review_is_a_pre_review_and_pre_commit_gate() -> None:
+    agent_guide = AGENT_GUIDE.read_text(encoding="utf-8")
+    front_page_guide = FRONT_PAGE_GUIDE.read_text(encoding="utf-8")
+    pull_request_template = PR_TEMPLATE.read_text(encoding="utf-8")
+
+    assert "Before any code review or commit" in agent_guide
+    assert "docs/FRONT_PAGE_REVIEW.md" in agent_guide
+    assert "Open the rendered `README.md` as a first-time visitor" in front_page_guide
+    assert "docs/assets/atready-cli.png" in front_page_guide
+    assert "scripts/verify_cli_screenshot.py" in front_page_guide
+    assert "scripts/verify_readme_rendering.py" in front_page_guide
+    assert "I rendered and reviewed the repository front page" in pull_request_template
+
+    for receipt in (
+        "Front page: updated",
+        "Front page: reviewed; no change needed",
+    ):
+        assert receipt in agent_guide
+        assert receipt in front_page_guide

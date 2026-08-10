@@ -10,7 +10,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 SCREENSHOT = ROOT / "docs" / "assets" / "atready-cli.png"
-EXPECTED_SIZE = (1644, 878)
+EXPECTED_SIZE = (1364, 990)
 
 
 def validation_error(path: Path) -> str | None:

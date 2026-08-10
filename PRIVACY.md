@@ -48,9 +48,9 @@ AtReady itself does not upload local files to an AtReady-operated service; no su
 service exists in v0.1. The user's operating system, sync software, backup tools, shell, AI host,
 model provider, or other software may still copy, retain, or process those files independently.
 
-The CLI reads the inventory, project, resource-declaration, and
-inventory-annotation-declaration paths the user names; explicit non-interactive
-resource or inventory-annotation stdin; plus the resolved default inventory path
+The CLI reads bounded answers entered after explicit TTY-only `atready add`; the inventory,
+project, resource-declaration, and inventory-annotation-declaration paths the user names; explicit
+non-interactive resource or inventory-annotation stdin; plus the resolved default inventory path
 when no inventory path is supplied. `resource profiles` and `resource profile` read only the
 bundled offline proposal catalog. An explicit `resource discover` either checks one user-supplied
 absolute executable path or consults the current `PATH` only to locate one profile-allowlisted
@@ -67,9 +67,10 @@ they do not search other directories or target namespaces. Persistent writes
 are limited to `atready init` and explicitly applied resource
 add/replace/remove, root-annotation set/clear, exact-byte rollback, exact-ID
 recovery, and exact-ID backup deletion. `init` is the one direct-write
-exception: it creates only a new inventory and refuses to overwrite an existing
-target. Every other mutation is preview-only unless the caller repeats the
-previewed state/revision and plan token. Structured inventory edits canonicalize
+exception: it creates only a new inventory and refuses to overwrite an existing target. Every
+other mutation is preview-only until a separate approval: advanced commands repeat the previewed
+state/revision and plan token, while guided Quick Add requires the exact `save <resource-id>` phrase
+after displaying the bound complete preview. Structured inventory edits canonicalize
 the YAML; rollback and recovery restore the selected backup's exact bytes,
 including private notes and formatting. Replacement operations preserve active
 bytes in a private, content-addressed, target-scoped backup directory, sync that
@@ -91,19 +92,20 @@ the raw inventory, protected replacement files, and exact-byte backups. Normal C
 value-free protection status; routing snapshots/fingerprints, previews,
 receipts, diagnostics, and object reprs omit the nonce value.
 
-Typed onboarding places resource names, access, cost/quota, policy, ratings,
-and provenance in command-line arguments. Shell history, process observers,
-the invoking host, terminal logs, or endpoint-management software may retain
-those arguments independently of AtReady.
+Guided onboarding reads resource names, access, cost/quota, policy, ratings, and provenance as
+bounded terminal answers; typed onboarding places the same kinds of values in command-line
+arguments. Terminal scrollback/recording, shell history, process observers, the invoking host,
+logs, or endpoint-management software may retain those values independently of AtReady. Guided
+onboarding never asks for credentials or private notes.
 
 Versioned file/stdin declarations keep their **contents** out of AtReady's
 process arguments. That is argv safety, not an end-to-end confidentiality claim.
 An explicit file pathname remains in argv, the source file remains on disk under
 the user's lifecycle and backup/sync controls, and a redirected or piped stdin
-producer remains under shell/host control. AtReady does not copy, modify,
-delete, or retain the declaration source. Stdin is read only after the explicit
-`--resource-stdin` or `--annotation-stdin` flag and interactive terminal input
-is refused.
+producer remains under shell/host control. AtReady does not copy, modify, delete, or retain the
+declaration source. Declaration stdin is read only after the explicit `--resource-stdin` or
+`--annotation-stdin` flag and is refused when interactive; this is separate from the bounded
+terminal-question flow used only by `atready add`.
 
 On POSIX, file declarations must be current-user-owned, singly linked, regular
 `0600` files and are read through a bounded identity-checked descriptor. Windows

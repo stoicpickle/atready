@@ -23,6 +23,10 @@ Codex skill plus an offline inventory CLI.
   is unsigned metadata, never an attestation or publication claim. Follow `docs/RELEASING.md`.
 - Use synthetic fixtures only. Keep real inventories, histories, account metadata, and generated
   private plans out of this repository.
+- Before any code review or commit, complete the front-page sync in
+  `docs/FRONT_PAGE_REVIEW.md`. Render and inspect the README as a first-time visitor, update its
+  copy, commands, claims, or primary screenshot when the change affects them, and record exactly
+  `Front page: updated` or `Front page: reviewed; no change needed` in the handoff or PR.
 
 ## Preserve the trust boundary
 

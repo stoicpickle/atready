@@ -16,12 +16,12 @@ state; it never grants permission.
 | --- | --- | --- |
 | Install or update AtReady | Explicit user-controlled setup | The Codex plugin and Python local runtime are separate, independently versioned artifacts. A reviewed beta helper or documented manual commands may install both only when the user runs them; the plugin itself never installs, upgrades, or repairs the runtime and declares no apps, MCP servers, connectors, or hooks |
 | Read an inventory or preferences file | User-supplied only | The user selects or provides the file; no home-directory search |
-| Read one resource declaration | Explicit file path or explicit non-interactive stdin only | One versioned, bounded resource envelope; file contents/stdin stay out of AtReady argv, but the file path and routing-visible preview can be retained elsewhere |
+| Read one resource declaration | Explicit guided terminal answers, typed arguments, protected file path, or explicit non-interactive stdin | Guided Quick Add reads bounded answers only from the attached terminal and never asks for credentials or private notes. Structured modes read one versioned, bounded resource envelope; file contents/stdin stay out of AtReady argv, but terminal answers, typed arguments, the file path, and routing-visible preview can be retained elsewhere |
 | List or inspect a built-in resource profile | Explicit profile command | Read-only bounded package data containing editable label/unit suggestions, optional provider-specific workflow/question guidance, dated unverified model-routing proposals, and an exact executable probe; profiles are not inventory or provider facts |
 | Locate one profiled local executable | Separate exact-profile discovery approval | Bounded lookup of one profile's canonical executable and small platform-scoped exact alias allowlist, or user-supplied exact-path resolution, does not execute the program; different files under multiple allowed names fail as ambiguous, and the sanitized result writes no inventory and remains an unconfirmed proposal |
 | Inspect that executable's version | Second explicit version-probe approval | Runs the resolved external program with fixed arguments, no shell, and bounded time/output; AtReady writes no inventory and uses no network itself, but the external program's network/write side effects are not evaluated |
 | Create an empty personal inventory | Explicit `init` only | Exclusive create with one OS-CSPRNG revision privacy nonce; never overwrites an existing file or prints the nonce |
-| Add a resource to a personal inventory | Explicit preview, then explicit apply | Apply requires the previewed revision and plan token binding operation, canonical physical target and identities, and candidate; it creates a target-scoped private exact-byte backup, refuses demo inventories, and refuses private notes on an unblinded target |
+| Add a resource to a personal inventory | Explicit preview, then explicit save/apply | Guided Quick Add requires an attached terminal, a complete recap, preview approval, the existing complete no-write preview, and an exact `save <resource-id>` confirmation. Advanced apply requires the previewed revision and plan token. Both bind operation, canonical physical target and identities, and candidate; create a target-scoped private exact-byte backup; refuse demo inventories; and refuse private notes on an unblinded target |
 | Replace one resource in a personal inventory | Explicit preview, then explicit apply | Complete same-ID replacement only, never merge or rename; preview shows redacted before/after fields, defaults, and note effect; apply binds the complete candidate and creates an exact-byte safety backup |
 | Remove one resource from a personal inventory | Explicit preview, then explicit apply | One exact resource ID only, never bulk or pattern based; preview shows the redacted resource and note presence; apply creates an exact-byte safety backup before replacement |
 | Set or clear a root inventory annotation | Explicit protected declaration preview for set, value-free preview for clear, then explicit apply | Set accepts protected file/stdin only; both reject no-ops, bind the hidden value or absence to the revision and plan token, print only a value-free effect, and use the shared backup, manifest, lock, and atomic replacement engine |
@@ -92,6 +92,12 @@ AtReady does not interpret allow versus deny entries. It does not alter
 caller-owned ACLs; inspect their intent and choose a different protected location
 or remove them separately when appropriate. Ancestor-directory ACL policy outside
 the directly validated storage remains the user's responsibility.
+
+Guided Quick Add reads only bounded, user-entered terminal lines after `atready add`; it rejects
+redirected/non-interactive input before reading, never performs discovery, and never asks for
+credentials or private notes. Terminal history, recording, scrollback, invoking hosts, and model
+context remain separate disclosure surfaces. The answers are validated through the same resource
+schema as advanced input before a no-write plan is produced.
 
 An explicit resource or inventory-annotation declaration file is read-only input, not
 AtReady-owned storage. AtReady never copies, modifies, deletes, or retains it. On POSIX,

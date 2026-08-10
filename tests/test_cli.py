@@ -12,10 +12,12 @@ from pathlib import Path
 
 import pytest
 
+import atready.cli as cli
 import atready.inventory_edit as inventory_edit
 from atready.catalog import InventoryCatalog
-from atready.cli import _capacity_number, _date_value, main
-from atready.errors import StorageError
+from atready.cli import _WORDMARK, _capacity_number, _date_value, _welcome_text, main
+from atready.errors import ConfigurationError, StorageError
+from atready.models import DataClass
 from atready.templates import demo_inventory, starter_inventory, starter_project
 
 
@@ -24,11 +26,9 @@ def test_bare_cli_is_a_plain_language_welcome(capsys) -> None:
     captured = capsys.readouterr()
     assert "Plan with what you have at the ready." in captured.out
     assert "Turn a rough plan and your available tools" in captured.out
-    assert "atready project template > project.yaml" in captured.out
-    assert (
-        "atready route --project project.yaml --inventory inventory.yaml --allow-demo"
-        in captured.out
-    )
+    assert "Create your roster  atready init" in captured.out
+    assert "Add a resource      atready add" in captured.out
+    assert "Try the safe demo   atready demo inventory > inventory.yaml" in captured.out
     assert "never runs a tool, spends a credit, or starts the work" in captured.out
     assert "\033[" not in captured.out
     assert captured.err == ""
@@ -46,12 +46,378 @@ def test_welcome_supports_explicit_plain_and_gradient_output(capsys) -> None:
     assert "Plan with what you have at the ready." in colored
 
 
+def test_welcome_keeps_the_toolbox_rows_on_one_fixed_axis() -> None:
+    banner = _welcome_text(color=False, block_art=True).splitlines()[:6]
+    toolbox_axis = max(len(line) for line in _WORDMARK) + 2
+
+    assert banner[0].index("▉", toolbox_axis) == toolbox_axis + 6
+    assert banner[1].index("▉", toolbox_axis) == toolbox_axis + 5
+    assert banner[2].index("▉", toolbox_axis) == toolbox_axis + 2
+    assert banner[3].index("TOOL KIT") == toolbox_axis + 6
+    assert banner[4].index("▉", toolbox_axis) == toolbox_axis + 2
+
+
+class _TTYInput(io.StringIO):
+    def isatty(self) -> bool:
+        return True
+
+
+class _EncodinglessOutput:
+    def __init__(self) -> None:
+        self.parts: list[str] = []
+
+    def write(self, value: str) -> int:
+        self.parts.append(value)
+        return len(value)
+
+    def flush(self) -> None:
+        pass
+
+    def isatty(self) -> bool:
+        return True
+
+
+def test_welcome_uses_ascii_art_when_stdout_has_no_encoding(monkeypatch) -> None:
+    output = _EncodinglessOutput()
+    monkeypatch.setattr(sys, "stdout", output)
+
+    assert main(["welcome", "--color", "auto"]) == 0
+
+    rendered = "".join(output.parts)
+    assert "Plan with what you have at the ready." in rendered
+    assert "▉" not in rendered
+    assert "#" in rendered
+
+
+def _guided_codex_answers(*, save: bool, cost: str = "low") -> str:
+    answers = [
+        "",  # use the displayed inventory
+        "",  # proposed name
+        "",  # proposed stable ID
+        "",  # proposed categories
+        "",  # proposed capabilities
+        "strong",
+        "strong",
+        "strong",
+        "terminal",
+        "yes",
+        "yes",
+        "some",
+        "judgment",
+        "today",
+        "internal",
+        "yes",
+        "subscription",
+        cost,
+        "",  # Quick Add defaults
+        "yes",  # preview authorization
+        "save codex" if save else "cancel",
+    ]
+    return "\n".join(answers) + "\n"
+
+
+def test_guided_add_refuses_non_terminal_input_before_reading(tmp_path: Path, capsys) -> None:
+    target = tmp_path / "inventory.yaml"
+
+    assert main(["add", "--path", str(target), "--profile", "codex"]) == 2
+
+    captured = capsys.readouterr()
+    assert "interactive and requires a terminal" in captured.err
+    assert "atready inventory add --help" in captured.err
+    assert not target.exists()
+
+
+def test_guided_add_missing_inventory_points_to_init(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    target = tmp_path / "inventory.yaml"
+    monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
+
+    assert main(["add", "--path", str(target), "--profile", "codex"]) == 2
+
+    captured = capsys.readouterr()
+    assert "personal inventory does not exist" in captured.err
+    assert f"atready init --path {target}" in captured.err
+    assert not target.exists()
+
+
+def test_guided_add_missing_inventory_escapes_terminal_controls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    target = tmp_path / "missing\x1binventory\nline\tfile.yaml"
+    monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
+
+    assert main(["add", "--path", str(target), "--profile", "codex"]) == 2
+
+    error = capsys.readouterr().err
+    assert "\x1b" not in error
+    assert "\t" not in error
+    assert error.count("\n") == 2
+    assert "\\x1b" in error
+    assert "\\n" in error
+    assert "\\t" in error
+
+
+def test_guided_add_preview_can_be_cancelled_without_writing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    target = tmp_path / "inventory.yaml"
+    assert main(["init", "--path", str(target)]) == 0
+    capsys.readouterr()
+    original = target.read_bytes()
+    monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
+    monkeypatch.setattr(sys, "stdin", _TTYInput(_guided_codex_answers(save=False)))
+
+    assert main(["add", "--path", str(target), "--profile", "codex"]) == 0
+
+    output = capsys.readouterr().out
+    assert "REVIEW WHAT ATREADY UNDERSTOOD" in output
+    assert "COMPLETE NO-WRITE PREVIEW" in output
+    assert "Comparison ratings:" in output
+    assert '"context_switch_cost":' not in output
+    assert "Type 'save codex'" in output
+    assert "Cancelled. No files changed." in output
+    assert target.read_bytes() == original
+    assert not (tmp_path / ".quartermaster-backups").exists()
+
+
+def test_guided_add_saves_the_exact_preview_after_separate_confirmation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    target = tmp_path / "inventory.yaml"
+    assert main(["init", "--path", str(target)]) == 0
+    capsys.readouterr()
+    monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
+    monkeypatch.setattr(sys, "stdin", _TTYInput(_guided_codex_answers(save=True)))
+
+    assert main(["add", "--path", str(target), "--profile", "codex"]) == 0
+
+    output = capsys.readouterr().out
+    assert "Added resource 'codex'" in output
+    assert "Replacement verified: true" in output
+    saved = inventory_edit.read_inventory_file(target).inventory.resources
+    assert len(saved) == 1
+    assert saved[0].id == "codex"
+    assert saved[0].capabilities == {
+        "code-implementation": 0.8,
+        "code-review": 0.8,
+        "repository-analysis": 0.8,
+    }
+    assert saved[0].access.interaction.value == "local-cli"
+    assert saved[0].access.status.value == "active"
+    assert saved[0].access.current_session.value == "available"
+    assert saved[0].economics.billing.value == "subscription"
+    assert saved[0].economics.marginal_cost == 0.25
+    assert saved[0].economics.quota.value == "limited"
+    assert [item.value for item in saved[0].policy.allowed_data_classes] == [
+        "public",
+        "internal",
+    ]
+    assert saved[0].policy.approval_required is True
+    assert saved[0].policy.requires_network is True
+    assert (tmp_path / ".quartermaster-backups").is_dir()
+
+
+def test_guided_add_interruption_after_save_reports_uncertain_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    target = tmp_path / "inventory.yaml"
+    assert main(["init", "--path", str(target)]) == 0
+    capsys.readouterr()
+    real_commit = cli._commit_inventory_add
+
+    def commit_then_interrupt(*args, **kwargs) -> int:
+        assert real_commit(*args, **kwargs) == 0
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
+    monkeypatch.setattr(cli, "_commit_inventory_add", commit_then_interrupt)
+    monkeypatch.setattr(sys, "stdin", _TTYInput(_guided_codex_answers(save=True)))
+
+    assert main(["add", "--path", str(target), "--profile", "codex"]) == 130
+
+    captured = capsys.readouterr()
+    assert "state may be uncertain" in captured.err
+    assert "Inspect the inventory and backups before retrying" in captured.err
+    assert "No files changed" not in captured.err
+    assert inventory_edit.read_inventory_file(target).inventory.resources[0].id == "codex"
+
+
+def test_guided_add_custom_resource_preserves_declared_unknowns_and_can_cancel(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    target = tmp_path / "inventory.yaml"
+    assert main(["init", "--path", str(target)]) == 0
+    capsys.readouterr()
+    original = target.read_bytes()
+    answers = [
+        "",  # use inventory
+        str(len(cli.resource_profiles()) + 1),
+        "Build Farm",
+        "",  # derived build-farm ID
+        "Bad Category",
+        "build",
+        "Build Farm",
+        "",  # derived build-farm ID after local validation retry
+        "compute",
+        "build, testing",
+        "0.7",
+        "exceptional",
+        "separate",
+        "no",
+        "no",
+        "none",
+        "not sure",
+        "sensitive",
+        "no",
+        "owned",
+        "high",
+        "",  # Quick Add defaults
+        "yes",  # preview
+        "cancel",
+    ]
+    monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
+    monkeypatch.setattr(sys, "stdin", _TTYInput("\n".join(answers) + "\n"))
+
+    assert main(["add", "--path", str(target)]) == 0
+
+    output = capsys.readouterr().out
+    assert "Something else" in output
+    assert "Please correct those identity fields" in output
+    assert "Build Farm (build-farm)" in output
+    assert "build 0.70" in output
+    assert "testing 0.95" in output
+    assert "Selection facts: declared-unavailable" in output
+    assert "Cancelled. No files changed." in output
+    assert target.read_bytes() == original
+
+
+def test_guided_recap_explains_unverified_selection_consequence(tmp_path: Path, capsys) -> None:
+    parsed = cli.parse_resource_mapping(
+        {
+            "id": "uncertain-tool",
+            "name": "Uncertain Tool",
+            "categories": ["tool"],
+            "capabilities": {"research": 0.5},
+        }
+    )
+
+    cli._print_guided_recap(parsed, tmp_path / "inventory.yaml")
+
+    output = capsys.readouterr().out
+    assert "Selection facts: requires-verification" in output
+    assert "will not normally select this resource" in output
+    assert "separately allow unverified resources" in output
+
+
+def test_guided_output_escapes_declared_controls_and_uses_explicit_data_ladder(
+    tmp_path: Path, capsys
+) -> None:
+    target = tmp_path / "inventory.yaml"
+    assert main(["init", "--path", str(target)]) == 0
+    capsys.readouterr()
+    parsed = cli.parse_resource_mapping(
+        {
+            "id": "unsafe-tool",
+            "name": "Unsafe Tool",
+            "categories": ["tool"],
+            "capabilities": {"research": 0.5},
+            "policy": {"allowed_data_classes": ["sensitive", "public"]},
+        }
+    )
+
+    cli._print_guided_recap(parsed, Path("inventory\npath.yaml"))
+    plan = cli.plan_add_resource(
+        target,
+        parsed.resource,
+        defaulted_fields=parsed.defaulted_fields,
+    )
+    preview = plan.preview()
+    preview["resource"]["name"] = "Unsafe\x1b[31m\rName"
+    preview["resource"]["best_for"] = ["line\nbreak"]
+    preview["resource"]["avoid_for"] = ["tab\tvalue"]
+    cli._print_guided_inventory_add_preview(preview)
+
+    output = capsys.readouterr().out
+    assert "\x1b" not in output
+    assert "\r" not in output
+    assert "\t" not in output
+    assert "Unsafe\\x1b[31m\\rName" in output
+    assert "line\\nbreak" in output
+    assert "tab\\tvalue" in output
+    assert "Inventory: inventory\\npath.yaml" in output
+    assert "Safety: data up to sensitive" in output
+    assert cli._DATA_SENSITIVITY_LADDER == (
+        DataClass.PUBLIC,
+        DataClass.INTERNAL,
+        DataClass.PRIVATE,
+        DataClass.SENSITIVE,
+    )
+
+
+def test_guided_prompt_helpers_reprompt_and_bound_input(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(sys, "stdin", _TTYInput("maybe\nyes\nwrong\napp\n\na, a, b\nbad\n0.75\n"))
+
+    assert cli._guided_yes_no("Continue?") is True
+    assert cli._guided_choice("Mode", {"app": "manual"}) == "manual"
+    assert cli._guided_csv("IDs") == ("a", "b")
+    assert cli._guided_strength("testing") == 0.75
+    assert "Please answer yes or no." in capsys.readouterr().out
+
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        _TTYInput("x" * (cli._MAX_GUIDED_INPUT_CHARACTERS + 1) + "\n"),
+    )
+    with pytest.raises(ConfigurationError, match="guided answer is too long"):
+        cli._guided_read("Bounded")
+
+    assert cli._guided_slug_proposal("  My New Tool!  ") == "my-new-tool"
+
+
+def test_guided_add_eof_before_preview_is_a_no_write_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    target = tmp_path / "inventory.yaml"
+    assert main(["init", "--path", str(target)]) == 0
+    capsys.readouterr()
+    original = target.read_bytes()
+    monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
+    monkeypatch.setattr(sys, "stdin", _TTYInput(""))
+
+    assert main(["add", "--path", str(target), "--profile", "codex"]) == 2
+
+    assert "guided input ended before saving" in capsys.readouterr().err
+    assert target.read_bytes() == original
+
+
+def test_guided_add_unknown_cost_remains_a_defaulted_baseline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    target = tmp_path / "inventory.yaml"
+    assert main(["init", "--path", str(target)]) == 0
+    capsys.readouterr()
+    monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        _TTYInput(_guided_codex_answers(save=False, cost="not sure")),
+    )
+
+    assert main(["add", "--path", str(target), "--profile", "codex"]) == 0
+
+    output = capsys.readouterr().out
+    assert "relative cost 0.50 (baseline default)" in output
+    assert "comparison ratings, relative cost, and handoff shown above" in output
+
+
 def test_help_describes_the_beginner_facing_job(capsys) -> None:
     with pytest.raises(SystemExit) as result:
         main(["--help"])
     assert result.value.code == 0
     output = capsys.readouterr().out
     assert "Plan a project around the tools and resources you already have." in output
+    assert "Add one resource with guided, preview-first setup" in output
     assert "welcome" in output
 
 
