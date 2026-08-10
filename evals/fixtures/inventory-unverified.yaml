@@ -1,0 +1,19 @@
+schema_version: 1
+inventory_kind: demo
+preferences:
+  maximum_supporting_resources: 1
+  stale_after_days: 90
+  allow_purchase_suggestions: false
+resources:
+  - id: unconfirmed-researcher
+    name: Synthetic Unconfirmed Researcher
+    categories: [research-agent]
+    capabilities: {research: 0.90}
+    access: {status: unknown, interaction: manual, current_session: unknown}
+    economics: {billing: unknown, marginal_cost: 0.50, quota: unknown}
+    ratings: {quality: 0.80, speed: 0.70, confidence: 0.50}
+    policy:
+      allowed_data_classes: [public]
+      approval_required: true
+      requires_network: false
+    provenance: {basis: unknown}

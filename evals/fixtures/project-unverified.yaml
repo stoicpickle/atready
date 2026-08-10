@@ -1,0 +1,27 @@
+schema_version: 1
+id: synthetic-unverified-research
+name: Synthetic Unverified Research
+goal: Keep an unconfirmed research resource out of the plan and explain the resulting gap.
+as_of: 2026-08-10
+constraints:
+  data_class: public
+  max_marginal_cost: 1.0
+  allowed_interactions: [manual]
+  network_allowed: false
+  allow_unverified: false
+  forbidden_resources: []
+workstreams:
+  - id: research
+    name: Evidence research
+    objective: Research a synthetic product question.
+    required_capabilities: [{id: research, importance: 1.0, minimum: 0.70}]
+    inputs: [Synthetic research brief]
+    allowed_scope: [Synthetic public information]
+    exclusions: [Provider contact, execution]
+    deliverable: A synthetic research brief.
+    acceptance_criteria: [Every claim is traceable to synthetic evidence]
+    verification: [Inspect the returned route]
+    stop_conditions: [No confirmed eligible resource exists]
+    next_owner: Human reviewer
+    support: {allowed: false, capability_gaps: [], minimum_gain: 0.08}
+    alternate_required: false

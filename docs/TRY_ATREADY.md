@@ -58,35 +58,22 @@ If `atready init` says an inventory already exists, keep it and continue with `a
 
 ## 4. Route one small project
 
-Create a starter brief:
+Start the guided planner:
 
 ```bash
-atready project template > my-project.yaml
-atready inventory list --json
+atready plan
 ```
 
-The second command lists the saved resource and its capability IDs without showing private notes.
-Open `my-project.yaml` in your usual text editor and make these edits:
-
-1. Replace the synthetic project `name`, `goal`, workstream `name`, `objective`, `deliverable`, and
-   checks with a small plan of your own.
-2. Under `required_capabilities`, keep one capability `id` displayed by
-   `atready inventory list --json`. Set its `minimum` no higher than the score you approved for that
-   capability in the save preview.
-3. Make the project constraints agree with what you declared for the resource: allow its
-   exact interaction value in `allowed_interactions`; set `network_allowed: true` if it needs the
-   internet and `false` if it does not; keep `max_marginal_cost` at or above its declared marginal
-   cost; and set `allow_unverified: true` only if you want the route to consider declarations that
-   are not currently verified.
-
-Then run:
-
-```bash
-atready route --project my-project.yaml
-```
+Use a real but non-sensitive goal. Choose one to three steps, state the expected result and check,
+and select only capabilities you recognize from the roster shown by AtReady. Confirm the minimum
+strength and eligibility controls before asking it to route. The planner does not infer
+capabilities from your prose and does not write a project file.
 
 A useful result should make the assignment, reasoning, deliverable, check, and any gap easy to
 understand. It is advice, not an executed workflow: edit it, ignore it, or use it in your plan.
+
+If you prefer an editable project file, run `atready help planning` after this test. It shows the
+advanced `project template` and `route --project` workflow.
 
 ## 5. Tell us how it went
 

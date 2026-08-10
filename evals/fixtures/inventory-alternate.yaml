@@ -1,0 +1,23 @@
+schema_version: 1
+inventory_kind: demo
+preferences:
+  maximum_supporting_resources: 1
+  stale_after_days: 90
+  allow_purchase_suggestions: false
+resources:
+  - id: verifier-a
+    name: Synthetic Verifier A
+    categories: [review-agent]
+    capabilities: {verification: 0.90}
+    access: {status: active, interaction: local-cli, current_session: available}
+    economics: {billing: free, marginal_cost: 0.10, quota: ample}
+    policy: {allowed_data_classes: [public], approval_required: true, requires_network: false}
+    provenance: {basis: observed, last_verified: 2026-08-10}
+  - id: verifier-b
+    name: Synthetic Verifier B
+    categories: [review-agent]
+    capabilities: {verification: 0.80}
+    access: {status: active, interaction: local-cli, current_session: available}
+    economics: {billing: free, marginal_cost: 0.10, quota: ample}
+    policy: {allowed_data_classes: [public], approval_required: true, requires_network: false}
+    provenance: {basis: observed, last_verified: 2026-08-10}

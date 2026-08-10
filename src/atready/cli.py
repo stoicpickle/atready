@@ -13,6 +13,7 @@ from datetime import date
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
+from unicodedata import category as unicode_category
 
 from atready import __version__
 from atready.catalog import InventoryCatalog
@@ -54,6 +55,7 @@ from atready.models import (
     Inventory,
     InventoryAnnotationDeclaration,
     InventoryKind,
+    ProjectBrief,
     QuotaStatus,
     ResourceDeclaration,
     SessionAvailability,
@@ -85,6 +87,12 @@ _DATA_SENSITIVITY_LADDER: tuple[DataClass, ...] = (
     DataClass.PRIVATE,
     DataClass.SENSITIVE,
 )
+_GUIDED_STRENGTHS = {
+    "basic": 0.40,
+    "solid": 0.65,
+    "strong": 0.80,
+    "exceptional": 0.95,
+}
 if len(_DATA_SENSITIVITY_LADDER) != len(set(_DATA_SENSITIVITY_LADDER)) or set(
     _DATA_SENSITIVITY_LADDER
 ) != set(DataClass):
@@ -107,6 +115,43 @@ _TOOLBOX = (
     "  ▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉  ",
 )
 _GRADIENT_STOPS = ((24, 76, 174), (124, 82, 184), (224, 65, 55))
+
+
+class _AtReadyArgumentParser(argparse.ArgumentParser):
+    """Keep first-contact help short while retaining normal nested help."""
+
+    def format_help(self) -> str:
+        if self.prog != "atready":
+            return super().format_help()
+        return """usage: atready [--version] <command> ...
+
+Plan a project around the tools and resources you already have.
+
+Get started:
+  init      Create your local resource roster
+  add       Add one resource with guided, preview-first setup
+  plan      Make a resource plan through a guided conversation
+  demo inventory  Try AtReady with synthetic data
+
+Manage:
+  inventory Inspect or maintain your roster
+  project   Create or validate a project brief
+  route     Route an existing project brief
+
+More:
+  welcome              Show the AtReady welcome screen
+  help planning        Learn the beginner planning workflow
+  help resources       Learn the resource workflow
+  help automation      Learn the scriptable workflow
+  help --all           See every top-level command
+
+Advanced command names:
+  doctor  runtime  config  resource  skill  schema
+
+options:
+  -h, --help  show this help message and exit
+  --version   show the installed version and exit
+"""
 
 
 def _gradient_rgb(position: int, maximum: int) -> tuple[int, int, int]:
@@ -286,7 +331,7 @@ def _configure_annotation_mutation_parser(parser: argparse.ArgumentParser) -> No
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = _AtReadyArgumentParser(
         prog="atready",
         description="Plan a project around the tools and resources you already have.",
     )
@@ -319,6 +364,34 @@ def build_parser() -> argparse.ArgumentParser:
         "--profile", help="Optional exact bundled profile ID or alias to start from"
     )
     guided_add_parser.set_defaults(handler=_handle_guided_add)
+
+    guided_plan_parser = commands.add_parser(
+        "plan",
+        help="Make a resource plan through a guided conversation",
+        description=(
+            "Turn a goal and one to three steps into a temporary, read-only resource plan. "
+            "AtReady uses only capabilities you choose from your declared roster. It does not "
+            "write a project file, contact a resource, or run any work."
+        ),
+    )
+    guided_plan_parser.add_argument(
+        "--inventory", type=Path, help="Inventory path; defaults to user config"
+    )
+    guided_plan_parser.add_argument(
+        "--format",
+        choices=("summary", "markdown"),
+        default="summary",
+        help="summary is concise; markdown includes scores and complete inert handoffs",
+    )
+    guided_plan_parser.add_argument(
+        "--width",
+        type=_summary_width,
+        help="Wrap the summary to 40-120 columns (default: 80)",
+    )
+    guided_plan_parser.add_argument(
+        "--allow-demo", action="store_true", help="Explicitly permit synthetic demo resources"
+    )
+    guided_plan_parser.set_defaults(handler=_handle_guided_plan)
 
     doctor_parser = commands.add_parser(
         "doctor",
@@ -729,6 +802,10 @@ def build_parser() -> argparse.ArgumentParser:
         "path", help="Print the distributable project-atready skill path"
     )
     skill_path_parser.set_defaults(handler=_handle_skill_path)
+    skill_status_parser = skill_commands.add_parser(
+        "status", help="Check whether Codex can discover the bundled skill"
+    )
+    skill_status_parser.set_defaults(handler=_handle_skill_status)
 
     schema_parser = commands.add_parser("schema", help="Print a JSON Schema")
     schema_parser.add_argument(
@@ -742,6 +819,13 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     schema_parser.set_defaults(handler=_handle_schema)
+
+    help_parser = commands.add_parser(
+        "help", help="Show getting-started, topic, or complete command help"
+    )
+    help_parser.add_argument("topic", nargs="?", help="Topic or top-level command")
+    help_parser.add_argument("--all", action="store_true", help="Show every top-level command")
+    help_parser.set_defaults(handler=_handle_help, root_parser=parser)
     return parser
 
 
@@ -789,6 +873,80 @@ def _capacity_number(value: str) -> int | float:
 
 def _inventory_path(candidate: Path | None) -> Path:
     return candidate.expanduser() if candidate else resolve_paths().inventory_path
+
+
+_HELP_TOPICS = {
+    "planning": """PLANNING
+
+For a first plan:
+  1. Create your roster:  atready init
+  2. Add a resource:      atready add
+  3. Make a plan:         atready plan
+
+The guided planner asks for a goal, one to three steps, each expected result and
+check, and the declared capability strength each step needs. It creates no
+project file and runs no resource.
+
+For a reusable or scripted project brief:
+  atready project template > project.yaml
+  atready route --project project.yaml
+""",
+    "resources": """RESOURCES
+
+Add one resource interactively:
+  atready add
+
+Inspect the roster:
+  atready inventory list
+
+For structured, non-interactive changes:
+  atready inventory add --help
+  atready inventory replace --help
+  atready inventory remove --help
+
+AtReady uses only facts you declare. It does not scan apps, inspect accounts,
+contact providers, or run resources.
+""",
+    "automation": """AUTOMATION
+
+Use the stable file-based commands for scripts:
+  atready inventory validate --json
+  atready project validate project.yaml --json
+  atready route --project project.yaml --format json
+
+Interactive commands such as 'atready add' and 'atready plan' require a real
+terminal. JSON output stays on standard output; errors use standard error.
+""",
+}
+
+
+def _command_parsers(parser: argparse.ArgumentParser) -> dict[str, argparse.ArgumentParser]:
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            return dict(action.choices)
+    return {}
+
+
+def _handle_help(args: argparse.Namespace) -> int:
+    root: argparse.ArgumentParser = args.root_parser
+    if args.all:
+        if args.topic is not None:
+            raise ConfigurationError("choose either a help topic or --all")
+        print(argparse.ArgumentParser.format_help(root), end="")
+        return 0
+    if args.topic is None:
+        print(root.format_help(), end="")
+        return 0
+    topic = args.topic.casefold()
+    if topic in _HELP_TOPICS:
+        print(_HELP_TOPICS[topic], end="")
+        return 0
+    command_parser = _command_parsers(root).get(topic)
+    if command_parser is None:
+        available = ", ".join((*sorted(_HELP_TOPICS), *sorted(_command_parsers(root))))
+        raise ConfigurationError(f"unknown help topic; choose one of: {available}")
+    print(command_parser.format_help(), end="")
+    return 0
 
 
 def _terminal_safe(value: object) -> str:
@@ -1010,6 +1168,10 @@ class _GuidedAddCancelledError(Exception):
     """Internal control flow for an intentional pre-commit cancellation."""
 
 
+class _GuidedPlanCancelledError(Exception):
+    """Internal control flow for an intentional guided-plan cancellation."""
+
+
 def _guided_terminal_available() -> bool:
     return sys.stdin.isatty() and sys.stdout.isatty()
 
@@ -1063,6 +1225,87 @@ def _guided_csv(prompt: str, *, default: tuple[str, ...] = ()) -> tuple[str, ...
         print("Enter at least one comma-separated ID.")
 
 
+def _guided_plan_read(prompt: str, *, default: str | None = None) -> str:
+    while True:
+        value = _guided_read(prompt, default=default)
+        if value.casefold() in {"cancel", "exit", "quit"}:
+            raise _GuidedPlanCancelledError
+        if any(unicode_category(character) in {"Cc", "Cf"} for character in value):
+            print("Remove control or zero-width characters, or type cancel.")
+            continue
+        return value
+
+
+def _guided_plan_yes_no(prompt: str, *, default: bool | None = None) -> bool:
+    label = "Y/n" if default is True else "y/N" if default is False else "yes/no"
+    while True:
+        answer = _guided_plan_read(f"{prompt} [{label}]").casefold()
+        if not answer and default is not None:
+            return default
+        if answer in {"y", "yes"}:
+            return True
+        if answer in {"n", "no"}:
+            return False
+        print("Please answer yes or no, or type cancel.")
+
+
+def _guided_plan_choice(
+    prompt: str,
+    choices: dict[str, Any],
+    *,
+    default: str | None = None,
+) -> Any:
+    while True:
+        answer = _guided_plan_read(prompt, default=default).casefold()
+        if answer in choices:
+            return choices[answer]
+        print("Choose one of: " + ", ".join(choices))
+
+
+def _guided_plan_numbered_selection(
+    prompt: str,
+    values: Sequence[str],
+    *,
+    allow_none: bool = False,
+) -> tuple[str, ...]:
+    while True:
+        answer = _guided_plan_read(prompt).casefold()
+        if allow_none and answer in {"", "none"}:
+            return ()
+        if answer == "all":
+            return tuple(values)
+        raw_choices = tuple(item.strip() for item in answer.split(",") if item.strip())
+        try:
+            indexes = tuple(dict.fromkeys(int(item) for item in raw_choices))
+        except ValueError:
+            indexes = ()
+        if indexes and all(1 <= index <= len(values) for index in indexes):
+            return tuple(values[index - 1] for index in indexes)
+        options = f"1-{len(values)}"
+        suffix = ", all, or none" if allow_none else ", or all"
+        print(f"Choose comma-separated numbers from {options}{suffix}.")
+
+
+def _guided_plan_interactions() -> list[str]:
+    labels = {
+        "codex": InteractionMode.CODEX_CALLABLE.value,
+        "terminal": InteractionMode.LOCAL_CLI.value,
+        "separate": InteractionMode.EXTERNAL_AGENT.value,
+        "manual": InteractionMode.MANUAL.value,
+    }
+    while True:
+        answer = _guided_plan_read(
+            "Allowed workflows, comma-separated [all/codex/terminal/separate/manual]",
+            default="all",
+        ).casefold()
+        if answer == "all":
+            return [item.value for item in InteractionMode]
+        selected = tuple(dict.fromkeys(item.strip() for item in answer.split(",") if item.strip()))
+        if selected and all(item in labels for item in selected):
+            return [labels[item] for item in selected]
+        print("Choose all or a comma-separated list of codex, terminal, separate, and manual.")
+
+
 def _guided_slug_proposal(name: str) -> str:
     proposal = re.sub(r"[^a-z0-9._-]+", "-", name.casefold()).strip("-._")
     return proposal[:64] or "resource"
@@ -1070,13 +1313,12 @@ def _guided_slug_proposal(name: str) -> str:
 
 def _guided_strength(capability: str, *, label: str | None = None) -> float:
     display = f"{label} ({capability})" if label and label != capability else capability
-    choices = {"basic": 0.4, "solid": 0.65, "strong": 0.8, "exceptional": 0.95}
     while True:
         answer = _guided_read(
             f"Strength for {display} [basic/solid/strong/exceptional/0.0-1.0]"
         ).casefold()
-        if answer in choices:
-            return choices[answer]
+        if answer in _GUIDED_STRENGTHS:
+            return _GUIDED_STRENGTHS[answer]
         try:
             score = float(answer)
         except ValueError:
@@ -2028,6 +2270,240 @@ def _handle_guided_add(args: argparse.Namespace) -> int:
         return 130
 
 
+def _guided_project_capabilities(inventory: Inventory) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            {capability for resource in inventory.resources for capability in resource.capabilities}
+        )
+    )
+
+
+def _print_guided_plan_capabilities(inventory: Inventory, capabilities: Sequence[str]) -> None:
+    print("Declared capabilities:")
+    for index, capability in enumerate(capabilities, start=1):
+        resource_names = sorted(
+            resource.name for resource in inventory.resources if capability in resource.capabilities
+        )
+        names = ", ".join(_terminal_safe(name) for name in resource_names)
+        print(f"  {index}. {capability} ({names})")
+
+
+def _guided_project_from_inventory(inventory: Inventory) -> ProjectBrief:
+    capabilities = _guided_project_capabilities(inventory)
+    if not capabilities:
+        raise ConfigurationError("the inventory has no declared capabilities")
+
+    goal = ""
+    while not goal:
+        goal = _guided_plan_read("What are you trying to accomplish?")
+        if not goal:
+            print("Enter a project goal, or type cancel.")
+
+    step_count = _guided_plan_choice(
+        "How many steps should AtReady route? [1/2/3]",
+        {"1": 1, "2": 2, "3": 3},
+        default="1",
+    )
+    _print_guided_plan_capabilities(inventory, capabilities)
+    workstreams: list[dict[str, Any]] = []
+    for index in range(1, step_count + 1):
+        step = ""
+        while not step:
+            step = _guided_plan_read(f"Step {index}")
+            if not step:
+                print("Enter a step, or type cancel.")
+        selected = _guided_plan_numbered_selection(
+            f"Capability numbers needed for step {index}",
+            capabilities,
+        )
+        minimum = _guided_plan_choice(
+            "Minimum capability strength [basic/solid/strong/exceptional]",
+            _GUIDED_STRENGTHS,
+            default="basic",
+        )
+        expected_result = ""
+        while not expected_result:
+            expected_result = _guided_plan_read(f"Expected result for step {index}")
+            if not expected_result:
+                print("Enter the result this step should produce, or type cancel.")
+        verification = ""
+        while not verification:
+            verification = _guided_plan_read(f"How will you check step {index}?")
+            if not verification:
+                print("Enter one way to check the result, or type cancel.")
+        workstreams.append(
+            {
+                "id": f"step-{index}",
+                "name": step[:120],
+                "objective": step,
+                "required_capabilities": [
+                    {"id": capability, "importance": 1.0, "minimum": minimum}
+                    for capability in selected
+                ],
+                "inputs": ["The user-provided project goal"],
+                "allowed_scope": [step],
+                "exclusions": ["Anything outside this step"],
+                "deliverable": expected_result,
+                "acceptance_criteria": [expected_result],
+                "verification": [verification],
+                "stop_conditions": [
+                    "Stop before using any resource without separate authorization"
+                ],
+                "next_owner": "User",
+            }
+        )
+
+    print("\nEligibility controls decide which declared resources may be considered.")
+    use_defaults = _guided_plan_yes_no(
+        "Use standard eligibility? Public data, internet allowed, any workflow and cost, "
+        "verified facts only",
+        default=True,
+    )
+    constraints: dict[str, Any] = {}
+    if not use_defaults:
+        constraints["data_class"] = _guided_plan_choice(
+            "Project data sensitivity [public/internal/private/sensitive]",
+            {item.value: item.value for item in DataClass},
+            default=DataClass.PUBLIC.value,
+        )
+        constraints["network_allowed"] = _guided_plan_yes_no(
+            "May resources that require internet be considered?", default=True
+        )
+        constraints["allow_unverified"] = _guided_plan_yes_no(
+            "May resources with unverified eligibility facts be considered?", default=False
+        )
+        constraints["max_marginal_cost"] = _guided_plan_choice(
+            "Maximum relative cost per use [low/medium/high/any]",
+            {"low": 0.25, "medium": 0.5, "high": 0.75, "any": 1.0},
+            default="any",
+        )
+        constraints["allowed_interactions"] = _guided_plan_interactions()
+        print("Resources that can be excluded:")
+        resource_ids = tuple(resource.id for resource in inventory.resources)
+        for index, resource in enumerate(inventory.resources, start=1):
+            print(f"  {index}. {_terminal_safe(resource.name)} ({resource.id})")
+        constraints["forbidden_resources"] = list(
+            _guided_plan_numbered_selection(
+                "Resource numbers to exclude [none]",
+                resource_ids,
+                allow_none=True,
+            )
+        )
+
+    return ProjectBrief.model_validate(
+        {
+            "schema_version": 1,
+            "id": "guided-plan",
+            "name": "Guided AtReady plan",
+            "goal": goal,
+            "as_of": date.today(),
+            "constraints": constraints,
+            "workstreams": workstreams,
+        }
+    )
+
+
+def _print_guided_plan_recap(project: ProjectBrief) -> None:
+    constraints = project.constraints
+    print("\nREVIEW WHAT ATREADY UNDERSTOOD")
+    print(f"Goal: {_terminal_safe(project.goal)}")
+    strength_scale = ", ".join(f"{label} {value:.2f}" for label, value in _GUIDED_STRENGTHS.items())
+    print(f"Strength scale: {strength_scale}")
+    for index, workstream in enumerate(project.workstreams, start=1):
+        minimum_labels = {value: label for label, value in _GUIDED_STRENGTHS.items()}
+        capabilities = ", ".join(
+            f"{item.id} (minimum {minimum_labels.get(item.minimum, 'custom')}: {item.minimum:.2f})"
+            for item in workstream.required_capabilities
+        )
+        print(f"Step {index}: {_terminal_safe(workstream.objective)}")
+        print(f"  Needs: {capabilities}")
+        print(f"  Expected result: {_terminal_safe(workstream.deliverable)}")
+        print(f"  Check: {_terminal_safe(workstream.verification[0])}")
+    interaction_labels = {
+        InteractionMode.CODEX_CALLABLE: "Codex",
+        InteractionMode.LOCAL_CLI: "terminal",
+        InteractionMode.EXTERNAL_AGENT: "separate app or agent",
+        InteractionMode.MANUAL: "manual",
+    }
+    interactions = ", ".join(interaction_labels[item] for item in constraints.allowed_interactions)
+    cost_labels = {0.25: "low", 0.5: "medium", 0.75: "high", 1.0: "any declared cost"}
+    maximum_cost = cost_labels.get(
+        constraints.max_marginal_cost,
+        f"relative score {constraints.max_marginal_cost:.2f}",
+    )
+    print(
+        "Eligibility: "
+        f"{constraints.data_class.value} data; "
+        f"internet {'allowed' if constraints.network_allowed else 'not allowed'}; "
+        f"maximum cost {maximum_cost}; "
+        f"workflows {interactions}; "
+        f"unverified facts {'allowed' if constraints.allow_unverified else 'not allowed'}"
+    )
+    if constraints.forbidden_resources:
+        print("Excluded resources: " + ", ".join(constraints.forbidden_resources))
+    print("No project file will be written. No resource will be contacted or run.")
+
+
+def _handle_guided_plan(args: argparse.Namespace) -> int:
+    if args.width is not None and args.format != "summary":
+        raise ConfigurationError("--width is only available with --format summary")
+    if not _guided_terminal_available():
+        raise ConfigurationError(
+            "'atready plan' is interactive and requires a terminal; "
+            "use 'atready route --help' for non-interactive input"
+        )
+
+    target = _inventory_path(args.inventory)
+    try:
+        catalog = InventoryCatalog.from_path(target, today=date.today())
+    except ConfigurationError as exc:
+        if "configuration file does not exist" in str(exc):
+            exc.add_note("Create your roster first with: atready init")
+        raise
+    if not catalog.inventory.resources:
+        failure = ConfigurationError("personal inventory has no resources")
+        failure.add_note("Add one resource first with: atready add")
+        raise failure
+    if catalog.inventory.inventory_kind is InventoryKind.DEMO and not args.allow_demo:
+        failure = ConfigurationError("demo inventories require explicit routing permission")
+        failure.add_note("Retry this synthetic example with: atready plan --allow-demo")
+        raise failure
+
+    try:
+        print("PLAN A PROJECT")
+        print(f"Inventory: {_terminal_safe(target)}")
+        print(
+            "AtReady will use only your declared roster. It will not write a project file, "
+            "contact a resource, spend a credit, or run any work."
+        )
+        print("Do not enter credentials or secrets. Type cancel at any prompt.\n")
+        project = _guided_project_from_inventory(catalog.inventory)
+        _print_guided_plan_recap(project)
+        if not _guided_plan_yes_no("Make this resource plan?", default=True):
+            raise _GuidedPlanCancelledError
+        plan = route(catalog.inventory, project, allow_demo=args.allow_demo)
+        print()
+        return _emit_route_plan(
+            plan,
+            project,
+            output_format=args.format,
+            width=args.width or 80,
+        )
+    except _GuidedPlanCancelledError:
+        print("Cancelled. No files changed and no resources were run.")
+        return 0
+    except EOFError:
+        print(
+            "error: guided input ended before planning; no files changed and no resources were run",
+            file=sys.stderr,
+        )
+        return 2
+    except KeyboardInterrupt:
+        print(file=sys.stderr)
+        print("Cancelled. No files changed and no resources were run.", file=sys.stderr)
+        return 130
+
+
 def _handle_inventory_add(args: argparse.Namespace) -> int:
     _require_preview_apply_contract(args, subject="addition")
     parsed = _resource_input(args)
@@ -2514,33 +2990,122 @@ def _handle_project_validate(args: argparse.Namespace) -> int:
 def _handle_route(args: argparse.Namespace) -> int:
     if args.width is not None and args.format != "summary":
         raise ConfigurationError("--width is only available with --format summary")
-    project = project_from_path(args.project.expanduser())
-    catalog = InventoryCatalog.from_path(_inventory_path(args.inventory), today=project.as_of)
+    project_path = args.project.expanduser()
+    try:
+        project = project_from_path(project_path)
+    except ConfigurationError as exc:
+        if "configuration file does not exist" in str(exc):
+            exc.add_note("Use the guided planner instead: atready plan")
+            exc.add_note("Or create a project brief: atready project template > project.yaml")
+        raise
+    try:
+        catalog = InventoryCatalog.from_path(_inventory_path(args.inventory), today=project.as_of)
+    except ConfigurationError as exc:
+        if "configuration file does not exist" in str(exc):
+            exc.add_note("Create your roster first with: atready init")
+        raise
     plan = route(catalog.inventory, project, allow_demo=args.allow_demo)
-    if args.format == "json":
+    return _emit_route_plan(
+        plan,
+        project,
+        output_format=args.format,
+        width=args.width or 80,
+    )
+
+
+def _emit_route_plan(
+    plan: Any,
+    project: ProjectBrief,
+    *,
+    output_format: str,
+    width: int,
+) -> int:
+    if output_format == "json":
         print(json.dumps(plan.model_dump(mode="json"), indent=2, sort_keys=True))
-    elif args.format == "markdown":
+    elif output_format == "markdown":
         print(render_markdown(plan), end="")
     else:
-        print(render_summary(plan, goal=project.goal, width=args.width or 80), end="")
+        print(render_summary(plan, goal=project.goal, width=width), end="")
     has_gap = any(
         assignment.primary is None or assignment.unresolved_gaps for assignment in plan.assignments
     )
     return 3 if has_gap else 0
 
 
-def _handle_skill_path(args: argparse.Namespace) -> int:
-    del args
+def _bundled_skill_path() -> Any:
     source_checkout = (
         Path(__file__).resolve().parents[2] / "plugins" / "atready" / "skills" / "project-atready"
     )
     if source_checkout.is_dir():
-        print(_terminal_safe(source_checkout))
-        return 0
+        return source_checkout
     bundled = files("atready").joinpath("bundled_skill")
     if not bundled.is_dir():
         raise ConfigurationError("the installed distribution does not contain the bundled skill")
-    print(_terminal_safe(bundled))
+    return bundled
+
+
+def _handle_skill_path(args: argparse.Namespace) -> int:
+    del args
+    print(_terminal_safe(_bundled_skill_path()))
+    return 0
+
+
+_REQUIRED_SKILL_FILES = (
+    Path("SKILL.md"),
+    Path("scripts/atready.py"),
+    Path("references/output-contract.md"),
+    Path("references/routing-rules.md"),
+    Path("references/runtime-setup.md"),
+)
+
+
+def _skill_location_status(path: Path) -> str:
+    if not path.is_dir():
+        return "not found"
+    if any(not (path / required).is_file() for required in _REQUIRED_SKILL_FILES):
+        return "incomplete"
+    return "ready"
+
+
+def _handle_skill_status(args: argparse.Namespace) -> int:
+    del args
+    bundled = _bundled_skill_path()
+    try:
+        personal = Path.home() / ".agents" / "skills" / "project-atready"
+    except RuntimeError:
+        raise ConfigurationError("cannot resolve the personal Codex skill location") from None
+    workspace_locations = [
+        directory / ".agents" / "skills" / "project-atready"
+        for directory in (Path.cwd(), *Path.cwd().parents)
+    ]
+    workspace_statuses = [(path, _skill_location_status(path)) for path in workspace_locations]
+    ready_workspaces = [(path, status) for path, status in workspace_statuses if status == "ready"]
+    incomplete_workspaces = [
+        (path, status) for path, status in workspace_statuses if status == "incomplete"
+    ]
+    personal_status = _skill_location_status(personal)
+
+    print(f"Bundled skill: {_terminal_safe(bundled)}")
+    print(f"Personal location: {_terminal_safe(personal)} ({personal_status})")
+    if ready_workspaces:
+        for path, _status in ready_workspaces:
+            print(f"Workspace location: {_terminal_safe(path)} (ready)")
+    elif incomplete_workspaces:
+        for path, _status in incomplete_workspaces:
+            print(f"Workspace location: {_terminal_safe(path)} (incomplete)")
+    else:
+        print(
+            "Workspace location: "
+            f"{_terminal_safe(workspace_locations[0])} (not found in this directory or a parent)"
+        )
+    ready = personal_status == "ready" or bool(ready_workspaces)
+    print(f"Codex skill ready: {'yes' if ready else 'no'}")
+    if not ready:
+        print(
+            "Next: copy the bundled project-atready folder into the personal location "
+            "shown above, then restart Codex."
+        )
+    print("No files changed.")
     return 0
 
 
@@ -2569,6 +3134,22 @@ def _handle_schema(args: argparse.Namespace) -> int:
     raise AssertionError(f"unhandled schema kind: {args.kind}")
 
 
+def _suggested_next_actions(args: argparse.Namespace, exc: Exception) -> tuple[str, ...]:
+    message = str(exc)
+    command = getattr(args, "command", None)
+    if "personal inventory has no resources" in message:
+        return ("Add one resource: atready add",)
+    if "already exists" in message and command in {"add", "inventory"}:
+        return ("Review the current roster: atready inventory list",)
+    if "configuration file does not exist" not in message:
+        return ()
+    if command == "project":
+        return ("Create a project brief: atready project template > project.yaml",)
+    if command in {"inventory", "resource", "plan"}:
+        return ("Create your roster: atready init",)
+    return ()
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -2578,6 +3159,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"error: {_terminal_safe(exc)}", file=sys.stderr)
         for note in getattr(exc, "__notes__", ()):
             print(f"note: {_terminal_safe(note)}", file=sys.stderr)
+        existing = set(getattr(exc, "__notes__", ()))
+        for action in _suggested_next_actions(args, exc):
+            if action not in existing:
+                print(f"next: {_terminal_safe(action)}", file=sys.stderr)
         return 2
 
 

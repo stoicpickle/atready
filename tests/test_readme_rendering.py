@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import runpy
 import subprocess
 import sys
@@ -83,6 +84,27 @@ def test_current_readme_rendering_is_channel_safe() -> None:
 
     assert result.returncode == 0, result.stderr
     assert result.stdout == ""
+
+
+def test_readme_skill_copy_is_guarded_before_the_first_write() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    guard = 'if [ -e "$atready_skill_dest" ] || [ -L "$atready_skill_dest" ]; then'
+    copy = 'cp -R "$(atready skill path)" "$atready_skill_dest"'
+    skill_blocks = [
+        block
+        for block in re.findall(r"```bash\n(.*?)\n```", readme, flags=re.DOTALL)
+        if 'atready_skill_dest="$HOME/.agents/skills/project-atready"' in block
+    ]
+
+    assert len(skill_blocks) == 1
+    block = skill_blocks[0]
+    assert guard in block
+    assert copy in block
+    assert block.index(guard) < block.index(copy)
+    before_guard = block[: block.index(guard)]
+    assert re.search(r"(?m)^\s*(?:cp|install|mkdir|mv|rm|touch)\b", before_guard) is None
+    assert ">" not in before_guard
+    assert "keep any existing destination unchanged by default" in " ".join(readme.split())
 
 
 def test_front_page_review_is_a_pre_review_and_pre_commit_gate() -> None:

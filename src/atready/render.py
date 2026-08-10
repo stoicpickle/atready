@@ -88,6 +88,52 @@ def _primary_handoff(assignment: RouteAssignment):
     return next((handoff for handoff in assignment.handoffs if handoff.role == "primary"), None)
 
 
+def _next_action(plan: RoutePlan, *, has_gaps: bool) -> str:
+    unverified = [item for item in plan.dispositions if item.status is DispositionStatus.UNVERIFIED]
+    if has_gaps and unverified:
+        confirmation_labels = {
+            "access-unknown": "access",
+            "confidence-unknown": "the confidence basis",
+            "provenance-stale": "a current verification date",
+            "provenance-unknown": "the declaration source",
+            "quota-unknown": "remaining usage",
+            "session-unknown": "current availability",
+        }
+        if len(unverified) > 3:
+            return (
+                "Confirm the missing selection facts for the unverified resources, "
+                "then route again."
+            )
+        confirmations = []
+        for item in unverified:
+            gate_codes = sorted(
+                {
+                    gate
+                    for assignment in plan.assignments
+                    for candidate in assignment.candidates
+                    if candidate.resource_id == item.resource_id
+                    for gate in candidate.gate_codes
+                    if gate in confirmation_labels
+                }
+            )
+            if not gate_codes:
+                gate_codes = [item.reason_code]
+            facts = [
+                confirmation_labels.get(code, "the missing selection facts") for code in gate_codes
+            ]
+            if len(facts) == 1:
+                fact_text = facts[0]
+            else:
+                fact_text = ", ".join(facts[:-1]) + f", and {facts[-1]}"
+            confirmations.append(f"{fact_text} for {item.resource_name}")
+        if len(confirmations) == 1:
+            detail = confirmations[0]
+        else:
+            detail = ", ".join(confirmations[:-1]) + f", and {confirmations[-1]}"
+        return f"Confirm {detail}, then route again."
+    return "Review the assignments. Use --format markdown for scores and full handoff details."
+
+
 def render_summary(plan: RoutePlan, *, goal: str | None = None, width: int = 100) -> str:
     """Render a concise, width-aware human route without audit-only details."""
 
@@ -274,7 +320,7 @@ def render_summary(plan: RoutePlan, *, goal: str | None = None, width: int = 100
     lines.append("")
     _append_wrapped(
         lines,
-        "Review the assignments. Use --format markdown for scores and full handoff details.",
+        _next_action(plan, has_gaps=bool(gaps)),
         width=width,
         initial_indent="Next: ",
         subsequent_indent="      ",

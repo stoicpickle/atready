@@ -1,0 +1,27 @@
+schema_version: 1
+id: synthetic-alternate-check
+name: Synthetic Alternate Check
+goal: Select a primary verifier and reserve one eligible alternate.
+as_of: 2026-08-10
+constraints:
+  data_class: public
+  max_marginal_cost: 1.0
+  allowed_interactions: [local-cli]
+  network_allowed: false
+  allow_unverified: false
+  forbidden_resources: []
+workstreams:
+  - id: verification
+    name: Verification
+    objective: Verify a synthetic artifact.
+    required_capabilities: [{id: verification, importance: 1.0, minimum: 0.70}]
+    inputs: [Synthetic artifact]
+    allowed_scope: [Synthetic verification]
+    exclusions: [Execution]
+    deliverable: A synthetic verification report.
+    acceptance_criteria: [One primary and one reserved alternate are explained]
+    verification: [Inspect the returned route]
+    stop_conditions: [No eligible alternate remains]
+    next_owner: Human reviewer
+    support: {allowed: false, capability_gaps: [], minimum_gain: 0.08}
+    alternate_required: true

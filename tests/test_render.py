@@ -156,6 +156,24 @@ def test_summary_translates_selected_unverified_warning_without_losing_facts() -
     assert "stale-provenance" not in rendered
 
 
+def test_summary_tells_the_user_which_unverified_fact_to_confirm_next() -> None:
+    inventory = InventoryCatalog.from_path(FIXTURES / "inventory-unverified.yaml").inventory
+    project = project_from_path(FIXTURES / "project-unverified.yaml")
+
+    rendered = render_summary(
+        route(inventory, project, allow_demo=True), goal=project.goal, width=60
+    )
+    flattened = " ".join(line.strip() for line in rendered.splitlines())
+
+    assert "Confirm access" in flattened
+    assert "the confidence basis" in flattened
+    assert "the declaration source" in flattened
+    assert "remaining usage" in flattened
+    assert "current availability for Synthetic Unconfirmed Researcher" in flattened
+    assert "then route again." in flattened
+    assert "access-unknown" not in rendered
+
+
 def test_summary_preserves_support_and_nonselected_statuses_in_plain_language() -> None:
     inventory = InventoryCatalog.from_path(FIXTURES / "inventory-degraded.yaml").inventory
     project = project_from_path(FIXTURES / "project-degraded.yaml")

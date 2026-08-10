@@ -105,76 +105,50 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert metadata["name"] == "project-atready"
     assert set(metadata) == {"name", "description"}
     assert "TODO" not in body
-    assert body.count('"/absolute/path/to/project-atready/scripts/atready.py"') >= 8
-    assert "Never invoke the bare CLI or bypass the launcher" in normalized_body
+    assert body.count('"/absolute/path/to/project-atready/scripts/atready.py"') >= 6
+    assert "Never invoke a bare `atready` command or bypass the launcher" in normalized_body
     assert "never searches `PATH` for `atready`" in normalized_body
     assert "offline and without configuration files" in normalized_body
     assert re.search(r"(?m)^\s*atready(?:\s|$)", body) is None
+    assert "config path" in body
     assert "inventory validate /absolute/path/to/inventory.yaml" in body
-    assert "inventory list /absolute/path/to/inventory.yaml --json" in body
-    assert "--resource-file /absolute/private/resource.yaml" in body
-    assert "--resource-stdin --json" in body
-    assert "schema resource-declaration" in body
-    assert "argv-safe only" in body
-    assert "host/model context" in body
-    assert "never use `echo`, `printf`, a shell literal, or a heredoc" in normalized_body
-    assert "review them in the source" in body
-    assert "remove the exact temporary file and directory before yielding" in body
-    assert "new protected" in body
-    assert "temporary directory" in body
+    assert "inventory snapshot /absolute/path/to/inventory.yaml --format json" in body
+    assert "project template" in body
+    assert "project validate /absolute/path/to/project.yaml" in body
     assert "--inventory /absolute/path/to/inventory.yaml" in body
-    assert "explicitly approves that complete preview" in body
-    assert "--expect-plan <preview" in body
-    assert "Exit code `4`" in body
-    assert "Never retry it" in body
-    assert "command history" in body
-    assert "inventory backup rollback" in body
-    assert "inventory backup delete" in body
-    assert "--allow-no-backups" in body
-    assert "separately approves that rendered preview" in body
-    assert "Never infer approval for recovery, rollback" in body
-    assert "Do not substitute bundled synthetic resources" in body
-    assert all(
-        f"`{status}`" in body
-        for status in (
-            "selected-primary",
-            "selected-support",
-            "reserved-alternate",
-            "deliberately-unused",
-            "unavailable",
-            "ineligible",
-            "unverified",
-        )
-    )
-    assert "never replace their exact statuses" in normalized_body
-    assert "explicit inventory/project/resource-declaration paths" in body
-    assert "explicit non-interactive" in body
-    assert "resource stdin" in body
-    assert "hidden revision privacy nonce" in body
-    assert "Never" in body
-    assert "ask the user to paste that nonce" in body
-    assert "There is no supported in-place migration or rotation" in body
-    assert "inventory annotate set" in body
-    assert "inventory annotate clear" in body
-    assert "## Choose the intent" in body
-    assert "**Resource setup:**" in body
-    assert "**Project planning:**" in body
-    assert "**Maintenance or recovery:**" in body
-    assert "Do not combine setup and routing" in body
-    assert "Keep the user's project plan primary" in body
-    assert "Meet the user at the planning pivot" in body
-    assert "goal, loose plan, or written plan" in normalized_body
-    assert "a user-authored formal brief is not a prerequisite" in normalized_body
-    assert "smallest useful ordered workstreams" in normalized_body
-    assert "references/model-routing.md" in body
+    assert "--format json" in body
+    assert "## Planning workflow" in body
+    assert "at the planning pivot" in normalized_body
+    assert "natural-language goal, loose plan, or existing brief" in normalized_body
+    assert "A formal project file is not a prerequisite" in normalized_body
+    assert "smallest useful ordered steps" in normalized_body
+    assert "at most one consolidated clarification" in normalized_body
+    assert "could change resource eligibility or assignment" in normalized_body
+    assert "explicit request to use AtReady with their saved roster" in body
+    assert "authorizes only the bounded, read-only inventory checks" in normalized_body
+    assert "planning authorization never authorizes credential access" in normalized_body
+    assert "direct the user to `atready add`" in normalized_body
+    assert "direct roster initialization, addition, replacement, removal" in normalized_body
+    assert "separate preview-first tasks" in normalized_body
+    assert "private notes, revision nonces" in normalized_body
+    assert "fresh unpredictable temporary directory" in normalized_body
+    assert "`0700` directory" in normalized_body
+    assert "`0600` `project.yaml`" in normalized_body
+    assert "remove only the exact temporary file" in normalized_body
+    assert "complete evidence record" in normalized_body
+    assert "Preserve every assignment, gap, uncertainty, disposition" in normalized_body
     assert "references/runtime-setup.md" in body
-    assert "never override the CLI's resource assignment" in normalized_body
-    assert "Keep the user's plan primary" in normalized_body
-    assert "detailed evidence and every handoff packet" in normalized_body
-    assert "requires an explicit request" in normalized_body
-    assert "Lead with the selected resources, then the route and handoffs" not in normalized_body
+    assert "references/routing-rules.md" in body
+    assert "references/output-contract.md" in body
+    assert "choose a different winner" in normalized_body
+    assert "detailed evidence or inert handoff packets" in normalized_body
+    assert "only when explicitly requested" in normalized_body
+    assert "A resource-fit plan is advice, not authorization" in normalized_body
     assert "Do not activate for ordinary project planning" in metadata["description"]
-    assert len(text.splitlines()) < 500
+    assert "rough project goal or loose plan" in metadata["description"]
+    assert "explicitly invokes AtReady" in metadata["description"]
+    assert len(text.splitlines()) <= 150
+    assert len(text.split()) <= 1_500
     assert (SKILL / "scripts" / "atready.py").is_file()
     assert (SKILL / "references" / "routing-rules.md").is_file()
     assert (SKILL / "references" / "output-contract.md").is_file()
@@ -190,7 +164,8 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     normalized = " ".join(reference.split())
     folded = normalized.casefold()
 
-    assert "[resource-onboarding.md](references/resource-onboarding.md)" in body
+    assert "[resource-onboarding.md](references/resource-onboarding.md)" not in body
+    assert "direct the user to `atready add`" in " ".join(body.split())
     assert "one resource at a time" in folded
     assert "keep additional resources in a names-only queue" in folded
     assert "**Quick Setup**" in reference
@@ -227,7 +202,6 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert output_contract.count("No routed project resources were contacted or run.") == 1
     assert "When the user asks for details" in output_folded
     assert "lead with the proposed useful entry" in folded
-    assert "one grouped human-language intake card" in " ".join(body.split())
     assert "a lowercase resource id only as a proposal" in folded
     assert "require the user to confirm it" in folded
     assert "label proposals only, not claims" in folded
@@ -283,17 +257,10 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
         )
     )
     assert "neutral `0.5` defaults" in reference
-    for rating_name in (
-        "quality",
-        "speed",
-        "autonomy",
-        "privacy",
-        "reliability",
-        "confidence",
-        "context_switch_cost",
-        "integration_friction",
-    ):
-        assert f"`{rating_name}`" in body
+    assert (
+        "quality, speed, autonomy, privacy, reliability, confidence, context-switch cost, and "
+        "integration friction"
+    ) in folded
     assert "never ask for its value in chat" in folded
     assert "do not ask a separate private-note question" in folded
     assert "do not echo it" in reference
@@ -541,20 +508,19 @@ def test_popular_coding_agent_quick_setups_share_the_planning_only_boundary() ->
         assert boundary in folded
 
 
-def test_guided_resource_input_transport_prefers_real_stdin_and_exact_cleanup() -> None:
+def test_planning_skill_uses_a_protected_temporary_project_and_exact_cleanup() -> None:
     body = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     folded = " ".join(body.split()).casefold()
 
-    assert "signal an explicit end-of-input without a terminal" in folded
-    assert "cannot close stdin does not qualify" in folded
-    assert "do not rewrite a created `/var/...` source path" in folded
-    assert "remove only the exact file with `unlink`" in folded
-    assert "exact empty directory with `rmdir`" in folded
-    assert "do not use `rm`, recursive cleanup" in folded
-    assert (
-        "do not create a directory or materialize declaration bytes before that authorization"
-        in folded
-    )
+    assert "fresh unpredictable temporary directory" in folded
+    assert "outside every repository" in folded
+    assert "register exact cleanup for success and error paths immediately" in folded
+    assert "restrictive creation mask" in folded
+    assert "`0700` directory" in folded
+    assert "`0600` `project.yaml`" in folded
+    assert "remove only the exact temporary file" in folded
+    assert "exact empty temporary directory" in folded
+    assert "if cleanup fails, report the retained path" in folded
 
 
 def test_openai_metadata_matches_skill_name() -> None:

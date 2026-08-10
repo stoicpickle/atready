@@ -149,7 +149,18 @@ explains the same fields in friendlier language.
 
 ## Route a real plan
 
-Create a starter project file:
+For the shortest path, start the guided planner:
+
+```bash
+atready plan
+```
+
+It asks for a goal, one to three steps, the result and check for each step, the declared
+capabilities and minimum strength each step needs, and the project constraints that can change
+which resources qualify. It shows what it understood before routing. The guided planner does not
+write a project file, contact a resource, spend a credit, or run work.
+
+For a reusable or scripted plan, create a starter project file:
 
 ```bash
 atready project template > my-project.yaml
@@ -194,17 +205,35 @@ use. “Local-first” does not mean model processing is automatically local.
 
 ## Optional Codex skill
 
-The CLI is the product. This repository also includes an optional Codex skill that can guide the
-same setup and planning flow conversationally. The skill does not replace the CLI's validation,
-preview, or routing engine.
+The CLI is the product. This repository also includes an optional Codex skill that can turn a rough
+project idea into the same CLI-grounded resource plan conversationally. The skill does not replace
+the CLI's validation or routing engine, and it directs roster changes back to the CLI.
 
-Developers working from this checkout can inspect it with:
+Codex discovers personal skills under `~/.agents/skills`. After installing AtReady, keep any
+existing destination unchanged by default. The following guarded setup copies the bundled skill
+only when that destination is absent:
 
 ```bash
-atready skill path
+atready_skill_dest="$HOME/.agents/skills/project-atready"
+if [ -e "$atready_skill_dest" ] || [ -L "$atready_skill_dest" ]; then
+  printf 'Keeping existing skill: %s\n' "$atready_skill_dest"
+else
+  mkdir -p "$HOME/.agents/skills"
+  cp -R "$(atready skill path)" "$atready_skill_dest"
+fi
+atready skill status
 ```
 
-The public beta does not depend on OpenAI Plugin Directory publication.
+To update an existing skill, review and replace it as a separate deliberate step. After Codex
+restarts, try:
+
+```text
+$project-atready I have a rough project idea. Use my saved AtReady resources to show where they fit.
+```
+
+The skill asks at most one consolidated routing question, uses the CLI's JSON result as evidence,
+and stops before implementation. The public beta does not depend on OpenAI Plugin Directory
+publication.
 
 ## Useful commands
 
@@ -212,11 +241,15 @@ The public beta does not depend on OpenAI Plugin Directory publication.
 atready                         Show the welcome screen
 atready --help                  List commands
 atready init                    Create an empty personal inventory
+atready add                     Add one resource through guided setup
+atready plan                    Make a guided resource plan
 atready resource profiles      Browse planning-oriented resource suggestions
 atready inventory list         List saved resources
 atready inventory validate     Check an inventory
 atready project template       Print a starter project brief
 atready route                  Produce a concise advisory resource plan
+atready help planning           Show the beginner planning workflow
+atready help --all              Show every advanced command
 ```
 
 ## Documentation

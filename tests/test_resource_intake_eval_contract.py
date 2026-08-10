@@ -19,7 +19,7 @@ def test_blank_slate_intake_eval_is_linked_by_its_real_consumers() -> None:
     link = "[blank-slate resource-intake evaluation](../evals/RESOURCE_INTAKE_EVAL.md)"
     assert link in private_beta
     assert link in directory_packet
-    assert "There is deliberately no provider-calling evaluation runner" in evaluation
+    assert "There is deliberately no provider calling evaluation runner" in evaluation
     assert "separate **new Codex task**" in private_beta
     assert "source-level or installed-wheel acceptance harness does not substitute" in private_beta
 
@@ -123,6 +123,4 @@ def test_blank_slate_intake_eval_includes_safe_manual_transcript_template() -> N
     assert "exact text synthetic" in evaluation
     assert "do not attach terminal history" in evaluation.casefold()
     normalized = " ".join(evaluation.split()).casefold()
-    assert (
-        "completed transcripts belong in the private beta or release evidence packet" in normalized
-    )
+    assert "completed transcripts belong in a local evaluation evidence packet" in normalized

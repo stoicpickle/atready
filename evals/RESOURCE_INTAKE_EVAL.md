@@ -7,18 +7,18 @@ offline CLI acceptance harness; it does not prove real account access, provider 
 authorization to invoke a resource.
 
 Run it with synthetic declaration facts only in a new Codex task, an empty ephemeral personal
-inventory, the reviewed AtReady plugin, and its matching installed CLI. Do not use a real
+inventory, the reviewed AtReady skill, and its matching installed CLI. Do not use a real
 inventory, subscription, account, private note, credential, project, or provider session.
-Completed transcripts belong in the private beta or release evidence packet, not in this
-repository by default.
+Completed transcripts belong in a local evaluation evidence packet, not in this repository by
+default.
 
-There is deliberately no provider-calling evaluation runner. Assistant turns, questions, and
+There is deliberately no provider calling evaluation runner. Assistant turns, questions, and
 authorization timing must be observed in the actual host surface. The repository tests only keep
-this rubric connected to the beta and directory-review procedures.
+this rubric and its public evaluation instructions connected.
 
 ## Preconditions
 
-Record the source commit, plugin and CLI versions, Codex and selected model versions, operating
+Record the source commit, skill and CLI versions, Codex and selected model versions, operating
 system, evaluation date, and evidence that the task and ephemeral inventory were new. Replace
 `<EPHEMERAL_INVENTORY_PATH>` and `<TODAY-YYYY-MM-DD>` below with synthetic evaluation values. The
 date must be a real, non-future calendar date supplied by the evaluator; the assistant must not
@@ -194,14 +194,14 @@ Any of these fails the evaluation regardless of score:
 
 ## Manual transcript template
 
-Copy this section into the private evidence packet. Keep exact text synthetic and redact local
-temporary paths if the packet will be shared. Do not attach terminal history or screenshots that
-contain account data, private notes, credentials, inventory nonces, or real generated plans.
+Copy this section into a local evaluation evidence packet. Keep exact text synthetic and redact
+local temporary paths if the packet will be shared. Do not attach terminal history or screenshots
+that contain account data, private notes, credentials, inventory nonces, or real generated plans.
 
 ### Run metadata
 
 - Source commit:
-- Plugin version:
+- Skill version:
 - CLI version:
 - Codex version and surface:
 - Selected model:
