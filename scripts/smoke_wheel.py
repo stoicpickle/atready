@@ -643,14 +643,14 @@ def main_smoke() -> None:
             raise AssertionError("installed wheel skill differs from the canonical plugin skill")
         skill_contract_text = installed_skill.read_text(encoding="utf-8")
         required_planning_contract = (
-            "Use AtReady at the planning pivot",
+            "Use AtReady for one of two explicit jobs",
             "Ask at most one consolidated clarification",
             "authorizes only the bounded, read-only inventory checks",
             "inventory validate /absolute/path/to/inventory.yaml",
             "inventory snapshot /absolute/path/to/inventory.yaml --format json",
             "project template",
             "project validate /absolute/path/to/project.yaml",
-            "direct the user to `atready add`",
+            "direct the user to run `atready add` in a local terminal",
             "question budget is already used",
             "A resource-fit plan is advice, not authorization",
             "No routed project resources were contacted or run.",
