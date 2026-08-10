@@ -31,6 +31,7 @@ jobs:
         with:
           version: "0.11.7"
           enable-cache: true
+          prune-cache: true
 
       - name: Install locked dependencies
         run: uv sync --locked --all-groups --no-group release --no-install-project
