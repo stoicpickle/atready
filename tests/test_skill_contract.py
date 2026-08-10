@@ -169,9 +169,9 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "references/model-routing.md" in body
     assert "references/runtime-setup.md" in body
     assert "never override the CLI's resource assignment" in normalized_body
-    assert "Return the user's project plan first" in normalized_body
-    assert "show them only" in normalized_body
-    assert "when requested or when a material gap requires the detail" in normalized_body
+    assert "Keep the user's plan primary" in normalized_body
+    assert "detailed evidence and every handoff packet" in normalized_body
+    assert "requires an explicit request" in normalized_body
     assert "Lead with the selected resources, then the route and handoffs" not in normalized_body
     assert "Do not activate for ordinary project planning" in metadata["description"]
     assert len(text.splitlines()) < 500
@@ -209,9 +209,23 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
 
     output_contract = (SKILL / "references" / "output-contract.md").read_text(encoding="utf-8")
     output_folded = " ".join(output_contract.split())
-    assert "keep the user's project plan primary" in output_folded
-    assert "Do not render score traces, every omission, the full execution route" in output_folded
-    assert "When the user requests the expanded AtReady result" in output_folded
+    assert "the user's project as the subject" in output_folded
+    assert "Use this order for a normal planning response" in output_folded
+    assert "short vertical blocks rather than a table" in output_folded
+    assert "**Plan.**" in output_contract
+    assert "**Resource fit.**" in output_contract
+    assert "**Gaps and uncertainty.**" in output_contract
+    assert "**Next.**" in output_contract
+    assert "`Use:`" in output_contract
+    assert "`Help from:`" in output_contract
+    assert "`Why:`" in output_contract
+    assert "`Deliver:`" in output_contract
+    assert "`Check:`" in output_contract
+    assert "steps, assignments, and material gaps" in output_folded
+    assert "scores, score components, plan IDs, fingerprints" in output_folded
+    assert "unless the user asks for details" in output_folded
+    assert output_contract.count("No routed project resources were contacted or run.") == 1
+    assert "When the user asks for details" in output_folded
     assert "lead with the proposed useful entry" in folded
     assert "one grouped human-language intake card" in " ".join(body.split())
     assert "a lowercase resource id only as a proposal" in folded

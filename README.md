@@ -42,21 +42,28 @@ atready route \
 The result looks like this:
 
 ```text
-# AtReady route: Synthetic CLI Release
+Resource plan: Synthetic CLI Release
+Goal: Ship a tested local CLI without network access or telemetry.
+1 step - 1 assigned - no open gaps
 
-## Deterministic workstream route
+Watch
+- This uses a demo inventory. Its contents are not verified as resources you can
+  use.
 
-| Resource | Role | Workstreams | Why it earned a seat |
-| --- | --- | --- | --- |
-| Synthetic Local Coding Agent | selected-primary | implementation | Highest eligible score... |
+1. Core implementation
+   Use: Synthetic Local Coding Agent
+   Why: Best eligible match after applying the project constraints.
+   Deliver: A locally runnable CLI with deterministic tests.
+   Check: uv run pytest (+1 more in the detailed view)
 
-## Resources deliberately not used
+Other resources
+- Not needed for this plan: Synthetic Asset Studio
+- Blocked by a project rule: Synthetic Interactive Debugger
 
-- Synthetic Asset Studio: No workstream needs its declared capabilities.
-
-## Authorization boundary
-
-This route is advisory. No handoff, command, purchase, or subscription change has been executed.
+Next: Review the assignments. Use --format markdown for scores and full handoff
+      details.
+AtReady made this plan only.
+No routed project resources were contacted or run.
 ```
 
 ## Install the source beta
@@ -148,8 +155,19 @@ atready route --project my-project.yaml
 
 AtReady checks hard constraints first, scores eligible resources with a deterministic rubric, and
 selects a primary resource for each ordered workstream. It may also suggest one support resource or
-reserve one standalone alternate when the project calls for it. The output explains selections,
-unused resources, exclusions, gaps, and handoff notes.
+reserve one standalone alternate when the project calls for it. The default output is a concise
+human summary of each assignment, result, check, and material gap.
+
+Use the detailed Markdown view when you want scores, exclusions, every resource disposition, and
+the complete inert handoff notes:
+
+```bash
+atready route --project my-project.yaml --format markdown
+```
+
+Use `--format json` for the unchanged complete machine-readable evidence record.
+The summary defaults to 80 columns; add `--width 40` through `--width 120` when you want a
+different wrap width.
 
 The same project and inventory produce the same route. AtReady does not claim the route is globally
 optimal; it is a consistent, inspectable recommendation you can accept, edit, or ignore.
@@ -190,7 +208,7 @@ atready resource profiles      Browse planning-oriented resource suggestions
 atready inventory list         List saved resources
 atready inventory validate     Check an inventory
 atready project template       Print a starter project brief
-atready route                  Produce an advisory route
+atready route                  Produce a concise advisory resource plan
 ```
 
 ## Documentation

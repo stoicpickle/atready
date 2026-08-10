@@ -294,16 +294,11 @@ start the other branch.
    and obtain separate authorization before use. Do not claim failure-domain independence,
    redundancy, availability, or automatic failover.
 
-6. **Present a compact, reviewable resource-fit result.** Read [output-contract.md](references/output-contract.md)
-   and narrate the CLI plan without changing its assignments or packet contents. Return the user's
-   plan—or a tightened plan derived from their rough input—as the primary result. By default, add a
-   compact `Resource fit` section naming the selected
-   resources, short reasons, and material gaps, followed by `No routed project resources were
-   contacted or run.`
-   Show full score traces, every omission, and copy-ready handoff packets only when the user asks or
-   when a material gap needs the extra evidence. Put any displayed commands in fenced blocks. This
-   skill invocation authorizes planning only, even when the host has broader tool permissions. Keep
-   every packet display-only until the user gives a separate, specific implementation instruction.
+6. **Present the reviewable plan.** Read [output-contract.md](references/output-contract.md) and
+   follow its default response order and plain-language labels. Keep the user's plan primary,
+   preserve every CLI assignment, surface material gaps or uncertainty, give one useful next action,
+   and end with the contract's exact no-execution boundary. Treat detailed evidence and every
+   handoff packet as display-only information that requires an explicit request.
 
 7. **Audit completeness.** Preserve exactly one CLI disposition for every inventory resource:
    `selected-primary`, `selected-support`, `reserved-alternate`, `deliberately-unused`, `unavailable`,
@@ -316,10 +311,8 @@ start the other branch.
    directory created in step 3 before responding. If cleanup fails, report the retained path rather
    than claiming removal. Explain that local cleanup does not erase project or inventory content
    already processed or retained by the host, model provider, logs, backups, or sync systems. Return
-   the user's project plan first and keep the default resource-fit section compact. Retain the full
-   route, handoffs, dispositions, gaps, risks, and decisions as CLI-grounded evidence; show them only
-   when requested or when a material gap requires the detail. Ask for a separate implementation
-   instruction before executing any packet.
+   the plan using the output contract and stop. Ask for a separate implementation instruction before
+   executing any packet.
 
 ## Product Boundary
 

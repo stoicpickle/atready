@@ -890,6 +890,29 @@ def test_project_route_yaml_snapshot_and_all_schemas(tmp_path: Path, monkeypatch
     assert "# AtReady route" in markdown
     assert "## Authorization boundary" in markdown
 
+    assert main(["route", "--project", str(project_path)]) == 0
+    summary = capsys.readouterr().out
+    assert "Resource plan:" in summary
+    assert "Use: Personal Local Coding Agent" in summary
+    assert "AtReady made this plan only." in summary
+    assert "## Authorization boundary" not in summary
+    assert "Adjusted score" not in summary
+
+    assert main(["route", "--project", str(project_path), "--width", "40"]) == 0
+    narrow_summary = capsys.readouterr().out
+    assert all(
+        len(line) <= 40 or line == "No routed project resources were contacted or run."
+        for line in narrow_summary.splitlines()
+    )
+
+    with pytest.raises(SystemExit) as invalid_width:
+        main(["route", "--project", str(project_path), "--width", "39"])
+    assert invalid_width.value.code == 2
+    assert "expected an integer from 40 to 120" in capsys.readouterr().err
+
+    assert main(["route", "--project", str(project_path), "--format", "json", "--width", "80"]) == 2
+    assert "--width is only available with --format summary" in capsys.readouterr().err
+
     assert main(["skill", "path"]) == 0
     skill_path = Path(capsys.readouterr().out.strip())
     assert (skill_path / "SKILL.md").is_file()
@@ -934,6 +957,13 @@ def test_route_returns_gap_exit_when_required_alternate_is_unavailable(
     markdown = capsys.readouterr().out
     assert "required-alternate-unavailable" in markdown
     assert "Primary: **Personal Local Coding Agent**" in markdown
+
+    assert main(["route", "--project", str(project_path)]) == 3
+    summary = capsys.readouterr().out
+    assert "1 open gap" in summary
+    assert "Gaps and decisions" in summary
+    assert "required-alternate-unavailable" not in summary
+    assert "No routed project resources were contacted or run." in summary
 
 
 def test_inventory_add_is_preview_first_and_requires_exact_revision(tmp_path: Path, capsys) -> None:

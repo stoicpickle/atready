@@ -60,7 +60,7 @@ from atready.models import (
 )
 from atready.paths import create_private_file, resolve_paths
 from atready.project import project_from_path
-from atready.render import render_markdown
+from atready.render import render_markdown, render_summary
 from atready.resource_input import (
     ParsedResourceDeclaration,
     load_inventory_annotation_declaration_file,
@@ -707,7 +707,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     route_parser.add_argument("--project", required=True, type=Path)
     route_parser.add_argument("--inventory", type=Path, help="Defaults to user config")
-    route_parser.add_argument("--format", choices=("json", "markdown"), default="markdown")
+    route_parser.add_argument(
+        "--format",
+        choices=("summary", "markdown", "json"),
+        default="summary",
+        help="summary is concise; markdown includes scores and complete inert handoffs",
+    )
+    route_parser.add_argument(
+        "--width",
+        type=_summary_width,
+        help="Wrap the summary to 40-120 columns (default: 80)",
+    )
     route_parser.add_argument(
         "--allow-demo", action="store_true", help="Explicitly permit synthetic demo resources"
     )
@@ -747,6 +757,16 @@ def _date_value(value: str) -> date:
     if parsed.isoformat() != value:
         raise argparse.ArgumentTypeError("expected an ISO date in YYYY-MM-DD form")
     return parsed
+
+
+def _summary_width(value: str) -> int:
+    try:
+        width = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected an integer from 40 to 120") from exc
+    if not 40 <= width <= 120:
+        raise argparse.ArgumentTypeError("expected an integer from 40 to 120")
+    return width
 
 
 def _capacity_number(value: str) -> int | float:
@@ -2492,13 +2512,17 @@ def _handle_project_validate(args: argparse.Namespace) -> int:
 
 
 def _handle_route(args: argparse.Namespace) -> int:
+    if args.width is not None and args.format != "summary":
+        raise ConfigurationError("--width is only available with --format summary")
     project = project_from_path(args.project.expanduser())
     catalog = InventoryCatalog.from_path(_inventory_path(args.inventory), today=project.as_of)
     plan = route(catalog.inventory, project, allow_demo=args.allow_demo)
     if args.format == "json":
         print(json.dumps(plan.model_dump(mode="json"), indent=2, sort_keys=True))
-    else:
+    elif args.format == "markdown":
         print(render_markdown(plan), end="")
+    else:
+        print(render_summary(plan, goal=project.goal, width=args.width or 80), end="")
     has_gap = any(
         assignment.primary is None or assignment.unresolved_gaps for assignment in plan.assignments
     )
