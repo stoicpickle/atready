@@ -78,18 +78,18 @@ _RUNTIME_FEATURE_ID = re.compile(r"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$")
 _PLUGIN_VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.!+_-]{0,63}$")
 
 _WORDMARK = (
-    "  A   TTTTT RRRR  EEEEE   A   DDDD  Y   Y",
-    " A A    T   R   R E      A A  D   D  Y Y ",
-    "AAAAA   T   RRRR  EEEE  AAAAA D   D   Y  ",
-    "A   A   T   R R   E     A   A D   D   Y  ",
-    "A   A   T   R  RR EEEEE A   A DDDD    Y  ",
+    "    _  _____ ____  _____    _    ______   __",
+    "   / \\|_   _|  _ \\| ____|  / \\  |  _ \\ \\ / /",
+    "  / _ \\ | | | |_) |  _|   / _ \\ | | | | \\ V / ",
+    " / ___ \\| | |  _ <| |___ / ___ \\| |_| |  | |  ",
+    "/_/   \\_\\_| |_| \\_\\_____/_/   \\_\\____/   |_|  ",
 )
 _TOOLBOX = (
-    " .--------.",
-    " |  ____  |",
-    " | |____| |",
-    " |________|",
-    "   |____|  ",
+    "       ________     ",
+    "   ___/  ____  \\___ ",
+    "  |   | |____| |   |",
+    "  |    TOOL KIT    |",
+    "  |________________|",
 )
 _GRADIENT_STOPS = ((24, 76, 174), (124, 82, 184), (224, 65, 55))
 
@@ -133,16 +133,16 @@ def _welcome_text(*, color: bool) -> str:
             "",
             "Plan with what you have at the ready.",
             "",
-            "AtReady turns a rough plan and a list of your available tools into a clear,",
-            "explainable workstream route. It recommends who or what could help; it does not",
-            "run those resources or execute the work.",
+            "Turn a rough plan and your available tools into a clear workstream route.",
+            "AtReady suggests where each resource fits - and what should stay out.",
+            "It never runs a tool, spends a credit, or starts the work.",
             "",
-            "Try the synthetic demo (it does not touch your personal inventory):",
-            "  atready demo inventory > inventory.yaml",
-            "  atready project template > project.yaml",
-            "  atready route --project project.yaml --inventory inventory.yaml --allow-demo",
+            "TRY IT WITH SAFE DEMO DATA",
+            "  $ atready demo inventory > inventory.yaml",
+            "  $ atready project template > project.yaml",
+            "  $ atready route --project project.yaml --inventory inventory.yaml --allow-demo",
             "",
-            "More commands: atready --help",
+            "Next: atready --help",
         ]
     )
 

@@ -23,9 +23,13 @@ def test_bare_cli_is_a_plain_language_welcome(capsys) -> None:
     assert main([]) == 0
     captured = capsys.readouterr()
     assert "Plan with what you have at the ready." in captured.out
-    assert "AtReady turns a rough plan" in captured.out
-    assert "atready demo inventory" in captured.out
-    assert "does not\nrun those resources or execute the work" in captured.out
+    assert "Turn a rough plan and your available tools" in captured.out
+    assert "atready project template > project.yaml" in captured.out
+    assert (
+        "atready route --project project.yaml --inventory inventory.yaml --allow-demo"
+        in captured.out
+    )
+    assert "never runs a tool, spends a credit, or starts the work" in captured.out
     assert "\033[" not in captured.out
     assert captured.err == ""
 
