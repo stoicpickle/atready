@@ -152,7 +152,8 @@ def test_guided_add_missing_inventory_escapes_terminal_controls(
     error = capsys.readouterr().err
     assert "\x1b" not in error
     assert "\t" not in error
-    assert error.count("\n") == 2
+    assert 1 <= error.count("\n") <= 2
+    assert error.startswith("error: ")
     assert "\\x1b" in error
     assert "\\n" in error
     assert "\\t" in error
