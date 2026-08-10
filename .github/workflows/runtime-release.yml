@@ -1,0 +1,438 @@
+name: Runtime release to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact lowercase 40-character private main commit already green in push CI
+        required: true
+        type: string
+      version:
+        description: Exact project-atready runtime version at that commit
+        required: true
+        type: string
+      public_metadata_urls_verified:
+        description: Owner anonymously verified final website, support, privacy, and terms URLs
+        required: true
+        default: false
+        type: boolean
+      publish_pypi:
+        description: Pause after build for protected-environment review, then publish exact bytes
+        required: true
+        default: false
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: runtime-release-${{ inputs.source_sha }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build reviewed runtime distributions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      actions: read
+      contents: read
+    env:
+      UV_DEFAULT_INDEX: https://pypi.org/simple
+      UV_INDEX: ""
+      UV_NO_CACHE: "1"
+      UV_NO_CONFIG: "1"
+      UV_PYTHON_DOWNLOADS: never
+    steps:
+      - name: Require owner-dispatched green private main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLIC_METADATA_URLS_VERIFIED: ${{ inputs.public_metadata_urls_verified }}
+          PUBLISH_PYPI: ${{ inputs.publish_pypi }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "source_sha must be an exact lowercase 40-character commit" >&2
+            exit 1
+          fi
+          if [[ ! "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "version must use the X.Y.Z form" >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_REPOSITORY" != "stoicpickle/atready-dev" ]]; then
+            echo "runtime publishing is bound to the reviewed private development repository" >&2
+            exit 1
+          fi
+          if [[ "$(gh api "repos/$GITHUB_REPOSITORY" --jq .visibility)" != "private" ]]; then
+            echo "use public-release.yml if source publication is intentionally authorized" >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" != "refs/heads/main" || "$GITHUB_SHA" != "$SOURCE_SHA" ]]; then
+            echo "runtime release must run against the exact requested main commit" >&2
+            exit 1
+          fi
+          if [[ "$WORKFLOW_SHA" != "$SOURCE_SHA" ]]; then
+            echo "runtime release workflow definition must come from source_sha" >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_TRIGGERING_ACTOR" != "$GITHUB_REPOSITORY_OWNER" ]]; then
+            echo "runtime release must be dispatched or rerun by the repository owner" >&2
+            exit 1
+          fi
+          if [[ "$PUBLISH_PYPI" == "true" && "$PUBLIC_METADATA_URLS_VERIFIED" != "true" ]]; then
+            echo "owner must anonymously verify final public project metadata URLs" >&2
+            exit 1
+          fi
+          ci_count="$(gh api --method GET \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+            -f branch=main \
+            -f event=push \
+            -f status=success \
+            -f head_sha="$SOURCE_SHA" \
+            -f per_page=1 \
+            --jq '.total_count')"
+          if (( ci_count < 1 )); then
+            echo "exact source_sha does not have a successful main push CI run" >&2
+            exit 1
+          fi
+
+      - name: Check out exact source without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ inputs.source_sha }}
+          submodules: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Set up pinned uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+          version: "0.11.7"
+
+      - name: Install locked test dependencies
+        run: uv sync --locked --all-groups --no-group release --no-install-project
+
+      - name: Require exact requested runtime version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          project_version="$(python - <<'PY'
+          import tomllib
+          with open("pyproject.toml", "rb") as stream:
+              print(tomllib.load(stream)["project"]["version"])
+          PY
+          )"
+          module_version="$(PYTHONPATH=src uv run --no-sync python -c \
+            'import atready; print(atready.__version__)')"
+          if [[ "$project_version" != "$RELEASE_VERSION" || \
+                "$module_version" != "$RELEASE_VERSION" ]]; then
+            echo "requested runtime version does not match project and module metadata" >&2
+            exit 1
+          fi
+
+      - name: Validate plugin and skill contracts
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync pytest tests/test_plugin_contract.py tests/test_skill_contract.py
+
+      - name: Lint
+        run: uv run --no-sync ruff check .
+
+      - name: Check formatting
+        run: uv run --no-sync ruff format --check .
+
+      - name: Test with branch coverage
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync pytest --cov=atready --cov-report=term-missing
+
+      - name: Require unchanged source before build
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          changes="$(git status --porcelain=v1 --untracked-files=all)"
+          if [[ -n "$changes" ]]; then
+            echo "source checkout changed before build" >&2
+            printf '%s\n' "$changes" >&2
+            exit 1
+          fi
+
+      - name: Bind build timestamps to source commit
+        run: |
+          set -euo pipefail
+          source_date_epoch="$(git show -s --format=%ct "$GITHUB_SHA")"
+          if [[ ! "$source_date_epoch" =~ ^[0-9]+$ ]]; then
+            echo "source commit timestamp is not a non-negative integer" >&2
+            exit 1
+          fi
+          printf 'SOURCE_DATE_EPOCH=%s\n' "$source_date_epoch" >> "$GITHUB_ENV"
+
+      - name: Build twice through hash-constrained backend
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/atready-runtime-release"
+          args=(
+            --clear
+            --no-create-gitignore
+            --no-sources
+            --build-constraints build-constraints.txt
+            --require-hashes
+            --no-cache
+            --default-index https://pypi.org/simple
+          )
+          mkdir "$root"
+          uv build "${args[@]}" --out-dir "$root/first"
+          uv build "${args[@]}" --out-dir "$root/second"
+          wheel="project_atready-${RELEASE_VERSION}-py3-none-any.whl"
+          source="project_atready-${RELEASE_VERSION}.tar.gz"
+          cmp "$root/first/$wheel" "$root/second/$wheel"
+          cmp "$root/first/$source" "$root/second/$source"
+          mkdir "$root/dist"
+          cp "$root/first/$wheel" "$root/dist/$wheel"
+          cp "$root/first/$source" "$root/dist/$source"
+
+      - name: Install locked release checks
+        run: uv sync --locked --all-groups --no-install-project
+
+      - name: Check PyPI metadata and rendering
+        run: >-
+          uv run --no-sync twine check --strict
+          "$RUNNER_TEMP/atready-runtime-release/dist/"*
+
+      - name: Verify rendered README links
+        run: uv run --no-sync python scripts/verify_readme_rendering.py
+
+      - name: Verify exact artifact contents
+        run: >-
+          uv run --no-sync python scripts/verify_release_artifacts.py
+          --dist "$RUNNER_TEMP/atready-runtime-release/dist"
+
+      - name: Smoke installed wheel
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: >-
+          uv run --isolated --no-project
+          --with "$RUNNER_TEMP/atready-runtime-release/dist/project_atready-${RELEASE_VERSION}-py3-none-any.whl"
+          python scripts/smoke_wheel.py
+
+      - name: Smoke staged plugin
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: >-
+          uv run --isolated --no-project
+          --with "$RUNNER_TEMP/atready-runtime-release/dist/project_atready-${RELEASE_VERSION}-py3-none-any.whl"
+          python scripts/smoke_plugin.py
+
+      - name: Require unchanged source after build and smokes
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          changes="$(git status --porcelain=v1 --untracked-files=all)"
+          if [[ -n "$changes" ]]; then
+            echo "source checkout changed after build" >&2
+            printf '%s\n' "$changes" >&2
+            exit 1
+          fi
+
+      - name: Reverify exact artifacts after smokes
+        run: >-
+          uv run --no-sync python scripts/verify_release_artifacts.py
+          --dist "$RUNNER_TEMP/atready-runtime-release/dist"
+
+      - name: Create bounded runtime review metadata
+        env:
+          PUBLISH_PYPI: ${{ inputs.publish_pypi }}
+          PUBLIC_METADATA_URLS_VERIFIED: ${{ inputs.public_metadata_urls_verified }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/atready-runtime-release/dist"
+          python - "$root" <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          plugin_document = json.loads(
+              pathlib.Path("plugins/atready/.codex-plugin/plugin.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          plugin_version = plugin_document.get("version")
+          if not isinstance(plugin_version, str) or re.fullmatch(
+              r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", plugin_version
+          ) is None:
+              raise SystemExit("plugin manifest version is not a semantic product version")
+          artifacts = []
+          for path in sorted((*root.glob("*.whl"), *root.glob("*.tar.gz"))):
+              artifacts.append(
+                  {
+                      "filename": path.name,
+                      "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                  }
+              )
+          value = {
+              "artifacts": artifacts,
+              "metadata_kind": "unsigned-runtime-release-review-metadata",
+              "plugin_version": plugin_version,
+              "project": "project-atready",
+              "publish_requested": os.environ["PUBLISH_PYPI"] == "true",
+              "public_metadata_urls_verified": (
+                  os.environ["PUBLIC_METADATA_URLS_VERIFIED"] == "true"
+              ),
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "runtime_version": os.environ["RELEASE_VERSION"],
+              "schema_version": 2,
+              "source_commit": os.environ["SOURCE_SHA"],
+              "unsigned": True,
+              "workflow_commit": os.environ["WORKFLOW_SHA"],
+              "workflow_path": ".github/workflows/runtime-release.yml",
+          }
+          manifest = root / "runtime-release-manifest.json"
+          manifest.write_text(
+              json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          subjects = sorted((*root.glob("*.whl"), *root.glob("*.tar.gz"), manifest))
+          (root / "SHA256SUMS").write_text(
+              "".join(
+                  f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
+                  for path in subjects
+              ),
+              encoding="ascii",
+          )
+          PY
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Upload runtime distributions for owner review
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: runtime-release-${{ inputs.source_sha }}
+          path: ${{ runner.temp }}/atready-runtime-release/dist/
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 30
+          compression-level: 0
+
+  publish-pypi:
+    name: Publish owner-approved runtime distributions
+    if: ${{ inputs.publish_pypi }}
+    needs: build
+    environment: pypi
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      id-token: write
+    steps:
+      - name: Download exact reviewed runtime distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: runtime-release-${{ inputs.source_sha }}
+          path: reviewed-dist
+
+      - name: Verify review metadata and exact publish bytes
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          PUBLIC_METADATA_URLS_VERIFIED: ${{ inputs.public_metadata_urls_verified }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+
+          root = pathlib.Path("reviewed-dist")
+          version = os.environ["RELEASE_VERSION"]
+          wheel = f"project_atready-{version}-py3-none-any.whl"
+          source = f"project_atready-{version}.tar.gz"
+          expected = {wheel, source, "runtime-release-manifest.json", "SHA256SUMS"}
+          actual = {path.name for path in root.iterdir() if path.is_file() and not path.is_symlink()}
+          if actual != expected or any(not path.is_file() or path.is_symlink() for path in root.iterdir()):
+              raise SystemExit("review artifact does not contain the exact four regular files")
+
+          manifest = json.loads((root / "runtime-release-manifest.json").read_text(encoding="utf-8"))
+          plugin_version = manifest.get("plugin_version")
+          if not isinstance(plugin_version, str) or re.fullmatch(
+              r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", plugin_version
+          ) is None:
+              raise SystemExit("runtime review plugin product version is invalid")
+          if manifest != {
+              "artifacts": manifest.get("artifacts"),
+              "metadata_kind": "unsigned-runtime-release-review-metadata",
+              "plugin_version": plugin_version,
+              "project": "project-atready",
+              "publish_requested": True,
+              "public_metadata_urls_verified": True,
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "runtime_version": version,
+              "schema_version": 2,
+              "source_commit": os.environ["SOURCE_SHA"],
+              "unsigned": True,
+              "workflow_commit": os.environ["WORKFLOW_SHA"],
+              "workflow_path": ".github/workflows/runtime-release.yml",
+          }:
+              raise SystemExit("runtime review metadata identity does not match this run")
+          if os.environ["PUBLIC_METADATA_URLS_VERIFIED"] != "true":
+              raise SystemExit("public project metadata URLs were not owner-verified")
+          artifacts = manifest["artifacts"]
+          if not isinstance(artifacts, list) or len(artifacts) != 2:
+              raise SystemExit("runtime review metadata has the wrong artifact count")
+          expected_artifacts = {}
+          for item in artifacts:
+              if not isinstance(item, dict) or set(item) != {"filename", "sha256"}:
+                  raise SystemExit("runtime review artifact metadata is malformed")
+              name, digest = item["filename"], item["sha256"]
+              if name not in {wheel, source} or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+                  raise SystemExit("runtime review artifact identity is invalid")
+              if name in expected_artifacts:
+                  raise SystemExit("runtime review artifact metadata is duplicated")
+              expected_artifacts[name] = digest
+          for name, digest in expected_artifacts.items():
+              if hashlib.sha256((root / name).read_bytes()).hexdigest() != digest:
+                  raise SystemExit(f"runtime review digest mismatch: {name}")
+
+          checksums = (root / "SHA256SUMS").read_text(encoding="ascii")
+          subjects = [root / wheel, root / source, root / "runtime-release-manifest.json"]
+          expected_checksums = "".join(
+              f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
+              for path in sorted(subjects)
+          )
+          if checksums != expected_checksums:
+              raise SystemExit("runtime review checksums do not match exact publish subjects")
+          PY
+
+      - name: Set up pinned uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+          version: "0.11.7"
+
+      - name: Publish wheel and sdist without rebuilding
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: >-
+          uv publish --no-config --trusted-publishing always
+          --publish-url https://upload.pypi.org/legacy/
+          "reviewed-dist/project_atready-${RELEASE_VERSION}-py3-none-any.whl"
+          "reviewed-dist/project_atready-${RELEASE_VERSION}.tar.gz"

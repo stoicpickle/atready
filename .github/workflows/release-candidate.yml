@@ -1,0 +1,253 @@
+name: Release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact lowercase 40-character main commit already green in push CI
+        required: true
+        type: string
+      version:
+        description: Exact project-atready runtime version expected at that commit
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: release-candidate-${{ inputs.source_sha }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build private candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+    env:
+      UV_DEFAULT_INDEX: https://pypi.org/simple
+      UV_INDEX: ""
+      UV_NO_CACHE: "1"
+      UV_NO_CONFIG: "1"
+      UV_PYTHON_DOWNLOADS: never
+    steps:
+      - name: Require owner-dispatched green main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_OWNER: ${{ secrets.ATREADY_RELEASE_OWNER }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "source_sha must be an exact lowercase 40-character commit" >&2
+            exit 1
+          fi
+          if [[ ! "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "version must use the X.Y.Z form" >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" != "refs/heads/main" || "$GITHUB_SHA" != "$SOURCE_SHA" ]]; then
+            echo "candidate must run against the exact requested main commit" >&2
+            exit 1
+          fi
+          if [[ -z "$RELEASE_OWNER" || "$GITHUB_TRIGGERING_ACTOR" != "$RELEASE_OWNER" ]]; then
+            echo "candidate must be dispatched or rerun by the configured release owner" >&2
+            exit 1
+          fi
+          ci_count="$(gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
+            -f branch=main \
+            -f event=push \
+            -f status=success \
+            -f head_sha="$SOURCE_SHA" \
+            -f per_page=1 \
+            --jq '.total_count')"
+          if (( ci_count < 1 )); then
+            echo "exact source_sha does not have a successful push CI run" >&2
+            exit 1
+          fi
+
+      - name: Check out exact source without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ inputs.source_sha }}
+          submodules: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Set up pinned uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+          version: "0.11.7"
+
+      - name: Install locked test dependencies
+        run: uv sync --locked --all-groups --no-group release --no-install-project
+
+      - name: Require exact requested version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          actual_version="$(PYTHONPATH=src uv run --no-sync python -c \
+            'import atready; print(atready.__version__)')"
+          if [[ "$actual_version" != "$RELEASE_VERSION" ]]; then
+            echo "requested version does not match the source: $actual_version" >&2
+            exit 1
+          fi
+
+      - name: Validate plugin and skill contracts
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync pytest tests/test_plugin_contract.py tests/test_skill_contract.py
+
+      - name: Lint
+        run: uv run --no-sync ruff check .
+
+      - name: Check formatting
+        run: uv run --no-sync ruff format --check .
+
+      - name: Test with branch coverage
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync pytest --cov=atready --cov-report=term-missing
+
+      - name: Require unchanged source before build
+        run: |
+          set -euo pipefail
+          if [[ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]]; then
+            echo "checked-out commit drifted before build" >&2
+            exit 1
+          fi
+          changes="$(git status --porcelain=v1 --untracked-files=all)"
+          if [[ -n "$changes" ]]; then
+            echo "source checkout changed before build" >&2
+            printf '%s\n' "$changes" >&2
+            exit 1
+          fi
+
+      - name: Bind build timestamps to source commit
+        run: |
+          set -euo pipefail
+          source_date_epoch="$(git show -s --format=%ct "$GITHUB_SHA")"
+          if [[ ! "$source_date_epoch" =~ ^[0-9]+$ ]]; then
+            echo "source commit timestamp is not a non-negative integer" >&2
+            exit 1
+          fi
+          printf 'SOURCE_DATE_EPOCH=%s\n' "$source_date_epoch" >> "$GITHUB_ENV"
+
+      - name: Build twice through hash-constrained backend
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          candidate_root="$RUNNER_TEMP/atready-candidate"
+          build_args=(
+            --clear
+            --no-create-gitignore
+            --no-sources
+            --build-constraints build-constraints.txt
+            --require-hashes
+            --no-cache
+            --default-index https://pypi.org/simple
+          )
+          mkdir "$candidate_root"
+          uv build "${build_args[@]}" --out-dir "$candidate_root/dist-first"
+          uv build "${build_args[@]}" --out-dir "$candidate_root/dist-second"
+          wheel="project_atready-${RELEASE_VERSION}-py3-none-any.whl"
+          sdist="project_atready-${RELEASE_VERSION}.tar.gz"
+          cmp "$candidate_root/dist-first/$wheel" "$candidate_root/dist-second/$wheel"
+          cmp "$candidate_root/dist-first/$sdist" "$candidate_root/dist-second/$sdist"
+          mkdir "$candidate_root/dist"
+          cp "$candidate_root/dist-first/$wheel" "$candidate_root/dist/$wheel"
+          cp "$candidate_root/dist-first/$sdist" "$candidate_root/dist/$sdist"
+
+      - name: Install locked release checks
+        run: uv sync --locked --all-groups --no-install-project
+
+      - name: Check PyPI metadata and rendering
+        run: >-
+          uv run --no-sync twine check --strict
+          "$RUNNER_TEMP/atready-candidate/dist/"*
+
+      - name: Verify rendered README links
+        run: uv run --no-sync python scripts/verify_readme_rendering.py
+
+      - name: Verify exact artifact contents
+        run: >-
+          uv run --no-sync python scripts/verify_release_artifacts.py
+          --dist "$RUNNER_TEMP/atready-candidate/dist"
+
+      - name: Smoke installed wheel
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: >-
+          uv run --isolated --no-project
+          --with "$RUNNER_TEMP/atready-candidate/dist/project_atready-${RELEASE_VERSION}-py3-none-any.whl"
+          python scripts/smoke_wheel.py
+
+      - name: Smoke staged plugin
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: >-
+          uv run --isolated --no-project
+          --with "$RUNNER_TEMP/atready-candidate/dist/project_atready-${RELEASE_VERSION}-py3-none-any.whl"
+          python scripts/smoke_plugin.py
+
+      - name: Require unchanged source after build and smokes
+        run: |
+          set -euo pipefail
+          if [[ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]]; then
+            echo "checked-out commit drifted after build" >&2
+            exit 1
+          fi
+          changes="$(git status --porcelain=v1 --untracked-files=all)"
+          if [[ -n "$changes" ]]; then
+            echo "source checkout changed after build" >&2
+            printf '%s\n' "$changes" >&2
+            exit 1
+          fi
+
+      - name: Reverify exact artifacts after smokes
+        run: >-
+          uv run --no-sync python scripts/verify_release_artifacts.py
+          --dist "$RUNNER_TEMP/atready-candidate/dist"
+
+      - name: Create and verify unsigned candidate metadata
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          uv run --no-sync python scripts/release_bundle.py create \
+            --dist "$RUNNER_TEMP/atready-candidate/dist" \
+            --repository "$GITHUB_REPOSITORY" \
+            --source-commit "$SOURCE_SHA" \
+            --workflow-commit "$WORKFLOW_SHA"
+          uv run --no-sync python scripts/release_bundle.py verify \
+            --dist "$RUNNER_TEMP/atready-candidate/dist" \
+            --repository "$GITHUB_REPOSITORY" \
+            --source-commit "$SOURCE_SHA" \
+            --workflow-commit "$WORKFLOW_SHA"
+
+      - name: Upload private candidate bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-candidate-${{ inputs.source_sha }}
+          path: |
+            ${{ runner.temp }}/atready-candidate/dist/project_atready-${{ inputs.version }}-py3-none-any.whl
+            ${{ runner.temp }}/atready-candidate/dist/project_atready-${{ inputs.version }}.tar.gz
+            ${{ runner.temp }}/atready-candidate/dist/release-receipt.json
+            ${{ runner.temp }}/atready-candidate/dist/SHA256SUMS
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 7
+          compression-level: 0

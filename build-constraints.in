@@ -1,0 +1,2 @@
+# Release builds resolve this exact backend set through a hash-complete compiled file.
+hatchling==1.31.0

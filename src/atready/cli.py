@@ -1,0 +1,1970 @@
+"""Dependency-light command-line interface for private inventory operations."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import os
+import re
+import sys
+from collections.abc import Sequence
+from datetime import date
+from importlib.resources import files
+from pathlib import Path
+from typing import Any
+
+from atready import __version__
+from atready.catalog import InventoryCatalog
+from atready.errors import AtReadyError, ConfigurationError
+from atready.intake import (
+    IntakeError,
+    LocalDiscoveryRequest,
+    discover_local_resource,
+    resource_profile,
+    resource_profiles,
+)
+from atready.inventory_edit import (
+    commit_add_resource,
+    commit_inventory_annotation,
+    commit_inventory_backup_delete,
+    commit_inventory_recovery,
+    commit_inventory_rollback,
+    commit_remove_resource,
+    commit_replace_resource,
+    inspect_inventory_backup,
+    inspect_inventory_backup_manifest,
+    list_inventory_backups,
+    plan_add_resource,
+    plan_inventory_annotation,
+    plan_inventory_backup_delete,
+    plan_inventory_recovery,
+    plan_inventory_rollback,
+    plan_remove_resource,
+    plan_replace_resource,
+    read_inventory_file,
+)
+from atready.models import (
+    AccessStatus,
+    BillingModel,
+    ConfidenceBasis,
+    DataClass,
+    HandoffMethod,
+    InteractionMode,
+    Inventory,
+    InventoryAnnotationDeclaration,
+    QuotaStatus,
+    ResourceDeclaration,
+    SessionAvailability,
+)
+from atready.paths import create_private_file, resolve_paths
+from atready.project import project_from_path
+from atready.render import render_markdown
+from atready.resource_input import (
+    ParsedResourceDeclaration,
+    load_inventory_annotation_declaration_file,
+    load_inventory_annotation_declaration_stdin,
+    load_resource_declaration_file,
+    load_resource_declaration_stdin,
+    parse_resource_mapping,
+)
+from atready.routing import route
+from atready.runtime_contract import doctor_payload, runtime_contract_payload
+from atready.templates import demo_inventory, starter_inventory, starter_project
+from atready.yamlio import dumps_yaml
+
+_MAX_CAPACITY_NUMBER_CHARACTERS = 64
+_RUNTIME_FEATURE_ID = re.compile(r"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$")
+_PLUGIN_VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.!+_-]{0,63}$")
+
+_WORDMARK = (
+    "  A   TTTTT RRRR  EEEEE   A   DDDD  Y   Y",
+    " A A    T   R   R E      A A  D   D  Y Y ",
+    "AAAAA   T   RRRR  EEEE  AAAAA D   D   Y  ",
+    "A   A   T   R R   E     A   A D   D   Y  ",
+    "A   A   T   R  RR EEEEE A   A DDDD    Y  ",
+)
+_TOOLBOX = (
+    " .--------.",
+    " |  ____  |",
+    " | |____| |",
+    " |________|",
+    "   |____|  ",
+)
+_GRADIENT_STOPS = ((24, 76, 174), (124, 82, 184), (224, 65, 55))
+
+
+def _gradient_rgb(position: int, maximum: int) -> tuple[int, int, int]:
+    ratio = position / maximum if maximum else 0.0
+    segment = min(int(ratio * (len(_GRADIENT_STOPS) - 1)), len(_GRADIENT_STOPS) - 2)
+    local = ratio * (len(_GRADIENT_STOPS) - 1) - segment
+    start = _GRADIENT_STOPS[segment]
+    end = _GRADIENT_STOPS[segment + 1]
+    return tuple(round(a + (b - a) * local) for a, b in zip(start, end, strict=True))
+
+
+def _colorize_banner_line(value: str) -> str:
+    last = max(len(value) - 1, 1)
+    output: list[str] = []
+    active: tuple[int, int, int] | None = None
+    for index, character in enumerate(value):
+        if character == " ":
+            output.append(character)
+            continue
+        rgb = _gradient_rgb(index, last)
+        if rgb != active:
+            output.append(f"\033[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m")
+            active = rgb
+        output.append(character)
+    if active is not None:
+        output.append("\033[0m")
+    return "".join(output)
+
+
+def _welcome_text(*, color: bool) -> str:
+    banner = [
+        f"{wordmark}  {toolbox}" for wordmark, toolbox in zip(_WORDMARK, _TOOLBOX, strict=True)
+    ]
+    if color:
+        banner = [_colorize_banner_line(line) for line in banner]
+    return "\n".join(
+        [
+            *banner,
+            "",
+            "Plan with what you have at the ready.",
+            "",
+            "AtReady turns a rough plan and a list of your available tools into a clear,",
+            "explainable workstream route. It recommends who or what could help; it does not",
+            "run those resources or execute the work.",
+            "",
+            "Try the synthetic demo (it does not touch your personal inventory):",
+            "  atready demo inventory > inventory.yaml",
+            "  atready project template > project.yaml",
+            "  atready route --project project.yaml --inventory inventory.yaml --allow-demo",
+            "",
+            "More commands: atready --help",
+        ]
+    )
+
+
+def _handle_welcome(args: argparse.Namespace) -> int:
+    color_mode = getattr(args, "color", "auto")
+    use_color = color_mode == "always" or (
+        color_mode == "auto"
+        and "NO_COLOR" not in os.environ
+        and os.environ.get("TERM") != "dumb"
+        and sys.stdout.isatty()
+    )
+    print(_welcome_text(color=use_color))
+    return 0
+
+
+def _plugin_version(value: str) -> str:
+    if _PLUGIN_VERSION_PATTERN.fullmatch(value) is None:
+        raise argparse.ArgumentTypeError("plugin version must be a bounded ASCII token")
+    return value
+
+
+def _runtime_contract_version(value: str) -> int:
+    try:
+        parsed = int(value)
+    except (ValueError, TypeError):
+        raise argparse.ArgumentTypeError("plugin contract must be a positive integer") from None
+    if parsed < 1 or str(parsed) != value:
+        raise argparse.ArgumentTypeError("plugin contract must be a positive integer")
+    return parsed
+
+
+def _runtime_feature_id(value: str) -> str:
+    if len(value) > 100 or _RUNTIME_FEATURE_ID.fullmatch(value) is None:
+        raise argparse.ArgumentTypeError("required feature must be a bounded feature ID")
+    return value
+
+
+def _configure_resource_declaration_parser(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--path", type=Path, help="Defaults to user config")
+    parser.add_argument(
+        "--resource-file",
+        type=Path,
+        help=(
+            "Read one protected versioned YAML/JSON declaration file; POSIX mode must be 0600 "
+            "and the pathname remains visible in argv"
+        ),
+    )
+    parser.add_argument(
+        "--resource-stdin",
+        action="store_true",
+        help=(
+            "Read one versioned YAML/JSON declaration from non-interactive stdin without "
+            "placing its contents in argv"
+        ),
+    )
+    parser.add_argument("--id", help="Typed mode; value is visible in argv")
+    parser.add_argument("--name", help="Typed mode; value is visible in argv")
+    parser.add_argument(
+        "--category", action="append", help="Typed mode; repeat; value is visible in argv"
+    )
+    parser.add_argument(
+        "--capability", action="append", metavar="ID=SCORE", help="Repeat for each capability"
+    )
+    parser.add_argument("--access", choices=_enum_values(AccessStatus))
+    parser.add_argument("--interaction", choices=_enum_values(InteractionMode))
+    parser.add_argument("--session", choices=_enum_values(SessionAvailability))
+    parser.add_argument("--billing", choices=_enum_values(BillingModel))
+    parser.add_argument("--marginal-cost", type=float)
+    parser.add_argument("--quota", choices=_enum_values(QuotaStatus))
+    parser.add_argument("--capacity-unit")
+    parser.add_argument("--capacity-remaining", type=_capacity_number)
+    parser.add_argument("--capacity-limit", type=_capacity_number)
+    parser.add_argument("--capacity-project-limit", type=_capacity_number)
+    parser.add_argument("--capacity-resets-on", type=_date_value, metavar="YYYY-MM-DD")
+    parser.add_argument("--capacity-basis", choices=_enum_values(ConfidenceBasis))
+    parser.add_argument("--capacity-verified-on", type=_date_value, metavar="YYYY-MM-DD")
+    parser.add_argument("--rating", action="append", metavar="NAME=SCORE")
+    parser.add_argument("--allowed-data-class", action="append", choices=_enum_values(DataClass))
+    parser.add_argument("--approval-required", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--requires-network", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--confidence-basis", choices=_enum_values(ConfidenceBasis))
+    parser.add_argument("--verified-on", type=_date_value, metavar="YYYY-MM-DD")
+    parser.add_argument("--handoff-method", choices=_enum_values(HandoffMethod))
+    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--expect-revision")
+    parser.add_argument("--expect-plan")
+    parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
+
+
+def _configure_annotation_mutation_parser(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--path", type=Path, help="Defaults to user config")
+    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--expect-revision")
+    parser.add_argument("--expect-plan")
+    parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="atready",
+        description="Plan a project around the tools and resources you already have.",
+    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.set_defaults(handler=_handle_welcome, color="auto")
+    commands = parser.add_subparsers(dest="command")
+
+    welcome_parser = commands.add_parser("welcome", help="Show the AtReady welcome screen")
+    welcome_parser.add_argument(
+        "--color",
+        choices=("auto", "always", "never"),
+        default="auto",
+        help="Color mode for the welcome wordmark",
+    )
+    welcome_parser.set_defaults(handler=_handle_welcome)
+
+    doctor_parser = commands.add_parser(
+        "doctor",
+        help="Report local runtime compatibility without reading inventory or changing anything",
+        description=(
+            "Report the value-free plugin/runtime compatibility contract. This command does not "
+            "read inventory, access the network, or write files."
+        ),
+    )
+    doctor_parser.add_argument(
+        "--plugin-version",
+        type=_plugin_version,
+        help="Plugin product version to include in diagnostics; it is not equality-enforced",
+    )
+    doctor_parser.add_argument(
+        "--plugin-contract",
+        type=_runtime_contract_version,
+        help="Runtime contract version required by the plugin",
+    )
+    doctor_parser.add_argument(
+        "--require-feature",
+        action="append",
+        default=[],
+        type=_runtime_feature_id,
+        help="Required runtime feature ID; repeat for each required feature",
+    )
+    doctor_parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
+    doctor_parser.set_defaults(handler=_handle_doctor)
+
+    runtime_parser = commands.add_parser(
+        "runtime", help="Inspect the value-free local runtime contract"
+    )
+    runtime_commands = runtime_parser.add_subparsers(dest="runtime_command", required=True)
+    runtime_contract_parser = runtime_commands.add_parser(
+        "contract", help="Report the canonical plugin/runtime compatibility contract"
+    )
+    runtime_contract_parser.add_argument(
+        "--json", action="store_true", help="Emit machine-readable output"
+    )
+    runtime_contract_parser.set_defaults(handler=_handle_runtime_contract)
+
+    init_parser = commands.add_parser(
+        "init",
+        help="Create an empty private personal inventory",
+        description=(
+            "Create an empty personal inventory with a fresh 256-bit revision privacy nonce. "
+            "The nonce value is written only inside the inventory and is never printed."
+        ),
+    )
+    init_parser.add_argument("--path", type=Path, help="Inventory path; defaults to user config")
+    init_parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
+    init_parser.set_defaults(handler=_handle_init)
+
+    demo_parser = commands.add_parser("demo", help="Print explicit synthetic demonstration data")
+    demo_commands = demo_parser.add_subparsers(dest="demo_command", required=True)
+    demo_inventory_parser = demo_commands.add_parser(
+        "inventory", help="Print the bundled synthetic inventory without writing it"
+    )
+    demo_inventory_parser.add_argument("--format", choices=("yaml", "json"), default="yaml")
+    demo_inventory_parser.set_defaults(handler=_handle_demo_inventory)
+
+    config_parser = commands.add_parser("config", help="Inspect resolved local paths")
+    config_commands = config_parser.add_subparsers(dest="config_command", required=True)
+    path_parser = config_commands.add_parser("path", help="Print the default inventory path")
+    path_parser.add_argument("--json", action="store_true", help="Emit all resolved paths as JSON")
+    path_parser.set_defaults(handler=_handle_config_path)
+
+    resource_parser = commands.add_parser(
+        "resource",
+        help="Inspect the bundled resource proposal catalog or run bounded local discovery",
+    )
+    resource_commands = resource_parser.add_subparsers(dest="resource_command", required=True)
+    profiles_parser = resource_commands.add_parser(
+        "profiles",
+        help="List bundled catalog proposals without inspecting local resources",
+    )
+    profiles_parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
+    profiles_parser.set_defaults(handler=_handle_resource_profiles)
+    profile_parser = resource_commands.add_parser(
+        "profile",
+        help="Show one bundled catalog proposal without inspecting a resource or account",
+    )
+    profile_parser.add_argument("profile", help="Exact profile ID or bundled alias")
+    profile_parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
+    profile_parser.set_defaults(handler=_handle_resource_profile)
+    discover_parser = resource_commands.add_parser(
+        "discover",
+        help="Locate an executable; optional version execution has unknown external side effects",
+    )
+    discover_parser.add_argument("profile", help="Exact profile ID or bundled alias")
+    discover_parser.add_argument(
+        "--executable",
+        help="Optional exact absolute path to the profile's allowlisted executable",
+    )
+    discover_parser.add_argument(
+        "--inspect-version",
+        action="store_true",
+        help="Run the fixed version probe for the reviewed --executable absolute path",
+    )
+    discover_parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
+    discover_parser.set_defaults(handler=_handle_resource_discover)
+
+    inventory_parser = commands.add_parser(
+        "inventory", help="Inspect and manage an inventory and its recovery backups"
+    )
+    inventory_commands = inventory_parser.add_subparsers(dest="inventory_command", required=True)
+
+    validate_parser = inventory_commands.add_parser("validate", help="Validate an inventory")
+    validate_parser.add_argument("path", nargs="?", type=Path, help="Defaults to user config")
+    validate_parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
+    validate_parser.add_argument(
+        "--strict", action="store_true", help="Treat staleness and unknown-state warnings as errors"
+    )
+    validate_parser.set_defaults(handler=_handle_inventory_validate)
+
+    snapshot_parser = inventory_commands.add_parser(
+        "snapshot",
+        help="Emit routing fields while omitting private notes and the revision privacy nonce",
+    )
+    snapshot_parser.add_argument("path", nargs="?", type=Path, help="Defaults to user config")
+    snapshot_parser.add_argument("--format", choices=("json", "yaml"), default="json")
+    snapshot_parser.set_defaults(handler=_handle_inventory_snapshot)
+
+    list_parser = inventory_commands.add_parser(
+        "list", help="List routing-safe resource summaries and the exact file revision"
+    )
+    list_parser.add_argument("path", nargs="?", type=Path, help="Defaults to user config")
+    list_parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
+    list_parser.set_defaults(handler=_handle_inventory_list)
+
+    add_parser = inventory_commands.add_parser(
+        "add",
+        help="Preview or apply one typed or argv-safe resource addition",
+        description=(
+            "Preview or apply one resource addition. Choose typed flags, --resource-file, or "
+            "--resource-stdin. Typed mode requires --id, --name, one or more --category, and "
+            "one or more --capability. Structured input keeps declaration contents out of "
+            "process arguments, but routing-visible preview output can still be retained by "
+            "the terminal, invoking host, logs, or model context. Private notes require an "
+            "inventory created with the current init command."
+        ),
+    )
+    add_parser.add_argument("--path", type=Path, help="Defaults to user config")
+    add_parser.add_argument(
+        "--resource-file",
+        type=Path,
+        help=(
+            "Read one protected versioned YAML/JSON declaration file; POSIX mode must be 0600 "
+            "and the pathname remains visible in argv"
+        ),
+    )
+    add_parser.add_argument(
+        "--resource-stdin",
+        action="store_true",
+        help=(
+            "Read one versioned YAML/JSON declaration from non-interactive stdin without "
+            "placing its contents in argv"
+        ),
+    )
+    add_parser.add_argument("--id", help="Typed mode; value is visible in argv")
+    add_parser.add_argument("--name", help="Typed mode; value is visible in argv")
+    add_parser.add_argument(
+        "--category", action="append", help="Typed mode; repeat; value is visible in argv"
+    )
+    add_parser.add_argument(
+        "--capability",
+        action="append",
+        metavar="ID=SCORE",
+        help="Repeat for each declared capability",
+    )
+    add_parser.add_argument("--access", choices=_enum_values(AccessStatus))
+    add_parser.add_argument("--interaction", choices=_enum_values(InteractionMode))
+    add_parser.add_argument("--session", choices=_enum_values(SessionAvailability))
+    add_parser.add_argument("--billing", choices=_enum_values(BillingModel))
+    add_parser.add_argument("--marginal-cost", type=float)
+    add_parser.add_argument("--quota", choices=_enum_values(QuotaStatus))
+    add_parser.add_argument("--capacity-unit")
+    add_parser.add_argument("--capacity-remaining", type=_capacity_number)
+    add_parser.add_argument("--capacity-limit", type=_capacity_number)
+    add_parser.add_argument("--capacity-project-limit", type=_capacity_number)
+    add_parser.add_argument("--capacity-resets-on", type=_date_value, metavar="YYYY-MM-DD")
+    add_parser.add_argument("--capacity-basis", choices=_enum_values(ConfidenceBasis))
+    add_parser.add_argument("--capacity-verified-on", type=_date_value, metavar="YYYY-MM-DD")
+    add_parser.add_argument(
+        "--rating",
+        action="append",
+        metavar="NAME=SCORE",
+        help="Repeat for quality, speed, autonomy, privacy, reliability, confidence, "
+        "context-switch-cost, or integration-friction",
+    )
+    add_parser.add_argument(
+        "--allowed-data-class", action="append", choices=_enum_values(DataClass)
+    )
+    add_parser.add_argument(
+        "--approval-required", action=argparse.BooleanOptionalAction, default=None
+    )
+    add_parser.add_argument(
+        "--requires-network", action=argparse.BooleanOptionalAction, default=None
+    )
+    add_parser.add_argument("--confidence-basis", choices=_enum_values(ConfidenceBasis))
+    add_parser.add_argument("--verified-on", type=_date_value, metavar="YYYY-MM-DD")
+    add_parser.add_argument("--handoff-method", choices=_enum_values(HandoffMethod))
+    add_parser.add_argument("--apply", action="store_true", help="Apply the previewed addition")
+    add_parser.add_argument(
+        "--expect-revision",
+        help="Exact sha256 revision printed by the preview; required with --apply",
+    )
+    add_parser.add_argument(
+        "--expect-plan",
+        help=(
+            "Plan token binding the previewed operation, target, and candidate; "
+            "required with --apply"
+        ),
+    )
+    add_parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
+    add_parser.set_defaults(handler=_handle_inventory_add)
+
+    replace_parser = inventory_commands.add_parser(
+        "replace",
+        help="Preview or apply full replacement of one existing resource",
+        description=(
+            "Replace the existing resource whose ID matches the complete typed or structured "
+            "declaration. Omitted fields take declared defaults; omitted private notes are removed."
+        ),
+    )
+    _configure_resource_declaration_parser(replace_parser)
+    replace_parser.set_defaults(handler=_handle_inventory_replace)
+
+    remove_parser = inventory_commands.add_parser(
+        "remove", help="Preview or apply removal of one exact resource ID"
+    )
+    remove_parser.add_argument("--path", type=Path, help="Defaults to user config")
+    remove_parser.add_argument("--resource", required=True, help="Exact resource ID to remove")
+    remove_parser.add_argument("--apply", action="store_true")
+    remove_parser.add_argument("--expect-revision")
+    remove_parser.add_argument("--expect-plan")
+    remove_parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
+    remove_parser.set_defaults(handler=_handle_inventory_remove)
+
+    annotate_parser = inventory_commands.add_parser(
+        "annotate", help="Preview or apply a protected root private-note set or clear"
+    )
+    annotate_commands = annotate_parser.add_subparsers(dest="annotation_command", required=True)
+    annotate_set_parser = annotate_commands.add_parser(
+        "set", help="Set root private notes from one protected declaration"
+    )
+    _configure_annotation_mutation_parser(annotate_set_parser)
+    annotation_input = annotate_set_parser.add_mutually_exclusive_group(required=True)
+    annotation_input.add_argument(
+        "--annotation-file",
+        type=Path,
+        help="Read a protected versioned declaration file; POSIX mode must be 0600",
+    )
+    annotation_input.add_argument(
+        "--annotation-stdin",
+        action="store_true",
+        help="Read a versioned declaration from non-interactive stdin",
+    )
+    annotate_set_parser.set_defaults(handler=_handle_inventory_annotation_set)
+
+    annotate_clear_parser = annotate_commands.add_parser(
+        "clear", help="Remove the root private notes without accepting a value"
+    )
+    _configure_annotation_mutation_parser(annotate_clear_parser)
+    annotate_clear_parser.set_defaults(handler=_handle_inventory_annotation_clear)
+
+    backup_parser = inventory_commands.add_parser(
+        "backup", help="Inspect, roll back, or explicitly delete exact inventory backups"
+    )
+    backup_commands = backup_parser.add_subparsers(dest="backup_command", required=True)
+
+    backup_list_parser = backup_commands.add_parser(
+        "list", help="List validated backups for one exact inventory target"
+    )
+    backup_list_parser.add_argument("--path", type=Path, help="Defaults to user config")
+    backup_list_parser.add_argument(
+        "--json", action="store_true", help="Emit machine-readable output"
+    )
+    backup_list_parser.set_defaults(handler=_handle_inventory_backup_list)
+
+    backup_manifest_parser = backup_commands.add_parser(
+        "manifest", help="Inspect ordered backup-operation evidence for one inventory target"
+    )
+    backup_manifest_parser.add_argument("--path", type=Path, help="Defaults to user config")
+    backup_manifest_parser.add_argument(
+        "--json", action="store_true", help="Emit machine-readable output"
+    )
+    backup_manifest_parser.set_defaults(handler=_handle_inventory_backup_manifest)
+
+    backup_inspect_parser = backup_commands.add_parser(
+        "inspect", help="Compare one exact backup with the active inventory"
+    )
+    backup_inspect_parser.add_argument("--path", type=Path, help="Defaults to user config")
+    backup_inspect_parser.add_argument(
+        "--backup", required=True, help="Exact sha256 backup ID from backup list"
+    )
+    backup_inspect_parser.add_argument(
+        "--json", action="store_true", help="Emit machine-readable output"
+    )
+    backup_inspect_parser.set_defaults(handler=_handle_inventory_backup_inspect)
+
+    backup_rollback_parser = backup_commands.add_parser(
+        "rollback", help="Preview or apply an exact-byte rollback"
+    )
+    backup_rollback_parser.add_argument("--path", type=Path, help="Defaults to user config")
+    backup_rollback_parser.add_argument(
+        "--backup", required=True, help="Exact sha256 backup ID from backup list"
+    )
+    backup_rollback_parser.add_argument(
+        "--apply", action="store_true", help="Apply the previewed rollback"
+    )
+    backup_rollback_parser.add_argument(
+        "--expect-revision", help="Exact active revision printed by the rollback preview"
+    )
+    backup_rollback_parser.add_argument(
+        "--expect-plan", help="Exact plan token printed by the rollback preview"
+    )
+    backup_rollback_parser.add_argument(
+        "--json", action="store_true", help="Emit machine-readable output"
+    )
+    backup_rollback_parser.set_defaults(handler=_handle_inventory_backup_rollback)
+
+    backup_recover_parser = backup_commands.add_parser(
+        "recover",
+        help="Preview or apply recovery of a missing or invalid active inventory",
+    )
+    backup_recover_parser.add_argument("--path", type=Path, help="Defaults to user config")
+    backup_recover_parser.add_argument(
+        "--backup", required=True, help="Exact sha256 backup ID from backup list"
+    )
+    backup_recover_parser.add_argument(
+        "--apply", action="store_true", help="Apply the previewed disaster recovery"
+    )
+    backup_recover_parser.add_argument(
+        "--expect-state", choices=("missing", "invalid"), help="Exact state from the preview"
+    )
+    backup_recover_parser.add_argument(
+        "--expect-plan", help="Exact plan token printed by the recovery preview"
+    )
+    backup_recover_parser.add_argument(
+        "--json", action="store_true", help="Emit machine-readable output"
+    )
+    backup_recover_parser.set_defaults(handler=_handle_inventory_backup_recover)
+
+    backup_delete_parser = backup_commands.add_parser(
+        "delete", help="Preview or apply irreversible deletion of one exact backup"
+    )
+    backup_delete_parser.add_argument("--path", type=Path, help="Defaults to user config")
+    backup_delete_parser.add_argument(
+        "--backup", required=True, help="Exact sha256 backup ID from backup list"
+    )
+    backup_delete_parser.add_argument(
+        "--allow-no-backups",
+        action="store_true",
+        help="Required in preview and apply when deleting the last valid backup",
+    )
+    backup_delete_parser.add_argument(
+        "--apply", action="store_true", help="Apply the previewed deletion"
+    )
+    backup_delete_parser.add_argument(
+        "--expect-revision", help="Exact active revision printed by the deletion preview"
+    )
+    backup_delete_parser.add_argument(
+        "--expect-plan", help="Exact plan token printed by the deletion preview"
+    )
+    backup_delete_parser.add_argument(
+        "--json", action="store_true", help="Emit machine-readable output"
+    )
+    backup_delete_parser.set_defaults(handler=_handle_inventory_backup_delete)
+
+    project_parser = commands.add_parser("project", help="Create or validate a project brief")
+    project_commands = project_parser.add_subparsers(dest="project_command", required=True)
+    project_template_parser = project_commands.add_parser(
+        "template", help="Print a synthetic project template without writing a file"
+    )
+    project_template_parser.set_defaults(handler=_handle_project_template)
+    project_validate_parser = project_commands.add_parser(
+        "validate", help="Validate a project brief"
+    )
+    project_validate_parser.add_argument("path", type=Path)
+    project_validate_parser.add_argument("--json", action="store_true")
+    project_validate_parser.set_defaults(handler=_handle_project_validate)
+
+    route_parser = commands.add_parser(
+        "route", help="Deterministically choose resources and render inert handoffs"
+    )
+    route_parser.add_argument("--project", required=True, type=Path)
+    route_parser.add_argument("--inventory", type=Path, help="Defaults to user config")
+    route_parser.add_argument("--format", choices=("json", "markdown"), default="markdown")
+    route_parser.add_argument(
+        "--allow-demo", action="store_true", help="Explicitly permit synthetic demo resources"
+    )
+    route_parser.set_defaults(handler=_handle_route)
+
+    skill_parser = commands.add_parser("skill", help="Inspect the bundled Codex skill")
+    skill_commands = skill_parser.add_subparsers(dest="skill_command", required=True)
+    skill_path_parser = skill_commands.add_parser(
+        "path", help="Print the distributable project-atready skill path"
+    )
+    skill_path_parser.set_defaults(handler=_handle_skill_path)
+
+    schema_parser = commands.add_parser("schema", help="Print a JSON Schema")
+    schema_parser.add_argument(
+        "kind",
+        choices=(
+            "inventory",
+            "inventory-annotation-declaration",
+            "project",
+            "resource-declaration",
+            "route-plan",
+        ),
+    )
+    schema_parser.set_defaults(handler=_handle_schema)
+    return parser
+
+
+def _enum_values(enum_type: type) -> tuple[str, ...]:
+    return tuple(item.value for item in enum_type)
+
+
+def _date_value(value: str) -> date:
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected an ISO date in YYYY-MM-DD form") from exc
+    if parsed.isoformat() != value:
+        raise argparse.ArgumentTypeError("expected an ISO date in YYYY-MM-DD form")
+    return parsed
+
+
+def _capacity_number(value: str) -> int | float:
+    if len(value) > _MAX_CAPACITY_NUMBER_CHARACTERS:
+        raise argparse.ArgumentTypeError("expected a non-negative JSON number")
+    try:
+        parsed = json.loads(value)
+    except (RecursionError, ValueError) as exc:
+        raise argparse.ArgumentTypeError("expected a non-negative JSON number") from exc
+    if (
+        isinstance(parsed, bool)
+        or not isinstance(parsed, (int, float))
+        or (isinstance(parsed, float) and not math.isfinite(parsed))
+        or parsed < 0
+        or parsed > 1e18
+    ):
+        raise argparse.ArgumentTypeError("expected a non-negative JSON number")
+    return parsed
+
+
+def _inventory_path(candidate: Path | None) -> Path:
+    return candidate.expanduser() if candidate else resolve_paths().inventory_path
+
+
+def _terminal_safe(value: object) -> str:
+    """Escape non-printing characters for one human-readable terminal line."""
+
+    return "".join(
+        character if character.isprintable() else character.encode("unicode_escape").decode("ascii")
+        for character in str(value)
+    )
+
+
+def _print_intake_review(review: dict[str, Any]) -> None:
+    """Render derived intake guidance without claiming route eligibility."""
+
+    print(f"Selection-fact status: {review['selection_fact_status']}")
+    facts = (
+        ("Unverified selection facts", review["unverified_selection_facts"]),
+        ("Declared unavailable facts", review["declared_unavailable_facts"]),
+    )
+    for label, values in facts:
+        print(f"{label}: {', '.join(values) if values else 'none'}")
+
+    labels = {
+        "selection_facts": "Selection-fact defaults",
+        "scoring_inputs": "Scoring-input defaults",
+        "conservative_policy": "Conservative-policy defaults",
+        "operating_context": "Operating-context defaults",
+    }
+    for group, label in labels.items():
+        values = review["default_groups"][group]
+        print(f"{label}: {', '.join(values) if values else 'none'}")
+    print(
+        "Route eligibility evaluated: false. Project constraints, capability fit, cost limits, "
+        "and provenance freshness are evaluated only during routing."
+    )
+
+
+_RATING_NAMES = {
+    "quality": "quality",
+    "speed": "speed",
+    "autonomy": "autonomy",
+    "privacy": "privacy",
+    "reliability": "reliability",
+    "confidence": "confidence",
+    "context-switch-cost": "context_switch_cost",
+    "integration-friction": "integration_friction",
+}
+
+
+def _scored_pairs(values: list[str], *, subject: str) -> dict[str, float]:
+    result: dict[str, float] = {}
+    for value in values:
+        if "=" not in value:
+            raise ConfigurationError(f"{subject} must use ID=SCORE: {value!r}")
+        name, raw_score = value.split("=", 1)
+        name = name.strip()
+        if not name:
+            raise ConfigurationError(f"{subject} ID must not be empty")
+        if name in result:
+            raise ConfigurationError(f"duplicate {subject} ID: {name}")
+        try:
+            score = float(raw_score)
+        except ValueError as exc:
+            raise ConfigurationError(f"{subject} score must be a number: {value!r}") from exc
+        if not math.isfinite(score):
+            raise ConfigurationError(f"{subject} score must be a finite number: {value!r}")
+        result[name] = score
+    return result
+
+
+def _resource_from_args(args: argparse.Namespace) -> ParsedResourceDeclaration:
+    capabilities = _scored_pairs(args.capability or [], subject="capability")
+    supplied_ratings = _scored_pairs(args.rating or [], subject="rating")
+    unknown_ratings = sorted(set(supplied_ratings) - set(_RATING_NAMES))
+    if unknown_ratings:
+        raise ConfigurationError("unknown rating names: " + ", ".join(unknown_ratings))
+    ratings = {_RATING_NAMES[name]: score for name, score in supplied_ratings.items()}
+
+    value: dict[str, Any] = {
+        "id": args.id,
+        "name": args.name,
+        "categories": args.category,
+        "capabilities": capabilities,
+    }
+    access = {
+        key: item
+        for key, item in {
+            "status": args.access,
+            "interaction": args.interaction,
+            "current_session": args.session,
+        }.items()
+        if item is not None
+    }
+    if access:
+        value["access"] = access
+    if args.marginal_cost is not None and not math.isfinite(args.marginal_cost):
+        raise ConfigurationError("marginal cost must be a finite number")
+    economics = {
+        key: item
+        for key, item in {
+            "billing": args.billing,
+            "marginal_cost": args.marginal_cost,
+            "quota": args.quota,
+        }.items()
+        if item is not None
+    }
+    capacity = {
+        key: item
+        for key, item in {
+            "unit": args.capacity_unit,
+            "remaining": args.capacity_remaining,
+            "limit": args.capacity_limit,
+            "project_limit": args.capacity_project_limit,
+            "resets_on": args.capacity_resets_on,
+            "basis": args.capacity_basis,
+            "last_verified": args.capacity_verified_on,
+        }.items()
+        if item is not None
+    }
+    if capacity:
+        economics["capacity"] = capacity
+    if economics:
+        value["economics"] = economics
+    if ratings:
+        value["ratings"] = ratings
+    policy = {
+        key: item
+        for key, item in {
+            "allowed_data_classes": args.allowed_data_class,
+            "approval_required": args.approval_required,
+            "requires_network": args.requires_network,
+        }.items()
+        if item is not None
+    }
+    if policy:
+        value["policy"] = policy
+    provenance = {
+        key: item
+        for key, item in {
+            "basis": args.confidence_basis,
+            "last_verified": args.verified_on,
+        }.items()
+        if item is not None
+    }
+    if provenance:
+        value["provenance"] = provenance
+    if args.handoff_method is not None:
+        value["handoff"] = {"method": args.handoff_method}
+
+    return parse_resource_mapping(value)
+
+
+_TYPED_RESOURCE_FLAGS = {
+    "id": "--id",
+    "name": "--name",
+    "category": "--category",
+    "capability": "--capability",
+    "access": "--access",
+    "interaction": "--interaction",
+    "session": "--session",
+    "billing": "--billing",
+    "marginal_cost": "--marginal-cost",
+    "quota": "--quota",
+    "capacity_unit": "--capacity-unit",
+    "capacity_remaining": "--capacity-remaining",
+    "capacity_limit": "--capacity-limit",
+    "capacity_project_limit": "--capacity-project-limit",
+    "capacity_resets_on": "--capacity-resets-on",
+    "capacity_basis": "--capacity-basis",
+    "capacity_verified_on": "--capacity-verified-on",
+    "rating": "--rating",
+    "allowed_data_class": "--allowed-data-class",
+    "approval_required": "--approval-required/--no-approval-required",
+    "requires_network": "--requires-network/--no-requires-network",
+    "confidence_basis": "--confidence-basis",
+    "verified_on": "--verified-on",
+    "handoff_method": "--handoff-method",
+}
+_REQUIRED_TYPED_RESOURCE_FLAGS = {
+    "id": "--id",
+    "name": "--name",
+    "category": "--category",
+    "capability": "--capability",
+}
+
+
+def _resource_input(args: argparse.Namespace) -> ParsedResourceDeclaration:
+    supplied_typed = [
+        flag for name, flag in _TYPED_RESOURCE_FLAGS.items() if getattr(args, name) is not None
+    ]
+    structured_modes = int(args.resource_file is not None) + int(args.resource_stdin)
+    if structured_modes > 1:
+        raise ConfigurationError("choose exactly one of --resource-file or --resource-stdin")
+    if structured_modes and supplied_typed:
+        raise ConfigurationError(
+            "structured resource input cannot be combined with typed flags: "
+            + ", ".join(supplied_typed)
+        )
+    if args.resource_file is not None:
+        return load_resource_declaration_file(args.resource_file)
+    if args.resource_stdin:
+        stream = getattr(sys.stdin, "buffer", None)
+        if stream is None:
+            raise ConfigurationError("--resource-stdin requires binary standard input")
+        return load_resource_declaration_stdin(stream)
+    missing = [
+        flag for name, flag in _REQUIRED_TYPED_RESOURCE_FLAGS.items() if getattr(args, name) is None
+    ]
+    if missing:
+        raise ConfigurationError(
+            "typed resource input requires "
+            + ", ".join(missing)
+            + "; otherwise use --resource-file or --resource-stdin"
+        )
+    return _resource_from_args(args)
+
+
+def _handle_init(args: argparse.Namespace) -> int:
+    path = _inventory_path(args.path)
+    create_private_file(path, starter_inventory())
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "created": str(path),
+                    "inventory_kind": "personal",
+                    "revision_protection": "nonce-v1-present",
+                    "resources": 0,
+                },
+                sort_keys=True,
+            )
+        )
+    else:
+        print(f"Created empty personal inventory at {_terminal_safe(path)}")
+        print(
+            "Revision privacy state: nonce-v1-present "
+            "(freshly generated; the nonce value is not printed)"
+        )
+        print("Add declared resources with 'atready inventory add'; never include credentials.")
+    return 0
+
+
+def _handle_doctor(args: argparse.Namespace) -> int:
+    payload = doctor_payload(
+        plugin_version=args.plugin_version,
+        plugin_contract_version=args.plugin_contract,
+        required_features=args.require_feature,
+    )
+    if args.json:
+        print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+    else:
+        if payload["compatible"]:
+            print("AtReady local runtime is ready for this plugin contract.")
+        else:
+            print("AtReady local runtime is not compatible with this plugin contract.")
+        print(f"Runtime version: {payload['runtime_version']}")
+        print(f"Runtime contract version: {payload['runtime_contract_version']}")
+        if payload["plugin_version"] is not None:
+            print(f"Plugin version checked: {payload['plugin_version']} (informational only)")
+        if payload["plugin_contract_version"] is not None:
+            print(f"Plugin contract required: {payload['plugin_contract_version']}")
+        print("Runtime features:")
+        for feature_id in payload["runtime_features"]:
+            print(f"- {feature_id}")
+        if payload["missing_features"]:
+            print("Missing required features:")
+            for feature_id in payload["missing_features"]:
+                print(f"- {feature_id}")
+        print("Inventory read: false")
+        print("Network accessed: false")
+        print("Writes performed: false")
+    return 0 if payload["compatible"] else 2
+
+
+def _handle_runtime_contract(args: argparse.Namespace) -> int:
+    payload = runtime_contract_payload()
+    if args.json:
+        print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+    else:
+        print(f"Product: {payload['product']}")
+        print(f"Runtime version: {payload['runtime_version']}")
+        print(f"Contract version: {payload['contract_version']}")
+        print("Features:")
+        for feature_id in payload["features"]:
+            print(f"- {feature_id}")
+        print("Inventory read: false")
+        print("Network accessed: false")
+        print("Writes performed: false")
+    return 0
+
+
+def _handle_demo_inventory(args: argparse.Namespace) -> int:
+    text = demo_inventory()
+    if args.format == "json":
+        inventory = InventoryCatalog.from_text(text).inventory
+        print(json.dumps(inventory.model_dump(mode="json"), indent=2, sort_keys=True))
+    else:
+        print(text, end="")
+    return 0
+
+
+def _handle_config_path(args: argparse.Namespace) -> int:
+    paths = resolve_paths()
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "config_directory": str(paths.config_dir),
+                    "data_directory": str(paths.data_dir),
+                    "inventory": str(paths.inventory_path),
+                },
+                sort_keys=True,
+            )
+        )
+    else:
+        print(_terminal_safe(paths.inventory_path))
+    return 0
+
+
+def _profile_payload(profile: Any) -> dict[str, Any]:
+    return {
+        "catalog_proposals_only": True,
+        "discovery_performed": False,
+        "resource_or_account_facts": False,
+        "writes_performed": False,
+        **profile.model_dump(mode="json"),
+    }
+
+
+def _handle_resource_profiles(args: argparse.Namespace) -> int:
+    profiles = resource_profiles()
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "catalog_version": 1,
+                    "catalog_proposals_only": True,
+                    "discovery_performed": False,
+                    "resource_or_account_facts": False,
+                    "writes_performed": False,
+                    "profiles": [profile.model_dump(mode="json") for profile in profiles],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        print("Bundled resource profiles (catalog proposals only; no discovery performed)")
+        for profile in profiles:
+            aliases = ", ".join(profile.aliases) if profile.aliases else "none"
+            print(f"- {profile.id}: {profile.name} (aliases: {aliases})")
+        print(
+            "Suggestions are not resource, account, authentication, quota, or availability facts."
+        )
+        print("Writes performed: false")
+    return 0
+
+
+def _handle_resource_profile(args: argparse.Namespace) -> int:
+    profile = resource_profile(args.profile)
+    if args.json:
+        print(json.dumps(_profile_payload(profile), indent=2, sort_keys=True))
+    else:
+        print(f"Resource profile proposal: {profile.name} ({profile.id})")
+        print(f"Aliases: {', '.join(profile.aliases) if profile.aliases else 'none'}")
+        print(
+            "Suggested categories: " + ", ".join(item.id for item in profile.category_suggestions)
+        )
+        print(
+            "Suggested capabilities: "
+            + ", ".join(item.id for item in profile.capability_suggestions)
+        )
+        print(
+            "Capacity unit hints: "
+            + (
+                ", ".join(item.unit for item in profile.capacity_unit_hints)
+                if profile.capacity_unit_hints
+                else "none"
+            )
+        )
+        if profile.executable_probe is not None:
+            executable_names = (
+                profile.executable_probe.executable,
+                *profile.executable_probe.aliases,
+            )
+            print("Local discovery executable proposals: " + ", ".join(executable_names))
+            print(
+                "Local discovery platforms: "
+                + ", ".join(profile.executable_probe.supported_platforms)
+            )
+        if profile.provider_kit is not None:
+            print("Provider workflow-mode proposals:")
+            for mode in profile.provider_kit.workflow_mode_suggestions:
+                print(
+                    f"- {mode.id}: {mode.label} (interaction: {mode.interaction_suggestion.value})"
+                )
+                print(f"  Guidance: {mode.guidance}")
+            print("Provider onboarding guidance:")
+            for item in profile.provider_kit.onboarding_guidance:
+                print(f"- {item.id}: {item.prompt}")
+            print("Provider capacity guidance:")
+            for item in profile.provider_kit.capacity_guidance:
+                print(f"- {item.id}: {item.prompt}")
+            if profile.provider_kit.model_routing_suggestions:
+                print(
+                    "Provider model-routing proposals "
+                    f"(reviewed {profile.provider_kit.model_catalog_reviewed_on}; "
+                    "availability unverified; capability scores require user confirmation):"
+                )
+                for model in profile.provider_kit.model_routing_suggestions:
+                    print(
+                        f"- {model.id}: {model.label} "
+                        f"(provider model: {model.provider_model_id}; "
+                        f"suggested resource: {model.suggested_resource_id}; "
+                        f"status: {model.selection_status})"
+                    )
+                    print(f"  Planning role: {model.planning_role}")
+                    print(f"  Caution: {model.planning_caution}")
+                    if model.shared_capacity_group is not None:
+                        print(f"  Shared capacity proposal: {model.shared_capacity_group}")
+            print(
+                "Provider kit limits: account inspection unsupported; AtReady network "
+                "access none; provider execution unsupported."
+            )
+        print("Catalog proposals only; no resource or account facts were inspected.")
+        print("Writes performed: false")
+    return 0
+
+
+def _handle_resource_discover(args: argparse.Namespace) -> int:
+    if args.inspect_version and args.executable is None:
+        raise IntakeError(
+            "version-probe-path-required",
+            "version inspection requires an explicitly supplied absolute executable path",
+        )
+    if args.executable is not None and not Path(args.executable).is_absolute():
+        raise IntakeError(
+            "executable-not-allowed",
+            "an explicitly supplied discovery executable must be an absolute path",
+        )
+    try:
+        request = LocalDiscoveryRequest(
+            profile=args.profile,
+            executable=args.executable,
+            probe_version=args.inspect_version,
+        )
+    except ValueError:
+        raise IntakeError(
+            "invalid-discovery-request",
+            "local discovery request is outside the bounded input contract",
+        ) from None
+    result = discover_local_resource(request)
+    payload = {
+        "discovery_scope": "local-executable-only",
+        **result.model_dump(mode="json"),
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print("Bounded local executable discovery (no inventory write)")
+        print(f"Profile: {result.profile_id}")
+        print(f"Executable: {result.executable_name}")
+        print(f"Search scope: {result.search_scope}")
+        print(f"Installed: {str(result.installed).lower()}")
+        print(f"Resolved path: {_terminal_safe(result.resolved_path or 'not located')}")
+        print(f"Version probe performed: {str(result.version_probe_performed).lower()}")
+        print(f"Version: {_terminal_safe(result.version or 'not observed')}")
+        print(f"Evidence: {', '.join(result.evidence)}")
+        print(f"Limitations: {', '.join(result.limitations)}")
+        print("Authentication evaluated: false")
+        print("Account status evaluated: false")
+        print("Quota evaluated: false")
+        print("Availability evaluated: false")
+        print("AtReady network accessed: false")
+        print("Inventory writes performed: false")
+        print(f"External process executed: {str(result.external_process_executed).lower()}")
+        print(f"External process side effects: {result.external_process_side_effects}")
+    return 0
+
+
+def _handle_inventory_validate(args: argparse.Namespace) -> int:
+    path = _inventory_path(args.path)
+    catalog = InventoryCatalog.from_path(path)
+    valid = not (args.strict and catalog.warnings)
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "fingerprint": "sha256:" + catalog.fingerprint(),
+                    "inventory_kind": catalog.inventory.inventory_kind.value,
+                    "path": str(path),
+                    "revision_protection": catalog.inventory.revision_protection(),
+                    "resources": len(catalog.inventory.resources),
+                    "valid": valid,
+                    "warnings": list(catalog.warnings),
+                },
+                sort_keys=True,
+            )
+        )
+    else:
+        status = "valid" if valid else "invalid in strict mode"
+        print(f"Inventory is {status}: {len(catalog.inventory.resources)} resources")
+        print(
+            f"Revision privacy state: {catalog.inventory.revision_protection()} "
+            "(presence only; imported nonce provenance is not verified)"
+        )
+        for warning in catalog.warnings:
+            print(f"warning: {_terminal_safe(warning)}", file=sys.stderr)
+    return 0 if valid else 2
+
+
+def _handle_inventory_snapshot(args: argparse.Namespace) -> int:
+    catalog = InventoryCatalog.from_path(_inventory_path(args.path))
+    snapshot = catalog.snapshot()
+    if args.format == "yaml":
+        print(dumps_yaml(snapshot), end="")
+    else:
+        print(json.dumps(snapshot, indent=2, sort_keys=True))
+    return 0
+
+
+def _handle_inventory_list(args: argparse.Namespace) -> int:
+    current = read_inventory_file(_inventory_path(args.path))
+    resources = [
+        {
+            "access": resource.access.status.value,
+            "capabilities": sorted(resource.capabilities),
+            "categories": sorted(resource.categories),
+            "id": resource.id,
+            "name": resource.name,
+            "quota": resource.economics.quota.value,
+        }
+        for resource in sorted(current.inventory.resources, key=lambda item: item.id)
+    ]
+    result = {
+        "inventory_kind": current.inventory.inventory_kind.value,
+        "resources": resources,
+        "revision": current.revision,
+        "revision_protection": current.inventory.revision_protection(),
+        "target": str(current.path),
+    }
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(f"Inventory: {result['inventory_kind']} · {len(resources)} resources")
+        print(f"Revision: {current.revision}")
+        print(
+            f"Revision privacy state: {result['revision_protection']} "
+            "(presence only; imported nonce provenance is not verified)"
+        )
+        for resource in resources:
+            print(
+                f"- {_terminal_safe(resource['id'])}: {_terminal_safe(resource['name'])} "
+                f"(access={resource['access']}, quota={resource['quota']})"
+            )
+    return 0
+
+
+def _require_preview_apply_contract(args: argparse.Namespace, *, subject: str) -> None:
+    if args.apply and (not args.expect_revision or not args.expect_plan):
+        raise ConfigurationError(
+            f"--apply requires --expect-revision and --expect-plan from a prior {subject} preview"
+        )
+    if (args.expect_revision or args.expect_plan) and not args.apply:
+        raise ConfigurationError("--expect-revision and --expect-plan are only valid with --apply")
+
+
+def _annotation_private_notes(args: argparse.Namespace) -> str:
+    if args.annotation_file is not None:
+        return load_inventory_annotation_declaration_file(args.annotation_file).private_notes
+    stream = getattr(sys.stdin, "buffer", None)
+    if stream is None:
+        raise ConfigurationError("--annotation-stdin requires binary standard input")
+    return load_inventory_annotation_declaration_stdin(stream).private_notes
+
+
+def _handle_inventory_annotation(args: argparse.Namespace, private_notes: str | None) -> int:
+    _require_preview_apply_contract(args, subject="inventory annotation")
+    plan = plan_inventory_annotation(_inventory_path(args.path), private_notes)
+    if not args.apply:
+        result = plan.preview()
+        if args.json:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            print("Inventory annotation preview (no files changed)")
+            print(f"Target: {_terminal_safe(result['target'])}")
+            print(f"Private notes effect: {result['private_notes_effect']}")
+            print("Private notes: value omitted and bound to this plan.")
+            print(f"Expected revision: {result['expect_revision']}")
+            print(f"Expected plan: {result['expect_plan']}")
+            print("Applying will canonicalize YAML and create a private exact-byte backup.")
+        return 0
+
+    receipt = commit_inventory_annotation(
+        plan,
+        expected_revision=args.expect_revision,
+        expected_plan=args.expect_plan,
+    )
+    result = receipt.as_dict()
+    result.update(
+        {
+            "private_notes_bound_to_plan": True,
+            "private_notes_effect": plan.private_notes_effect,
+            "private_notes_exposed": False,
+            "candidate_revision_protection": plan.revision_protection,
+            "observed_revision_protection": (
+                plan.revision_protection
+                if receipt.replacement_verified and receipt.revision == receipt.candidate_revision
+                else None
+            ),
+        }
+    )
+    uncertain = (
+        not receipt.replacement_verified
+        or bool(receipt.warnings)
+        or (os.name == "posix" and not receipt.directory_synced)
+    )
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(f"Updated inventory annotation in {_terminal_safe(receipt.target)}")
+        print(f"Private notes effect: {plan.private_notes_effect}")
+        print(f"Candidate revision: {receipt.candidate_revision}")
+        print(f"Replacement verified: {str(receipt.replacement_verified).lower()}")
+        print(f"Backup ID: {receipt.backup_id}")
+        print(f"Backup path: {_terminal_safe(receipt.backup_path)}")
+        for warning in receipt.warnings:
+            print(f"warning: {_terminal_safe(warning)}", file=sys.stderr)
+        if uncertain:
+            print(
+                "warning: update may already be applied; do not retry this apply; "
+                "inspect the target and backup before another update",
+                file=sys.stderr,
+            )
+    return 4 if uncertain else 0
+
+
+def _handle_inventory_annotation_set(args: argparse.Namespace) -> int:
+    return _handle_inventory_annotation(args, _annotation_private_notes(args))
+
+
+def _handle_inventory_annotation_clear(args: argparse.Namespace) -> int:
+    return _handle_inventory_annotation(args, None)
+
+
+def _handle_inventory_add(args: argparse.Namespace) -> int:
+    _require_preview_apply_contract(args, subject="addition")
+    parsed = _resource_input(args)
+    resource = parsed.resource
+    plan = plan_add_resource(
+        _inventory_path(args.path),
+        resource,
+        defaulted_fields=parsed.defaulted_fields,
+    )
+    if not args.apply:
+        result = plan.preview()
+        if args.json:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            print("Inventory addition preview (no files changed)")
+            print(f"Target: {_terminal_safe(result['target'])}")
+            print(f"Resource: {result['resource_id']}")
+            print(
+                f"Resource count: {result['resource_count_before']} -> "
+                f"{result['resource_count_after']}"
+            )
+            print(f"Expected revision: {result['expect_revision']}")
+            print(f"Expected plan: {result['expect_plan']}")
+            print("Candidate resource (all persisted routing fields):")
+            print(json.dumps(result["resource"], indent=2, sort_keys=True))
+            if result["private_notes_present"]:
+                print(
+                    "Private notes: present; value omitted and bound to this plan. "
+                    "Review it in the declaration source before approval."
+                )
+            else:
+                print("Private notes: absent; that state is bound to this plan.")
+            if result["defaulted_fields"]:
+                print("Defaulted fields: " + ", ".join(result["defaulted_fields"]))
+            _print_intake_review(result["intake_review"])
+            print("Applying will canonicalize YAML and create a private exact-byte backup.")
+            print(
+                "Rerun with --apply --expect-revision <revision> --expect-plan <plan> "
+                "after reviewing this preview."
+            )
+        return 0
+
+    receipt = commit_add_resource(
+        plan,
+        expected_revision=args.expect_revision,
+        expected_plan=args.expect_plan,
+    )
+    result = receipt.as_dict()
+    result["resource_id"] = resource.id
+    result["private_notes_bound_to_plan"] = True
+    result["private_notes_exposed"] = False
+    result["private_notes_present"] = resource.private_notes is not None
+    result["candidate_revision_protection"] = plan.revision_protection
+    result["observed_revision_protection"] = (
+        plan.revision_protection
+        if receipt.replacement_verified and receipt.revision == receipt.candidate_revision
+        else None
+    )
+    uncertain = (
+        not receipt.replacement_verified
+        or bool(receipt.warnings)
+        or (os.name == "posix" and not receipt.directory_synced)
+    )
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(f"Added resource {resource.id!r} to {_terminal_safe(receipt.target)}")
+        print(f"Candidate revision: {receipt.candidate_revision}")
+        print(f"Candidate revision privacy state: {plan.revision_protection}")
+        print(f"Observed revision: {receipt.revision or 'unavailable'}")
+        print(
+            "Observed revision privacy state: "
+            f"{result['observed_revision_protection'] or 'unavailable'}"
+        )
+        print(f"Replacement verified: {str(receipt.replacement_verified).lower()}")
+        print(f"Backup ID: {receipt.backup_id}")
+        print(f"Backup path: {_terminal_safe(receipt.backup_path)}")
+        if not receipt.directory_synced:
+            print("warning: parent-directory fsync was unavailable", file=sys.stderr)
+        for warning in receipt.warnings:
+            print(f"warning: {_terminal_safe(warning)}", file=sys.stderr)
+        if uncertain:
+            print(
+                "warning: update may already be applied; do not retry this apply; "
+                "inspect the target and backup before another update",
+                file=sys.stderr,
+            )
+    return 4 if uncertain else 0
+
+
+def _handle_inventory_replace(args: argparse.Namespace) -> int:
+    _require_preview_apply_contract(args, subject="resource replacement")
+    parsed = _resource_input(args)
+    plan = plan_replace_resource(
+        _inventory_path(args.path),
+        parsed.resource,
+        defaulted_fields=parsed.defaulted_fields,
+    )
+    if not args.apply:
+        result = plan.preview()
+        if args.json:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            print("Inventory resource replacement preview (no files changed)")
+            print(f"Target: {_terminal_safe(result['target'])}")
+            print(f"Resource: {result['resource_id']}")
+            print("Current resource (private notes omitted):")
+            print(json.dumps(result["resource_before"], indent=2, sort_keys=True))
+            print("Replacement resource (private notes omitted):")
+            print(json.dumps(result["resource_after"], indent=2, sort_keys=True))
+            print(f"Private notes effect: {result['private_notes_effect']}")
+            if result["defaulted_fields"]:
+                print("Defaulted fields: " + ", ".join(result["defaulted_fields"]))
+            _print_intake_review(result["intake_review"])
+            print(f"Expected revision: {result['expect_revision']}")
+            print(f"Expected plan: {result['expect_plan']}")
+            print("Applying will canonicalize YAML and create a private exact-byte backup.")
+            print(
+                "Rerun with --apply --expect-revision <revision> --expect-plan <plan> "
+                "after reviewing this full replacement."
+            )
+        return 0
+
+    receipt = commit_replace_resource(
+        plan,
+        expected_revision=args.expect_revision,
+        expected_plan=args.expect_plan,
+    )
+    result = receipt.as_dict()
+    result.update(
+        {
+            "resource_id": plan.resource.id,
+            "private_notes_bound_to_plan": True,
+            "private_notes_effect": plan.preview()["private_notes_effect"],
+            "private_notes_exposed": False,
+            "candidate_revision_protection": plan.revision_protection,
+            "observed_revision_protection": (
+                plan.revision_protection
+                if receipt.replacement_verified and receipt.revision == receipt.candidate_revision
+                else None
+            ),
+        }
+    )
+    uncertain = (
+        not receipt.replacement_verified
+        or bool(receipt.warnings)
+        or (os.name == "posix" and not receipt.directory_synced)
+    )
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(f"Replaced resource {plan.resource.id!r} in {_terminal_safe(receipt.target)}")
+        print(f"Candidate revision: {receipt.candidate_revision}")
+        print(f"Replacement verified: {str(receipt.replacement_verified).lower()}")
+        print(f"Backup ID: {receipt.backup_id}")
+        print(f"Backup path: {_terminal_safe(receipt.backup_path)}")
+        for warning in receipt.warnings:
+            print(f"warning: {_terminal_safe(warning)}", file=sys.stderr)
+        if uncertain:
+            print(
+                "warning: update may already be applied; do not retry this apply; "
+                "inspect the target and backup before another update",
+                file=sys.stderr,
+            )
+    return 4 if uncertain else 0
+
+
+def _handle_inventory_remove(args: argparse.Namespace) -> int:
+    _require_preview_apply_contract(args, subject="resource removal")
+    plan = plan_remove_resource(_inventory_path(args.path), args.resource)
+    if not args.apply:
+        result = plan.preview()
+        if args.json:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            print("Inventory resource removal preview (no files changed)")
+            print(f"Target: {_terminal_safe(result['target'])}")
+            print(f"Resource: {result['resource_id']}")
+            print("Resource to remove (private notes omitted):")
+            print(json.dumps(result["resource"], indent=2, sort_keys=True))
+            print(f"Private notes present: {str(result['private_notes_present']).lower()}")
+            print(
+                f"Resource count: {result['resource_count_before']} -> "
+                f"{result['resource_count_after']}"
+            )
+            print(f"Expected revision: {result['expect_revision']}")
+            print(f"Expected plan: {result['expect_plan']}")
+            print("Applying will create a private exact-byte safety backup before removal.")
+            print(
+                "Rerun with --apply --expect-revision <revision> --expect-plan <plan> "
+                "after reviewing this removal."
+            )
+        return 0
+
+    receipt = commit_remove_resource(
+        plan,
+        expected_revision=args.expect_revision,
+        expected_plan=args.expect_plan,
+    )
+    result = receipt.as_dict()
+    result.update(
+        {
+            "resource_id": plan.resource.id,
+            "private_notes_exposed": False,
+            "private_notes_present": plan.resource.private_notes is not None,
+            "candidate_revision_protection": plan.revision_protection,
+            "observed_revision_protection": (
+                plan.revision_protection
+                if receipt.replacement_verified and receipt.revision == receipt.candidate_revision
+                else None
+            ),
+        }
+    )
+    uncertain = (
+        not receipt.replacement_verified
+        or bool(receipt.warnings)
+        or (os.name == "posix" and not receipt.directory_synced)
+    )
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(f"Removed resource {plan.resource.id!r} from {_terminal_safe(receipt.target)}")
+        print(f"Candidate revision: {receipt.candidate_revision}")
+        print(f"Replacement verified: {str(receipt.replacement_verified).lower()}")
+        print(f"Safety backup ID: {receipt.backup_id}")
+        print(f"Safety backup path: {_terminal_safe(receipt.backup_path)}")
+        for warning in receipt.warnings:
+            print(f"warning: {_terminal_safe(warning)}", file=sys.stderr)
+        if uncertain:
+            print(
+                "warning: removal may already be applied; do not retry this apply; "
+                "inspect the target and backup before another update",
+                file=sys.stderr,
+            )
+    return 4 if uncertain else 0
+
+
+def _handle_inventory_backup_list(args: argparse.Namespace) -> int:
+    listing = list_inventory_backups(_inventory_path(args.path))
+    result = listing.as_dict()
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(f"Inventory backups for {_terminal_safe(listing.target)}")
+        print(f"Active state: {listing.active_state}")
+        print(f"Active revision: {listing.active_revision or 'unavailable'}")
+        print(f"Active revision protection: {listing.active_revision_protection or 'unavailable'}")
+        print(f"Validated backups: {len(listing.backups)}")
+        for backup in listing.backups:
+            print(
+                f"- {backup.backup_id} · {backup.resource_count} resources · active-match="
+                f"{str(backup.matches_active).lower()}"
+            )
+            print(f"  revision protection: {backup.revision_protection}")
+            print(
+                "  filesystem modified metadata (not backup history): "
+                f"{backup.filesystem_modified_at}"
+            )
+        for warning in listing.warnings:
+            print(f"warning: {_terminal_safe(warning)}", file=sys.stderr)
+    return 0
+
+
+def _handle_inventory_backup_manifest(args: argparse.Namespace) -> int:
+    manifest = inspect_inventory_backup_manifest(_inventory_path(args.path))
+    result = manifest.as_dict()
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(f"Backup operation manifest for {_terminal_safe(manifest.target)}")
+        print(f"Initialized: {str(manifest.initialized).lower()}")
+        print("Authoritative order: sequence (wall-clock timestamps are metadata only)")
+        print("Tamper evidence: local hash chain; not a signature or trusted clock")
+        print(f"Validated events: {len(manifest.events)}")
+        for event in manifest.events:
+            operation = event.operation or "baseline"
+            print(f"- {event.sequence}: {operation} · {event.phase} · {event.event_hash}")
+        for warning in manifest.warnings:
+            print(f"warning: {_terminal_safe(warning)}", file=sys.stderr)
+    return 0
+
+
+def _handle_inventory_backup_inspect(args: argparse.Namespace) -> int:
+    inspection = inspect_inventory_backup(_inventory_path(args.path), args.backup)
+    result = inspection.as_dict()
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(f"Inventory backup inspection (private notes omitted): {inspection.backup.backup_id}")
+        print(f"Target: {_terminal_safe(inspection.target)}")
+        print(f"Active state: {inspection.active_state}")
+        print(f"Active revision: {inspection.active_revision or 'unavailable'}")
+        print(
+            f"Active revision protection: {inspection.active_revision_protection or 'unavailable'}"
+        )
+        print(f"Backup revision: {inspection.backup.backup_id}")
+        print(f"Backup revision protection: {inspection.backup.revision_protection}")
+        if inspection.comparison is not None:
+            print("Sanitized comparison:")
+            print(json.dumps(inspection.comparison, indent=2, sort_keys=True))
+        if inspection.active_snapshot is not None:
+            print("Sanitized active snapshot:")
+            print(json.dumps(inspection.active_snapshot, indent=2, sort_keys=True))
+        print("Sanitized backup snapshot:")
+        print(json.dumps(inspection.backup_snapshot, indent=2, sort_keys=True))
+    return 0
+
+
+def _handle_inventory_backup_rollback(args: argparse.Namespace) -> int:
+    _require_preview_apply_contract(args, subject="rollback")
+    plan = plan_inventory_rollback(_inventory_path(args.path), args.backup)
+    if not args.apply:
+        result = plan.preview()
+        if args.json:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            print("Inventory rollback preview (no files changed)")
+            print(f"Target: {_terminal_safe(plan.target)}")
+            print(f"Source backup: {plan.source_backup_id}")
+            print(f"Current revision: {plan.original_revision}")
+            print(f"Current revision protection: {plan.active_revision_protection}")
+            print(f"Restored revision: {plan.candidate_revision}")
+            print(f"Restored revision protection: {plan.candidate_revision_protection}")
+            if plan.comparison["revision_privacy_nonce_effect"] != "unchanged":
+                print(
+                    "Warning: rollback changes hidden revision blinding state; confirm the "
+                    "backup nonce was not exposed or reused."
+                )
+            print("Sanitized comparison:")
+            print(json.dumps(plan.comparison, indent=2, sort_keys=True))
+            print("Sanitized active snapshot:")
+            print(json.dumps(plan.active_snapshot, indent=2, sort_keys=True))
+            print("Sanitized rollback candidate snapshot:")
+            print(json.dumps(plan.candidate_snapshot, indent=2, sort_keys=True))
+            print("Hidden private notes will be restored exactly but are not shown here.")
+            print("Applying first creates an exact safety backup of the active inventory.")
+            print(f"Expected revision: {plan.original_revision}")
+            print(f"Expected plan: {plan.plan_token}")
+            print(
+                "Rerun with --apply --expect-revision <revision> --expect-plan <plan> "
+                "after reviewing this preview."
+            )
+        return 0
+
+    receipt = commit_inventory_rollback(
+        plan,
+        expected_revision=args.expect_revision,
+        expected_plan=args.expect_plan,
+    )
+    result = receipt.as_dict()
+    uncertain = (
+        not receipt.update.replacement_verified
+        or bool(receipt.update.warnings)
+        or (os.name == "posix" and not receipt.update.directory_synced)
+    )
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(f"Restored {_terminal_safe(receipt.target)} from {receipt.source_backup_id}")
+        print(f"Restored revision: {receipt.update.candidate_revision}")
+        print(f"Candidate revision privacy state: {receipt.candidate_revision_protection}")
+        print(f"Observed revision: {receipt.update.revision or 'unavailable'}")
+        print(
+            "Observed revision privacy state: "
+            f"{receipt.observed_revision_protection or 'unavailable'}"
+        )
+        print(f"Replacement verified: {str(receipt.update.replacement_verified).lower()}")
+        print(f"Source backup retained: {_terminal_safe(receipt.source_backup_path)}")
+        print(f"Safety backup ID: {receipt.update.backup_id}")
+        print(f"Safety backup path: {_terminal_safe(receipt.update.backup_path)}")
+        if not receipt.update.directory_synced:
+            print("warning: parent-directory fsync was unavailable", file=sys.stderr)
+        for warning in receipt.update.warnings:
+            print(f"warning: {_terminal_safe(warning)}", file=sys.stderr)
+        if uncertain:
+            print(
+                "warning: rollback may already be applied; do not retry this apply; "
+                "inspect the target and backups first",
+                file=sys.stderr,
+            )
+    return 4 if uncertain else 0
+
+
+def _handle_inventory_backup_recover(args: argparse.Namespace) -> int:
+    if args.apply and (not args.expect_state or not args.expect_plan):
+        raise ConfigurationError(
+            "--apply requires --expect-state and --expect-plan from a prior recovery preview"
+        )
+    if (args.expect_state or args.expect_plan) and not args.apply:
+        raise ConfigurationError("--expect-state and --expect-plan are only valid with --apply")
+    plan = plan_inventory_recovery(_inventory_path(args.path), args.backup)
+    if not args.apply:
+        result = plan.preview()
+        if args.json:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            print("Inventory disaster-recovery preview (no files changed)")
+            print(f"Target: {_terminal_safe(plan.target)}")
+            print(f"Active state: {plan.active_state}")
+            print(f"Source backup: {plan.source_backup_id}")
+            print(f"Restored revision: {plan.candidate_revision}")
+            print(f"Restored revision protection: {plan.candidate_revision_protection}")
+            print("Sanitized recovery candidate snapshot:")
+            print(json.dumps(plan.candidate_snapshot, indent=2, sort_keys=True))
+            if plan.active_state == "invalid":
+                print("Applying will quarantine the exact invalid bytes before replacement.")
+            else:
+                print("The active target is missing, so no displaced bytes require quarantine.")
+            print("The exact source backup will be retained.")
+            print(f"Expected state: {plan.state_token}")
+            print(f"Expected plan: {plan.plan_token}")
+            print(
+                "Rerun with --apply --expect-state <state> --expect-plan <plan> "
+                "after reviewing this preview."
+            )
+        return 0
+
+    receipt = commit_inventory_recovery(
+        plan,
+        expected_state=args.expect_state,
+        expected_plan=args.expect_plan,
+    )
+    result = receipt.as_dict()
+    uncertain = (
+        not receipt.replacement_verified
+        or bool(receipt.warnings)
+        or (os.name == "posix" and not receipt.directory_synced)
+    )
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(f"Recovered inventory at {_terminal_safe(receipt.target)}")
+        print(f"Previous state: {receipt.previous_state}")
+        print(f"Restored revision: {receipt.restored_revision}")
+        print(f"Observed revision: {receipt.observed_revision or 'unavailable'}")
+        print(f"Replacement verified: {str(receipt.replacement_verified).lower()}")
+        print(f"Source backup retained: {_terminal_safe(receipt.source_backup_path)}")
+        if receipt.quarantine_path is not None:
+            print(f"Invalid bytes quarantined: {_terminal_safe(receipt.quarantine_path)}")
+        for warning in receipt.warnings:
+            print(f"warning: {_terminal_safe(warning)}", file=sys.stderr)
+        if uncertain:
+            print(
+                "warning: recovery may already be applied; do not retry blindly; "
+                "inspect the target and backups first",
+                file=sys.stderr,
+            )
+    return 4 if uncertain else 0
+
+
+def _handle_inventory_backup_delete(args: argparse.Namespace) -> int:
+    _require_preview_apply_contract(args, subject="backup deletion")
+    plan = plan_inventory_backup_delete(
+        _inventory_path(args.path),
+        args.backup,
+        allow_no_backups=args.allow_no_backups,
+    )
+    if not args.apply:
+        result = plan.preview()
+        if args.json:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        else:
+            print("Inventory backup deletion preview (no files changed)")
+            print(f"Target: {_terminal_safe(plan.target)}")
+            print(f"Backup: {plan.backup_id}")
+            print(f"Backup path: {_terminal_safe(plan.backup_path)}")
+            print(f"Selected revision privacy state: {plan.selected_revision_protection}")
+            print(
+                "Remaining revision privacy states: "
+                + json.dumps(plan.remaining_revision_protection_counts, sort_keys=True)
+            )
+            print(
+                f"Validated backup count: {plan.backup_count_before} -> "
+                f"{plan.backup_count_before - 1}"
+            )
+            print("This deletion is irreversible; no automatic retention policy is applied.")
+            print(f"Expected revision: {plan.original_revision}")
+            print(f"Expected plan: {plan.plan_token}")
+            for warning in plan.warnings:
+                print(f"warning: {_terminal_safe(warning)}", file=sys.stderr)
+            print(
+                "Rerun with --apply --expect-revision <revision> --expect-plan <plan> "
+                "after reviewing this preview."
+            )
+        return 0
+
+    receipt = commit_inventory_backup_delete(
+        plan,
+        expected_revision=args.expect_revision,
+        expected_plan=args.expect_plan,
+    )
+    result = receipt.as_dict()
+    uncertain = not receipt.deletion_verified or bool(receipt.warnings)
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(f"Deleted backup {receipt.backup_id}")
+        print(f"Deleted path: {_terminal_safe(receipt.backup_path)}")
+        print(f"Deletion verified: {str(receipt.deletion_verified).lower()}")
+        print(f"Remaining validated backups: {receipt.remaining_valid_backups}")
+        print(f"Deleted revision privacy state: {receipt.selected_revision_protection}")
+        print(
+            "Remaining revision privacy states: "
+            + (
+                json.dumps(receipt.remaining_revision_protection_counts, sort_keys=True)
+                if receipt.remaining_revision_protection_counts is not None
+                else "unavailable"
+            )
+        )
+        if not receipt.directory_synced:
+            print("warning: backup-directory fsync was unavailable", file=sys.stderr)
+        for warning in receipt.warnings:
+            print(f"warning: {_terminal_safe(warning)}", file=sys.stderr)
+        if uncertain:
+            print(
+                "warning: deletion may already be applied; do not retry blindly; "
+                "list and inspect backups first",
+                file=sys.stderr,
+            )
+    return 4 if uncertain else 0
+
+
+def _handle_project_template(args: argparse.Namespace) -> int:
+    del args
+    print(starter_project(), end="")
+    return 0
+
+
+def _handle_project_validate(args: argparse.Namespace) -> int:
+    project = project_from_path(args.path.expanduser())
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "as_of": project.as_of.isoformat(),
+                    "project_id": project.id,
+                    "valid": True,
+                    "workstreams": len(project.workstreams),
+                },
+                sort_keys=True,
+            )
+        )
+    else:
+        print(f"Project is valid: {len(project.workstreams)} workstreams")
+    return 0
+
+
+def _handle_route(args: argparse.Namespace) -> int:
+    project = project_from_path(args.project.expanduser())
+    catalog = InventoryCatalog.from_path(_inventory_path(args.inventory), today=project.as_of)
+    plan = route(catalog.inventory, project, allow_demo=args.allow_demo)
+    if args.format == "json":
+        print(json.dumps(plan.model_dump(mode="json"), indent=2, sort_keys=True))
+    else:
+        print(render_markdown(plan), end="")
+    has_gap = any(
+        assignment.primary is None or assignment.unresolved_gaps for assignment in plan.assignments
+    )
+    return 3 if has_gap else 0
+
+
+def _handle_skill_path(args: argparse.Namespace) -> int:
+    del args
+    source_checkout = (
+        Path(__file__).resolve().parents[2] / "plugins" / "atready" / "skills" / "project-atready"
+    )
+    if source_checkout.is_dir():
+        print(_terminal_safe(source_checkout))
+        return 0
+    bundled = files("atready").joinpath("bundled_skill")
+    if not bundled.is_dir():
+        raise ConfigurationError("the installed distribution does not contain the bundled skill")
+    print(_terminal_safe(bundled))
+    return 0
+
+
+def _handle_schema(args: argparse.Namespace) -> int:
+    if args.kind == "inventory":
+        print(json.dumps(Inventory.model_json_schema(), indent=2, sort_keys=True))
+        return 0
+    if args.kind == "project":
+        from atready.models import ProjectBrief
+
+        print(json.dumps(ProjectBrief.model_json_schema(), indent=2, sort_keys=True))
+        return 0
+    if args.kind == "inventory-annotation-declaration":
+        print(
+            json.dumps(InventoryAnnotationDeclaration.model_json_schema(), indent=2, sort_keys=True)
+        )
+        return 0
+    if args.kind == "resource-declaration":
+        print(json.dumps(ResourceDeclaration.model_json_schema(), indent=2, sort_keys=True))
+        return 0
+    if args.kind == "route-plan":
+        from atready.models import RoutePlan
+
+        print(json.dumps(RoutePlan.model_json_schema(), indent=2, sort_keys=True))
+        return 0
+    raise AssertionError(f"unhandled schema kind: {args.kind}")
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        return int(args.handler(args))
+    except (AtReadyError, IntakeError) as exc:
+        print(f"error: {_terminal_safe(exc)}", file=sys.stderr)
+        for note in getattr(exc, "__notes__", ()):
+            print(f"note: {_terminal_safe(note)}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

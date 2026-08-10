@@ -1,0 +1,50 @@
+schema_version: 1
+id: synthetic-godot-feature
+name: Synthetic Godot Feature
+goal: Build and review a deterministic battle-report feature.
+as_of: 2026-08-06
+constraints:
+  data_class: public
+  max_marginal_cost: 0.40
+  allowed_interactions: [codex-callable, external-agent, local-cli, manual]
+  network_allowed: true
+  allow_unverified: false
+  forbidden_resources: []
+workstreams:
+  - id: architecture
+    name: Architecture
+    objective: Define deterministic boundaries for the battle-report feature.
+    required_capabilities: [{id: architecture, importance: 1.0, minimum: 0.70}]
+    inputs: [Feature brief]
+    allowed_scope: [Design documents]
+    exclusions: [Deployment, art production]
+    deliverable: An implementation-ready architecture note.
+    acceptance_criteria: [State transitions and verification seams are explicit]
+    verification: [Review the architecture against the feature brief]
+    stop_conditions: [A save-format migration becomes necessary]
+    next_owner: Implementation workstream
+  - id: implementation
+    name: Implementation
+    objective: Implement the feature and deterministic tests.
+    required_capabilities: [{id: code-implementation, importance: 1.0, minimum: 0.70}]
+    inputs: [Approved architecture]
+    allowed_scope: [Feature source, feature tests]
+    exclusions: [Deployment, unrelated gameplay]
+    deliverable: Working feature and tests.
+    acceptance_criteria: [Feature tests pass]
+    verification:
+      - "Run the project-provided Godot 4.4 GDScript test runner: godot --headless --path . --script res://tests/run_tests.gd"
+    stop_conditions: [The architecture contract is contradicted]
+    next_owner: Review workstream
+  - id: review
+    name: Independent review
+    objective: Review the completed feature for correctness and regression risk.
+    required_capabilities: [{id: code-review, importance: 1.0, minimum: 0.70}]
+    inputs: [Implementation diff, test results]
+    allowed_scope: [Review comments]
+    exclusions: [Automatic fixes, merges]
+    deliverable: Evidence-backed review findings.
+    acceptance_criteria: [Every finding names a concrete risk and location]
+    verification: [Reconcile findings against the diff]
+    stop_conditions: [The implementation diff changes during review]
+    next_owner: Human maintainer

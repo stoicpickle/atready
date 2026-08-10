@@ -1,0 +1,504 @@
+name: Public release
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact reviewed commit already green in main push CI
+        required: true
+        type: string
+      tag:
+        description: Existing reviewed release tag in vX.Y.Z form
+        required: true
+        type: string
+      version:
+        description: Exact project-atready runtime version at that tag
+        required: true
+        type: string
+      immutable_releases_verified:
+        description: Owner verified release immutability through the admin-read API immediately before dispatch
+        required: true
+        default: false
+        type: boolean
+      publish_pypi:
+        description: Publish the reviewed artifacts through the protected pypi environment
+        required: true
+        default: false
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: public-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build reviewed release artifacts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      actions: read
+      contents: read
+    env:
+      UV_DEFAULT_INDEX: https://pypi.org/simple
+      UV_INDEX: ""
+      UV_NO_CACHE: "1"
+      UV_NO_CONFIG: "1"
+      UV_PYTHON_DOWNLOADS: never
+    steps:
+      - name: Check out exact source without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+          ref: ${{ inputs.source_sha }}
+          submodules: false
+
+      - name: Require public owner-dispatched exact green tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          IMMUTABLE_RELEASES_VERIFIED: ${{ inputs.immutable_releases_verified }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "source_sha must be an exact lowercase 40-character commit" >&2
+            exit 1
+          fi
+          if [[ ! "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "version must use the X.Y.Z form" >&2
+            exit 1
+          fi
+          if [[ "$RELEASE_TAG" != "v$RELEASE_VERSION" ]]; then
+            echo "tag must exactly equal v<version>" >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_SHA" != "$SOURCE_SHA" ]]; then
+            echo "workflow source does not match source_sha" >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" != "refs/tags/$RELEASE_TAG" ]]; then
+            echo "workflow must be dispatched at the exact release tag" >&2
+            exit 1
+          fi
+          if [[ "$WORKFLOW_SHA" != "$SOURCE_SHA" ]]; then
+            echo "release workflow definition must come from source_sha" >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_TRIGGERING_ACTOR" != "$GITHUB_REPOSITORY_OWNER" ]]; then
+            echo "public release must be dispatched or rerun by the repository owner" >&2
+            exit 1
+          fi
+          if [[ "$IMMUTABLE_RELEASES_VERIFIED" != "true" ]]; then
+            echo "owner must verify release immutability through the admin-read API before dispatch" >&2
+            exit 1
+          fi
+          gh release verify --help >/dev/null
+          gh release verify-asset --help >/dev/null
+          gh attestation verify --help >/dev/null
+          if [[ "$(gh api "repos/$GITHUB_REPOSITORY" --jq .visibility)" != "public" ]]; then
+            echo "artifact attestations require the approved public-release repository state" >&2
+            exit 1
+          fi
+          git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"
+          if [[ "$(git rev-parse "$RELEASE_TAG^{}")" != "$SOURCE_SHA" ]]; then
+            echo "release tag does not resolve to source_sha" >&2
+            exit 1
+          fi
+          ci_count="$(gh api --method GET \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+            -f branch=main -f event=push -f status=success \
+            -f head_sha="$SOURCE_SHA" -f per_page=1 \
+            --jq .total_count)"
+          if (( ci_count < 1 )); then
+            echo "source_sha does not have a successful main push CI run" >&2
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Set up pinned uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+          version: "0.11.7"
+
+      - name: Install locked validation dependencies
+        run: uv sync --locked --all-groups --no-install-project
+
+      - name: Validate source, plugin, and tests
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          actual_version="$(PYTHONPATH=src uv run --no-sync python -c \
+            'import atready; print(atready.__version__)')"
+          test "$actual_version" = "$RELEASE_VERSION"
+          uv run --no-sync ruff check .
+          uv run --no-sync ruff format --check .
+          uv run --no-sync pytest --cov=atready --cov-report=term-missing
+
+      - name: Bind timestamps and build twice through hash-constrained backend
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          export SOURCE_DATE_EPOCH="$(git show -s --format=%ct "$GITHUB_SHA")"
+          root="$RUNNER_TEMP/atready-public-release"
+          args=(--clear --no-create-gitignore --no-sources \
+            --build-constraints build-constraints.txt --require-hashes --no-cache \
+            --default-index https://pypi.org/simple)
+          mkdir "$root"
+          uv build "${args[@]}" --out-dir "$root/first"
+          uv build "${args[@]}" --out-dir "$root/second"
+          wheel="project_atready-${RELEASE_VERSION}-py3-none-any.whl"
+          source="project_atready-${RELEASE_VERSION}.tar.gz"
+          cmp "$root/first/$wheel" "$root/second/$wheel"
+          cmp "$root/first/$source" "$root/second/$source"
+          mkdir "$root/dist"
+          cp "$root/first/$wheel" "$root/dist/$wheel"
+          cp "$root/first/$source" "$root/dist/$source"
+
+      - name: Verify exact artifacts and installed behavior
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          dist="$RUNNER_TEMP/atready-public-release/dist"
+          uv run --no-sync twine check --strict "$dist"/*
+          uv run --no-sync python scripts/verify_readme_rendering.py
+          uv run --no-sync python scripts/verify_release_artifacts.py --dist "$dist"
+          uv run --isolated --no-project \
+            --with "$dist/project_atready-${RELEASE_VERSION}-py3-none-any.whl" \
+            python scripts/smoke_wheel.py
+          uv run --isolated --no-project \
+            --with "$dist/project_atready-${RELEASE_VERSION}-py3-none-any.whl" \
+            python scripts/smoke_plugin.py
+
+      - name: Create bounded release metadata
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          dist="$RUNNER_TEMP/atready-public-release/dist"
+          python - "$dist" <<'PY'
+          import hashlib, json, os, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          artifacts = []
+          for path in sorted((*root.glob("*.whl"), *root.glob("*.tar.gz"))):
+              artifacts.append({"filename": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+          value = {
+              "artifacts": artifacts,
+              "metadata_kind": "unsigned-public-release-metadata",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "review_materials": {
+                  "first_user_acceptance": {
+                      "path": "scripts/first_user_acceptance.py",
+                      "sha256": hashlib.sha256(
+                          pathlib.Path("scripts/first_user_acceptance.py").read_bytes()
+                      ).hexdigest(),
+                  }
+              },
+              "schema_version": 1,
+              "source_commit": os.environ["SOURCE_SHA"],
+              "tag": os.environ["RELEASE_TAG"],
+              "version": os.environ["RELEASE_VERSION"],
+              "workflow_path": ".github/workflows/public-release.yml",
+              "workflow_commit": os.environ["WORKFLOW_SHA"],
+              "unsigned": True,
+          }
+          manifest = root / "public-release-manifest.json"
+          manifest.write_text(
+              json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          subjects = sorted((*root.glob("*.whl"), *root.glob("*.tar.gz"), manifest), key=lambda p: p.name)
+          (root / "SHA256SUMS").write_text(
+              "".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n" for path in subjects),
+              encoding="ascii",
+          )
+          PY
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Upload reviewed release subjects
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-release-${{ inputs.source_sha }}
+          path: ${{ runner.temp }}/atready-public-release/dist/
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 30
+          compression-level: 0
+
+  attest:
+    name: Attest wheel and source distribution
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      attestations: write
+      contents: read
+      id-token: write
+    steps:
+      - name: Download exact reviewed artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: public-release-${{ inputs.source_sha }}
+          path: dist
+
+      - name: Generate GitHub build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/project_atready-${{ inputs.version }}-py3-none-any.whl
+            dist/project_atready-${{ inputs.version }}.tar.gz
+
+  draft-release:
+    name: Create human-reviewed draft release
+    needs: [build, attest]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download exact reviewed artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: public-release-${{ inputs.source_sha }}
+          path: dist
+
+      - name: Create or verify exact draft without publishing it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)" = "$SOURCE_SHA"
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --json isDraft --jq .isDraft)" = "true"
+            test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --json isImmutable --jq .isImmutable)" = "false"
+            echo "draft state is resumable; verifying exact bytes"
+          else
+            gh release create "$RELEASE_TAG" dist/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag --draft --generate-notes \
+              --title "AtReady $RELEASE_TAG"
+          fi
+          wheel="project_atready-${RELEASE_VERSION}-py3-none-any.whl"
+          source="project_atready-${RELEASE_VERSION}.tar.gz"
+          expected_assets="$RUNNER_TEMP/expected-draft-assets"
+          actual_assets="$RUNNER_TEMP/actual-draft-assets"
+          draft_dist="$RUNNER_TEMP/exact-draft-assets"
+          printf '%s\n' SHA256SUMS public-release-manifest.json "$source" "$wheel" \
+            | sort > "$expected_assets"
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets | map(.name) | sort | .[]' > "$actual_assets"
+          cmp "$expected_assets" "$actual_assets"
+          mkdir "$draft_dist"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --dir "$draft_dist" \
+            --pattern SHA256SUMS \
+            --pattern public-release-manifest.json \
+            --pattern "$source" \
+            --pattern "$wheel"
+          for name in SHA256SUMS public-release-manifest.json "$source" "$wheel"; do
+            cmp "dist/$name" "$draft_dist/$name"
+          done
+
+  publish-release:
+    name: Publish the approved immutable GitHub release
+    needs: draft-release
+    environment: github-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      attestations: read
+      contents: write
+    steps:
+      - name: Download exact reviewed workflow artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: public-release-${{ inputs.source_sha }}
+          path: reviewed-dist
+
+      - name: Verify exact build provenance policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          signer_workflow="$GITHUB_REPOSITORY/.github/workflows/public-release.yml"
+          source_ref="refs/tags/$RELEASE_TAG"
+          for artifact in \
+            "reviewed-dist/project_atready-${RELEASE_VERSION}-py3-none-any.whl" \
+            "reviewed-dist/project_atready-${RELEASE_VERSION}.tar.gz"; do
+            gh attestation verify "$artifact" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$signer_workflow" \
+              --source-digest "$SOURCE_SHA" \
+              --signer-digest "$SOURCE_SHA" \
+              --source-ref "$source_ref" \
+              --deny-self-hosted-runners
+          done
+
+      - name: Publish the reviewer-approved draft and prove immutability
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)" = "$SOURCE_SHA"
+          wheel="project_atready-${RELEASE_VERSION}-py3-none-any.whl"
+          source="project_atready-${RELEASE_VERSION}.tar.gz"
+          expected_assets="$RUNNER_TEMP/expected-release-assets"
+          actual_assets="$RUNNER_TEMP/actual-release-assets"
+          released_dist="$RUNNER_TEMP/release-assets-before-publication"
+          printf '%s\n' SHA256SUMS public-release-manifest.json "$source" "$wheel" \
+            | sort > "$expected_assets"
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets | map(.name) | sort | .[]' > "$actual_assets"
+          cmp "$expected_assets" "$actual_assets"
+          mkdir "$released_dist"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --dir "$released_dist" \
+            --pattern SHA256SUMS \
+            --pattern public-release-manifest.json \
+            --pattern "$source" \
+            --pattern "$wheel"
+          for name in SHA256SUMS public-release-manifest.json "$source" "$wheel"; do
+            cmp "reviewed-dist/$name" "$released_dist/$name"
+          done
+          is_draft="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft --jq .isDraft)"
+          is_immutable="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isImmutable --jq .isImmutable)"
+          if [[ "$is_draft" == "true" && "$is_immutable" == "false" ]]; then
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          elif [[ "$is_draft" == "false" && "$is_immutable" == "true" ]]; then
+            echo "exact release is already published and immutable; resuming verification"
+          else
+            echo "release must be either the expected draft or already-published immutable state" >&2
+            exit 1
+          fi
+          release_verified=false
+          for attempt in {1..12}; do
+            if gh release verify "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"; then
+              release_verified=true
+              break
+            fi
+            if (( attempt < 12 )); then
+              sleep 5
+            fi
+          done
+          if [[ "$release_verified" != "true" ]]; then
+            echo "immutable release attestation was not verifiable within the bounded retry window" >&2
+            exit 1
+          fi
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft --jq .isDraft)" = "false"
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isImmutable --jq .isImmutable)" = "true"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)" = "$SOURCE_SHA"
+
+  publish-pypi:
+    name: Publish immutable-release distributions
+    if: ${{ inputs.publish_pypi }}
+    needs: [build, publish-release]
+    environment: pypi
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      attestations: read
+      contents: read
+      id-token: write
+    steps:
+      - name: Download exact reviewed workflow artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: public-release-${{ inputs.source_sha }}
+          path: reviewed-dist
+
+      - name: Verify immutable release assets match reviewed bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          wheel="project_atready-${RELEASE_VERSION}-py3-none-any.whl"
+          source="project_atready-${RELEASE_VERSION}.tar.gz"
+          expected_assets="$RUNNER_TEMP/expected-release-assets"
+          actual_assets="$RUNNER_TEMP/actual-release-assets"
+          printf '%s\n' SHA256SUMS public-release-manifest.json "$source" "$wheel" \
+            | sort > "$expected_assets"
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets | map(.name) | sort | .[]' > "$actual_assets"
+          cmp "$expected_assets" "$actual_assets"
+          gh release verify "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft --jq .isDraft)" = "false"
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isImmutable --jq .isImmutable)" = "true"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)" = "$SOURCE_SHA"
+          mkdir released-dist
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --dir released-dist \
+            --pattern SHA256SUMS \
+            --pattern public-release-manifest.json \
+            --pattern "$source" \
+            --pattern "$wheel"
+          for name in SHA256SUMS public-release-manifest.json "$source" "$wheel"; do
+            cmp "reviewed-dist/$name" "released-dist/$name"
+            gh release verify-asset "$RELEASE_TAG" "released-dist/$name" \
+              --repo "$GITHUB_REPOSITORY"
+          done
+          signer_workflow="$GITHUB_REPOSITORY/.github/workflows/public-release.yml"
+          source_ref="refs/tags/$RELEASE_TAG"
+          for artifact in "released-dist/$source" "released-dist/$wheel"; do
+            gh attestation verify "$artifact" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$signer_workflow" \
+              --source-digest "$SOURCE_SHA" \
+              --signer-digest "$SOURCE_SHA" \
+              --source-ref "$source_ref" \
+              --deny-self-hosted-runners
+          done
+
+      - name: Set up pinned uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+          version: "0.11.7"
+
+      - name: Publish wheel and sdist without rebuilding
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: >-
+          uv publish --no-config --trusted-publishing always
+          --publish-url https://upload.pypi.org/legacy/
+          "released-dist/project_atready-${RELEASE_VERSION}-py3-none-any.whl"
+          "released-dist/project_atready-${RELEASE_VERSION}.tar.gz"

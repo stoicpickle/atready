@@ -1,0 +1,33 @@
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  path_filters:
+    - "!prompt-exports/**"
+    - "!plugins/atready/assets/**/*.png"
+    - "!dist/**"
+    - "!build/**"
+  path_instructions:
+    - path: "src/atready/**"
+      instructions: |
+        Focus on correctness, deterministic behavior, data loss, privacy leakage,
+        authorization boundaries, filesystem races, and broken public contracts.
+    - path: ".github/workflows/**"
+      instructions: |
+        Focus on permissions, source and ref binding, job ordering, resumability,
+        immutable artifact provenance, and fail-closed publication behavior.
+    - path: "scripts/**"
+      instructions: |
+        Focus on release integrity, exact artifact verification, unsafe subprocess
+        behavior, stale installed-artifact checks, and false-positive smoke proof.
+    - path: "tests/**"
+      instructions: |
+        Focus on false confidence, missing invariant assertions, and important
+        correctness, privacy, recovery, routing, or release edge cases.
+    - path: "plugins/atready/**"
+      instructions: |
+        Focus on capability and permission accuracy, inert handoff boundaries,
+        launcher safety, version matching, and packaging drift.
+    - path: "docs/**"
+      instructions: |
+        Focus on factual accuracy, release or privacy overclaims, stale commands,
+        and broken references rather than tone or stylistic preferences.

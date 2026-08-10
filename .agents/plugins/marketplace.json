@@ -1,0 +1,20 @@
+{
+  "name": "atready",
+  "interface": {
+    "displayName": "AtReady"
+  },
+  "plugins": [
+    {
+      "name": "atready",
+      "source": {
+        "source": "local",
+        "path": "./plugins/atready"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

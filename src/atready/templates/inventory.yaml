@@ -1,0 +1,125 @@
+schema_version: 1
+inventory_kind: demo
+preferences:
+  weights:
+    capability_fit: 1.0
+    quality: 0.7
+    cost_efficiency: 0.4
+    speed: 0.4
+    autonomy: 0.3
+    privacy: 0.6
+    reliability: 0.6
+    confidence: 0.5
+    low_context_switching: 0.4
+    low_integration_friction: 0.4
+  maximum_supporting_resources: 1
+  stale_after_days: 90
+  allow_purchase_suggestions: false
+resources:
+  - id: local-coding-agent
+    name: Synthetic Local Coding Agent
+    categories: [coding-agent]
+    capabilities:
+      architecture: 0.75
+      code-implementation: 0.90
+      test-automation: 0.85
+    access:
+      status: active
+      interaction: local-cli
+      current_session: available
+    economics:
+      billing: owned
+      marginal_cost: 0.05
+      quota: ample
+    ratings:
+      quality: 0.80
+      speed: 0.80
+      autonomy: 0.85
+      privacy: 0.95
+      reliability: 0.80
+      confidence: 0.70
+      context_switch_cost: 0.10
+      integration_friction: 0.10
+    policy:
+      allowed_data_classes: [public, internal, private]
+      approval_required: true
+    provenance:
+      basis: user-judgment
+      last_verified: {{TODAY}}
+    handoff:
+      method: manual-prompt
+      instructions: Provide a bounded mission with acceptance criteria and verification commands.
+    best_for: [bounded implementation, deterministic test loops]
+    avoid_for: [unresolved product strategy, delicate visual tuning]
+
+  - id: interactive-debugger
+    name: Synthetic Interactive Debugger
+    categories: [developer-tool]
+    capabilities:
+      code-implementation: 0.65
+      live-debugging: 0.95
+      performance-profiling: 0.80
+    access:
+      status: active
+      interaction: manual
+      current_session: available
+    economics:
+      billing: subscription
+      marginal_cost: 0.15
+      quota: ample
+    ratings:
+      quality: 0.85
+      speed: 0.75
+      autonomy: 0.30
+      privacy: 0.70
+      reliability: 0.85
+      confidence: 0.75
+      context_switch_cost: 0.55
+      integration_friction: 0.25
+    policy:
+      allowed_data_classes: [public, internal]
+      approval_required: true
+    provenance:
+      basis: observed
+      last_verified: {{TODAY}}
+    handoff:
+      method: interactive
+      instructions: Provide a failing reproduction and a surgical debugging checklist.
+    best_for: [interactive debugging, profiling]
+    avoid_for: [long autonomous missions]
+
+  - id: asset-studio
+    name: Synthetic Asset Studio
+    categories: [creative-tool]
+    capabilities:
+      concept-art: 0.90
+      consistent-asset-family: 0.80
+      visual-exploration: 0.90
+    access:
+      status: limited
+      interaction: manual
+      current_session: unknown
+    economics:
+      billing: subscription
+      marginal_cost: 0.30
+      quota: limited
+    ratings:
+      quality: 0.80
+      speed: 0.70
+      autonomy: 0.35
+      privacy: 0.45
+      reliability: 0.65
+      confidence: 0.60
+      context_switch_cost: 0.60
+      integration_friction: 0.40
+    policy:
+      allowed_data_classes: [public]
+      approval_required: true
+    provenance:
+      basis: vendor-claim
+      last_verified: {{TODAY}}
+    handoff:
+      method: manual-prompt
+      instructions: Provide a style brief, references, constraints, and export contract.
+    best_for: [visual exploration, coherent asset batches]
+    avoid_for: [private unreleased art, final pixel cleanup]

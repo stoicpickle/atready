@@ -1,0 +1,61 @@
+schema_version: 1
+id: synthetic-web-product
+name: Synthetic Web Product
+goal: Build and deploy a small model-backed web product with managed persistence.
+as_of: 2026-08-06
+constraints:
+  data_class: public
+  max_marginal_cost: 0.40
+  allowed_interactions: [codex-callable, external-agent, local-cli, manual]
+  network_allowed: true
+  allow_unverified: false
+  forbidden_resources: []
+workstreams:
+  - id: implementation
+    name: Product implementation
+    objective: Design and build the tested web application.
+    required_capabilities: [{id: code-implementation, importance: 1.0, minimum: 0.70}]
+    inputs: [Product brief]
+    allowed_scope: [Application source, tests]
+    exclusions: [Provider account changes]
+    deliverable: Tested web application.
+    acceptance_criteria: [Local tests pass]
+    verification: [uv run pytest]
+    stop_conditions: [A provider purchase becomes necessary]
+    next_owner: Model gateway workstream
+  - id: model-gateway
+    name: Model gateway
+    objective: Define the narrow model gateway integration.
+    required_capabilities: [{id: model-gateway, importance: 1.0, minimum: 0.70}]
+    inputs: [Application contract]
+    allowed_scope: [Gateway configuration]
+    exclusions: [Credentials, purchasing]
+    deliverable: A bounded gateway configuration handoff.
+    acceptance_criteria: [No credential values are included]
+    verification: [Review the provider boundary]
+    stop_conditions: [Credentials would enter the plan]
+    next_owner: Persistence workstream
+  - id: persistence
+    name: Managed persistence
+    objective: Define the smallest managed persistence lane.
+    required_capabilities: [{id: managed-persistence, importance: 1.0, minimum: 0.70}]
+    inputs: [Data model]
+    allowed_scope: [Persistence configuration]
+    exclusions: [Production migration]
+    deliverable: A persistence setup handoff.
+    acceptance_criteria: [Data retention and failure behavior are stated]
+    verification: [Review against the data model]
+    stop_conditions: [A production migration is required]
+    next_owner: Deployment workstream
+  - id: deployment
+    name: Web deployment
+    objective: Define a reproducible web deployment.
+    required_capabilities: [{id: web-deployment, importance: 1.0, minimum: 0.70}]
+    inputs: [Tested build]
+    allowed_scope: [Deployment configuration]
+    exclusions: [Automatic deploy, domain purchase]
+    deliverable: An inert deployment handoff.
+    acceptance_criteria: [Rollback and verification are explicit]
+    verification: [Review the deployment diff]
+    stop_conditions: [External changes need authorization]
+    next_owner: Human maintainer

@@ -1,0 +1,51 @@
+schema_version: 1
+id: synthetic-art-pipeline
+name: Synthetic Art Pipeline
+goal: Explore a style, produce a coherent small asset family, and export clean pixels.
+as_of: 2026-08-06
+constraints:
+  data_class: public
+  max_marginal_cost: 0.40
+  allowed_interactions: [codex-callable, external-agent, local-cli, manual]
+  network_allowed: true
+  allow_unverified: false
+  forbidden_resources: []
+workstreams:
+  - id: concepts
+    name: Concept exploration
+    objective: Explore a readable visual direction before production.
+    required_capabilities: [{id: concept-art, importance: 1.0, minimum: 0.60}]
+    inputs: [Art direction brief]
+    allowed_scope: [Synthetic concept images]
+    exclusions: [Final production assets]
+    deliverable: A selected visual direction.
+    acceptance_criteria: [The direction is readable at target scale]
+    verification: [Human visual review]
+    stop_conditions: [No direction passes readability review]
+    next_owner: Asset-family workstream
+  - id: asset-family
+    name: Coherent asset family
+    objective: Produce a small style-controlled family from the selected direction.
+    required_capabilities: [{id: asset-family, importance: 1.0, minimum: 0.70}]
+    inputs: [Selected visual direction]
+    allowed_scope: [Small synthetic asset batch]
+    exclusions: [Remote compute batch, final cleanup]
+    deliverable: A coherent source asset family.
+    acceptance_criteria: [Palette and silhouette remain coherent]
+    verification: [Human family consistency review]
+    stop_conditions: [The style contract drifts]
+    next_owner: Cleanup workstream
+  - id: cleanup
+    name: Pixel cleanup and export
+    objective: Clean silhouettes and export final pixel assets.
+    required_capabilities:
+      - {id: pixel-cleanup, importance: 1.0, minimum: 0.70}
+      - {id: asset-export, importance: 0.8, minimum: 0.70}
+    inputs: [Source asset family]
+    allowed_scope: [Pixel cleanup, local export]
+    exclusions: [Style redesign]
+    deliverable: Clean game-ready exports.
+    acceptance_criteria: [Native-scale silhouettes and palettes pass review]
+    verification: [Inspect exported assets at native scale]
+    stop_conditions: [Cleanup requires style redesign]
+    next_owner: Human art director

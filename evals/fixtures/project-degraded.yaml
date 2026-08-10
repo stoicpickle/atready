@@ -1,0 +1,57 @@
+schema_version: 1
+id: synthetic-degraded-routing
+name: Synthetic Degraded Routing
+goal: Exercise quota-aware rerouting, complementary support, and data-policy routing without side effects.
+as_of: 2026-08-06
+constraints:
+  data_class: private
+  max_marginal_cost: 0.50
+  allowed_interactions: [local-cli]
+  network_allowed: false
+  allow_unverified: false
+  forbidden_resources: []
+workstreams:
+  - id: implementation
+    name: Quota-aware implementation
+    objective: Route implementation around an exhausted preferred resource.
+    required_capabilities: [{id: code-implementation, importance: 1.0, minimum: 0.70}]
+    inputs: [Synthetic feature brief]
+    allowed_scope: [Synthetic implementation]
+    exclusions: [External side effects]
+    deliverable: An inert implementation handoff.
+    acceptance_criteria: [An available eligible resource owns the handoff]
+    verification: [Inspect the exact route]
+    stop_conditions: [No available eligible resource remains]
+    next_owner: Human reviewer
+
+  - id: delivery
+    name: Complementary delivery
+    objective: Pair a builder with a reviewer to meet the combined capability minima.
+    required_capabilities:
+      - {id: build, importance: 1.0, minimum: 0.60}
+      - {id: review, importance: 1.0, minimum: 0.60}
+    inputs: [Synthetic delivery brief]
+    allowed_scope: [Synthetic build and review]
+    exclusions: [Automatic execution]
+    deliverable: Primary and support handoffs.
+    acceptance_criteria: [The pair meets both capability minima]
+    verification: [Inspect primary and support evaluations]
+    stop_conditions: [No valid support combination remains]
+    next_owner: Human reviewer
+    support:
+      allowed: true
+      capability_gaps: [review]
+      minimum_gain: 0.08
+
+  - id: architecture
+    name: Private-compatible architecture
+    objective: Route private work away from a public-only resource.
+    required_capabilities: [{id: architecture, importance: 1.0, minimum: 0.70}]
+    inputs: [Synthetic private design brief]
+    allowed_scope: [Synthetic architecture]
+    exclusions: [Public-only resources]
+    deliverable: A private-compatible architecture handoff.
+    acceptance_criteria: [The selected resource permits private data]
+    verification: [Inspect data-class gates]
+    stop_conditions: [No policy-eligible resource remains]
+    next_owner: Human reviewer

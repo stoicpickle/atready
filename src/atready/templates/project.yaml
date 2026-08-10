@@ -1,0 +1,36 @@
+schema_version: 1
+id: synthetic-cli-release
+name: Synthetic CLI Release
+goal: Ship a tested local CLI without network access or telemetry.
+as_of: {{TODAY}}
+constraints:
+  data_class: internal
+  max_marginal_cost: 0.30
+  allowed_interactions: [codex-callable, local-cli, manual]
+  network_allowed: false
+  allow_unverified: false
+  forbidden_resources: []
+workstreams:
+  - id: implementation
+    name: Core implementation
+    objective: Implement the bounded CLI behavior and tests.
+    required_capabilities:
+      - id: code-implementation
+        importance: 1.0
+        minimum: 0.60
+      - id: test-automation
+        importance: 0.8
+        minimum: 0.60
+    inputs: [Validated product contract, existing source tree]
+    allowed_scope: [src, tests]
+    exclusions: [Network integrations, automatic command execution]
+    deliverable: A locally runnable CLI with deterministic tests.
+    acceptance_criteria: [All specified commands work, Private notes never enter snapshots]
+    verification: [uv run pytest, uv run ruff check .]
+    stop_conditions: [A requested change crosses the documented v0.1 permission boundary]
+    next_owner: Human reviewer
+    support:
+      allowed: false
+      capability_gaps: []
+      minimum_gain: 0.08
+    alternate_required: false

@@ -1,0 +1,190 @@
+schema_version: 1
+inventory_kind: demo
+preferences:
+  maximum_supporting_resources: 1
+  stale_after_days: 90
+  allow_purchase_suggestions: false
+resources:
+  - id: codex
+    name: Synthetic Codex Seat
+    categories: [coding-agent]
+    capabilities:
+      architecture: 0.95
+      code-implementation: 0.95
+      test-automation: 0.90
+      code-review: 0.40
+    access:
+      status: active
+      interaction: codex-callable
+      current_session: available
+    economics: {billing: subscription, marginal_cost: 0.05, quota: ample}
+    ratings:
+      quality: 0.90
+      speed: 0.85
+      autonomy: 0.85
+      privacy: 0.75
+      reliability: 0.85
+      confidence: 0.90
+      context_switch_cost: 0.10
+      integration_friction: 0.10
+    policy:
+      allowed_data_classes: [public, internal, private]
+      approval_required: true
+      requires_network: true
+    provenance: {basis: observed, last_verified: 2026-08-06}
+
+  - id: coderabbit
+    name: Synthetic CodeRabbit Seat
+    categories: [review-agent]
+    capabilities: {code-review: 1.00}
+    access:
+      status: active
+      interaction: external-agent
+      current_session: available
+    economics: {billing: subscription, marginal_cost: 0.10, quota: ample}
+    ratings:
+      quality: 0.90
+      speed: 0.70
+      autonomy: 0.80
+      privacy: 0.70
+      reliability: 0.80
+      confidence: 0.85
+      context_switch_cost: 0.35
+      integration_friction: 0.25
+    policy:
+      allowed_data_classes: [public, internal]
+      approval_required: true
+      requires_network: true
+    provenance: {basis: observed, last_verified: 2026-08-06}
+
+  - id: openrouter
+    name: Synthetic OpenRouter Seat
+    categories: [model-gateway]
+    capabilities: {model-gateway: 0.98}
+    access:
+      status: active
+      interaction: external-agent
+      current_session: available
+    economics: {billing: usage, marginal_cost: 0.35, quota: ample}
+    policy:
+      allowed_data_classes: [public, internal]
+      approval_required: true
+      requires_network: true
+    provenance: {basis: user-judgment, last_verified: 2026-08-06}
+
+  - id: upstash
+    name: Synthetic Upstash Seat
+    categories: [data-service]
+    capabilities: {managed-persistence: 0.96, cache: 0.95}
+    access:
+      status: active
+      interaction: external-agent
+      current_session: available
+    economics: {billing: usage, marginal_cost: 0.20, quota: ample}
+    policy:
+      allowed_data_classes: [public, internal]
+      approval_required: true
+      requires_network: true
+    provenance: {basis: user-judgment, last_verified: 2026-08-06}
+
+  - id: vercel
+    name: Synthetic Vercel Seat
+    categories: [hosting]
+    capabilities: {web-deployment: 0.98, web-hosting: 0.98}
+    access:
+      status: active
+      interaction: external-agent
+      current_session: available
+    economics: {billing: subscription, marginal_cost: 0.10, quota: ample}
+    policy:
+      allowed_data_classes: [public, internal]
+      approval_required: true
+      requires_network: true
+    provenance: {basis: user-judgment, last_verified: 2026-08-06}
+
+  - id: native-imagegen
+    name: Synthetic Native Image Generation
+    categories: [creative-tool]
+    capabilities: {concept-art: 0.98, visual-exploration: 0.95, asset-family: 0.45}
+    access:
+      status: active
+      interaction: codex-callable
+      current_session: available
+    economics: {billing: subscription, marginal_cost: 0.10, quota: ample}
+    ratings:
+      quality: 0.85
+      speed: 0.85
+      autonomy: 0.65
+      privacy: 0.45
+      reliability: 0.75
+      confidence: 0.85
+      context_switch_cost: 0.15
+      integration_friction: 0.15
+    policy:
+      allowed_data_classes: [public]
+      approval_required: true
+      requires_network: true
+    provenance: {basis: observed, last_verified: 2026-08-06}
+
+  - id: scenario
+    name: Synthetic Scenario Seat
+    categories: [creative-tool]
+    capabilities: {concept-art: 0.70, asset-family: 0.98}
+    access:
+      status: active
+      interaction: manual
+      current_session: available
+    economics: {billing: subscription, marginal_cost: 0.25, quota: ample}
+    ratings:
+      quality: 0.85
+      speed: 0.70
+      autonomy: 0.35
+      privacy: 0.40
+      reliability: 0.75
+      confidence: 0.80
+      context_switch_cost: 0.45
+      integration_friction: 0.35
+    policy:
+      allowed_data_classes: [public]
+      approval_required: true
+      requires_network: true
+    provenance: {basis: observed, last_verified: 2026-08-06}
+
+  - id: aseprite
+    name: Synthetic Aseprite Seat
+    categories: [creative-tool]
+    capabilities: {pixel-cleanup: 0.98, asset-export: 0.98}
+    access:
+      status: active
+      interaction: manual
+      current_session: available
+    economics: {billing: owned, marginal_cost: 0.00, quota: ample}
+    ratings:
+      quality: 0.95
+      speed: 0.60
+      autonomy: 0.20
+      privacy: 1.00
+      reliability: 0.95
+      confidence: 0.95
+      context_switch_cost: 0.50
+      integration_friction: 0.20
+    policy:
+      allowed_data_classes: [public, internal, private, sensitive]
+      approval_required: true
+      requires_network: false
+    provenance: {basis: observed, last_verified: 2026-08-06}
+
+  - id: runpod
+    name: Synthetic RunPod Seat
+    categories: [cloud-compute]
+    capabilities: {batch-compute: 0.98, large-asset-batch: 0.90}
+    access:
+      status: active
+      interaction: external-agent
+      current_session: available
+    economics: {billing: usage, marginal_cost: 0.65, quota: ample}
+    policy:
+      allowed_data_classes: [public]
+      approval_required: true
+      requires_network: true
+    provenance: {basis: vendor-claim, last_verified: 2026-08-06}

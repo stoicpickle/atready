@@ -1,0 +1,19 @@
+schema_version: 1
+inventory_kind: personal
+revision_privacy_nonce: "{{REVISION_PRIVACY_NONCE}}"
+preferences:
+  weights:
+    capability_fit: 1.0
+    quality: 0.7
+    cost_efficiency: 0.4
+    speed: 0.4
+    autonomy: 0.3
+    privacy: 0.6
+    reliability: 0.6
+    confidence: 0.5
+    low_context_switching: 0.4
+    low_integration_friction: 0.4
+  maximum_supporting_resources: 1
+  stale_after_days: 90
+  allow_purchase_suggestions: false
+resources: []

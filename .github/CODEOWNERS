@@ -1,0 +1,16 @@
+# Default ownership for this public project.
+* @stoicpickle
+
+# Security, privacy, permissions, and release-sensitive surfaces.
+/PRIVACY.md @stoicpickle
+/SECURITY.md @stoicpickle
+/docs/THREAT_MODEL.md @stoicpickle
+/docs/PERMISSIONS.md @stoicpickle
+/.github/ @stoicpickle
+/plugins/atready/ @stoicpickle
+/.agents/plugins/ @stoicpickle
+/src/ @stoicpickle
+/scripts/ @stoicpickle
+/build-constraints.in @stoicpickle
+/build-constraints.txt @stoicpickle
+/pyproject.toml @stoicpickle

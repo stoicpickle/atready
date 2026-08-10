@@ -1,0 +1,84 @@
+schema_version: 1
+inventory_kind: demo
+preferences:
+  maximum_supporting_resources: 1
+  stale_after_days: 90
+  allow_purchase_suggestions: false
+resources:
+  - id: fast-coder
+    name: Synthetic Exhausted Fast Coder
+    categories: [coding-agent]
+    capabilities: {code-implementation: 1.00}
+    access: {status: active, interaction: local-cli, current_session: available}
+    economics: {billing: subscription, marginal_cost: 0.05, quota: exhausted}
+    ratings: {quality: 1.00, speed: 1.00}
+    policy:
+      allowed_data_classes: [public, internal, private]
+      approval_required: true
+      requires_network: false
+    provenance: {basis: observed, last_verified: 2026-08-06}
+
+  - id: backup-coder
+    name: Synthetic Available Backup Coder
+    categories: [coding-agent]
+    capabilities: {code-implementation: 0.80}
+    access: {status: active, interaction: local-cli, current_session: available}
+    economics: {billing: owned, marginal_cost: 0.10, quota: ample}
+    ratings: {quality: 0.70, speed: 0.70}
+    policy:
+      allowed_data_classes: [public, internal, private]
+      approval_required: true
+      requires_network: false
+    provenance: {basis: observed, last_verified: 2026-08-06}
+
+  - id: builder
+    name: Synthetic Builder
+    categories: [coding-agent]
+    capabilities: {build: 0.90, review: 0.10}
+    access: {status: active, interaction: local-cli, current_session: available}
+    economics: {billing: owned, marginal_cost: 0.05, quota: ample}
+    ratings: {quality: 0.90, speed: 0.80}
+    policy:
+      allowed_data_classes: [public, internal, private]
+      approval_required: true
+      requires_network: false
+    provenance: {basis: observed, last_verified: 2026-08-06}
+
+  - id: reviewer
+    name: Synthetic Reviewer
+    categories: [review-agent]
+    capabilities: {build: 0.10, review: 0.90}
+    access: {status: active, interaction: local-cli, current_session: available}
+    economics: {billing: owned, marginal_cost: 0.05, quota: ample}
+    ratings: {quality: 0.70, speed: 0.60}
+    policy:
+      allowed_data_classes: [public, internal, private]
+      approval_required: true
+      requires_network: false
+    provenance: {basis: observed, last_verified: 2026-08-06}
+
+  - id: public-architect
+    name: Synthetic Public Architect
+    categories: [architecture-agent]
+    capabilities: {architecture: 1.00}
+    access: {status: active, interaction: local-cli, current_session: available}
+    economics: {billing: owned, marginal_cost: 0.05, quota: ample}
+    ratings: {quality: 1.00, speed: 0.90}
+    policy:
+      allowed_data_classes: [public]
+      approval_required: true
+      requires_network: false
+    provenance: {basis: observed, last_verified: 2026-08-06}
+
+  - id: private-architect
+    name: Synthetic Private-Compatible Architect
+    categories: [architecture-agent]
+    capabilities: {architecture: 0.80}
+    access: {status: active, interaction: local-cli, current_session: available}
+    economics: {billing: owned, marginal_cost: 0.10, quota: ample}
+    ratings: {quality: 0.70, speed: 0.70}
+    policy:
+      allowed_data_classes: [public, internal, private]
+      approval_required: true
+      requires_network: false
+    provenance: {basis: observed, last_verified: 2026-08-06}

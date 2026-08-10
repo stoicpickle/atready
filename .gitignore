@@ -1,0 +1,22 @@
+.coverage
+.DS_Store
+.pytest_cache/
+.ruff_cache/
+.venv/
+.devspace/
+__pycache__/
+*.egg-info/
+build/
+dist/
+
+# Real user state belongs outside repositories.
+**/.atready/
+/.quartermaster/
+**/.quartermaster-backups/
+**/.inventory.yaml.lock
+**/.inventory.yaml.*.tmp
+/inventory.yaml
+/history.yaml
+/preferences.yaml
+/*.local.yaml
+/routing-plan*.yaml
