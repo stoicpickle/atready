@@ -1,0 +1,82 @@
+name: Report a bug
+description: Tell us when AtReady behaves differently from what you expected.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve AtReady.
+
+        **Keep this public issue safe:** do not paste a real inventory, credentials, private notes, account details, proprietary plans, or unredacted terminal output. Replace sensitive values with clearly marked placeholders.
+
+        If this may be a security or privacy vulnerability, stop here and follow the [security reporting instructions](https://github.com/stoicpickle/atready/blob/main/SECURITY.md#reporting-a-vulnerability) instead.
+
+  - type: checkboxes
+    id: privacy_check
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed private, proprietary, account, and credential information from this report.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the behavior and where you saw it.
+      placeholder: When I ran a command using synthetic data, AtReady...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How can we reproduce it safely?
+      description: Use synthetic values and the smallest set of steps or commands that demonstrates the problem.
+      placeholder: |
+        1. Create a synthetic inventory with...
+        2. Run...
+        3. Observe...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      placeholder: I expected AtReady to...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: AtReady version or commit
+      description: Run `atready --version`, or paste the short commit identifier if you installed from source.
+      placeholder: atready 0.1.5 or abc1234
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Share only non-sensitive details that may matter, such as operating system, Python version, shell, and install method.
+      placeholder: macOS 15, Python 3.12, zsh, installed with uv tool
+    validations:
+      required: true
+
+  - type: textarea
+    id: sanitized_output
+    attributes:
+      label: Sanitized output (optional)
+      description: Paste only the relevant lines after replacing paths, names, inventory contents, and account details with placeholders.
+      render: shell
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Anything else? (optional)
+      description: Screenshots or context can help, but please check them carefully for private information first.

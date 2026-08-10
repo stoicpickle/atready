@@ -13,6 +13,9 @@ It does not run the work, contact your tools, or spend your credits. You stay in
 > **Public beta:** AtReady works today, but its setup and language will keep improving as people try
 > it. Expect changes—and please share what feels confusing or unnecessary.
 
+> **[Try AtReady and tell me how it went](https://github.com/stoicpickle/atready/blob/main/docs/TRY_ATREADY.md)**
+> —one short install, demo, resource, and planning journey for first-time users.
+
 ## The idea in one minute
 
 Maybe you have Codex, CodeRabbit, Cursor, a design subscription, and a small amount of image credit.
@@ -28,7 +31,8 @@ AtReady turns those answers into an advisory route and inert handoff notes. Noth
 
 ## Try the synthetic demo
 
-This example uses bundled fake data and does not touch a personal inventory.
+This example uses bundled fake data and does not touch a personal inventory. After installing
+AtReady, run it from a separate working directory—not the cloned AtReady source repository.
 
 ```bash
 atready demo inventory > inventory.yaml
@@ -76,10 +80,14 @@ git clone https://github.com/stoicpickle/atready.git
 cd atready
 uv tool install .
 atready
+cd ..
+mkdir atready-first-test
+cd atready-first-test
 ```
 
 The bare `atready` command opens a short welcome screen with a safe demo path. Run
-`atready --help` to see every command.
+`atready --help` to see every command. The final three commands create a sibling working folder so
+demo files and personal project briefs stay outside the source checkout.
 
 ## Use your own resources
 
@@ -213,6 +221,7 @@ atready route                  Produce a concise advisory resource plan
 
 ## Documentation
 
+- [First-time test journey](https://github.com/stoicpickle/atready/blob/main/docs/TRY_ATREADY.md)
 - [How routing works](https://github.com/stoicpickle/atready/blob/main/plugins/atready/skills/project-atready/references/routing-rules.md)
 - [Output contract](https://github.com/stoicpickle/atready/blob/main/plugins/atready/skills/project-atready/references/output-contract.md)
 - [Data model](https://github.com/stoicpickle/atready/blob/main/docs/DATA_MODEL.md)
@@ -225,7 +234,12 @@ atready route                  Produce a concise advisory resource plan
 AtReady is early. The most useful feedback is practical: what you tried, where setup became
 confusing, whether the recommendation changed your plan, and whether you wanted to use it again.
 
-If you want to work on the project locally:
+The quickest way to help is to complete the
+[first-time test journey](https://github.com/stoicpickle/atready/blob/main/docs/TRY_ATREADY.md), then
+[share first-use feedback](https://github.com/stoicpickle/atready/issues/new?template=first-use-feedback.yml).
+
+If you want to work on the project itself, run these commands from the cloned `atready` source
+checkout:
 
 ```bash
 uv sync --all-groups

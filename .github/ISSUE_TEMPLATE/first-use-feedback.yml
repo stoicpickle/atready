@@ -1,0 +1,79 @@
+name: Share first-use feedback
+description: Tell us what felt clear, useful, or confusing on your first AtReady route.
+title: "[First use]: "
+labels:
+  - feedback
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying AtReady. A short, honest report is more useful than a polished one.
+
+        **Keep this public issue safe:** use a synthetic or broadly described project. Do not paste a real inventory, credentials, private notes, account details, proprietary plans, or other sensitive output.
+
+  - type: checkboxes
+    id: privacy_check
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed private, proprietary, account, and credential information from this report.
+          required: true
+
+  - type: dropdown
+    id: progress
+    attributes:
+      label: 1. How far did you get?
+      description: Pick the closest match. Stopping early is useful feedback too.
+      options:
+        - I installed AtReady and completed the demo
+        - I added a resource and routed a project
+        - I completed only part of the journey
+        - I could not get started
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal_and_result
+    attributes:
+      label: 2. What were you trying to plan, and what did AtReady produce?
+      description: Keep the project generic or synthetic. A sentence or two is enough.
+      placeholder: I planned a small documentation refresh. AtReady suggested...
+    validations:
+      required: true
+
+  - type: textarea
+    id: friction
+    attributes:
+      label: 3. Where did you slow down or feel unsure?
+      description: Tell us about the first confusing instruction, question, command, or result.
+      placeholder: I was unsure what to enter when...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: plan_clarity
+    attributes:
+      label: 4. How easy was the resource plan to understand?
+      options:
+        - Very easy — I knew what to do next
+        - Mostly easy — one or two details were unclear
+        - Difficult — I had to interpret the result
+        - I did not reach a resource plan
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact_and_improvement
+    attributes:
+      label: 5. Did the plan change what you would do, and what one improvement would help most?
+      description: It is completely fine if the plan did not change anything.
+      placeholder: It did/did not change my approach because... The one improvement I would make is...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: AtReady version or commit (optional)
+      description: Run `atready --version`, or paste the short commit identifier if you installed from source.
+      placeholder: atready 0.1.5 or abc1234
