@@ -688,7 +688,7 @@ def test_distribution_uses_current_source_bound_release_and_submission_channels(
     for distribution_boundary in (
         "AtReady is a CLI-first open-source product",
         "reviewed public source beta -> optional PyPI package",
-        "Do not claim the public beta exists until that exact snapshot is populated",
+        "received its first clean source snapshot and was anonymously verified as public",
         "runtime contract version `1`",
         "product-version equality is no longer the compatibility boundary",
         "`atready runtime contract --json`",
@@ -787,9 +787,9 @@ def test_private_beta_is_named_exact_candidate_access_with_cleanup() -> None:
         assert forbidden not in text
 
     readme_text = README.read_text(encoding="utf-8")
-    assert "Public beta candidate" in readme_text
-    assert "this checkout is not public distribution" in readme_text
-    assert "The beta begins only after `stoicpickle/atready` is populated" in readme_text
+    assert "Public beta" in readme_text
+    assert "Public beta candidate" not in readme_text
+    assert "generally available" not in readme_text
     assert "PRIVATE_BETA.md" in DISTRIBUTION.read_text(encoding="utf-8")
     assert "PRIVATE_BETA.md" in RELEASING.read_text(encoding="utf-8")
 

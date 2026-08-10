@@ -41,9 +41,9 @@ source install from that repository; PyPI is a later convenience after its exact
 ready and independently verified. Local/repository plugin marketplaces remain optional authoring
 and testing channels.
 
-The separate `stoicpickle/atready` repository was private and empty when checked on 2026-08-09.
-Recheck that mutable state before promotion. Do not claim the public beta exists until that exact
-snapshot is populated, made public, and anonymously verified.
+The `stoicpickle/atready` repository received its first clean source snapshot and was anonymously
+verified as public on 2026-08-09. That proves only the public source-beta channel; it is not a PyPI
+package, immutable release, general-availability claim, or OpenAI review.
 
 This means the intended promotion flow is:
 
@@ -168,7 +168,6 @@ the result after the user runs it.
 - Verify any published release artifacts against the committed public source and retain
   cross-platform CI evidence.
 
-Until the public repository is populated, made public, and anonymously verified, describe AtReady
-as a reviewed open-source beta candidate. After that check, describe only the public source beta as
-publicly available. Do not use “generally available” or “OpenAI-reviewed” until their separate
-package, directory, review, and external first-user gates are verified.
+Describe AtReady as a public open-source beta. Do not use “generally available,” “immutable
+release,” “published on PyPI,” or “OpenAI-reviewed” until those separate package, release,
+directory, review, and external first-user gates are verified.

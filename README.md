@@ -10,9 +10,8 @@ It does not run the work, contact your tools, or spend your credits. You stay in
 
 ![AtReady welcome screen](https://raw.githubusercontent.com/stoicpickle/atready/main/docs/assets/atready-cli.png)
 
-> **Public beta candidate:** AtReady works today, but this checkout is not public distribution.
-> The beta begins only after `stoicpickle/atready` is populated, made public, and its links are
-> verified. Once released, expect changes—and please share what feels confusing or unnecessary.
+> **Public beta:** AtReady works today, but its setup and language will keep improving as people try
+> it. Expect changes—and please share what feels confusing or unnecessary.
 
 ## The idea in one minute
 

@@ -17,7 +17,8 @@ def test_beta_start_here_is_the_short_tester_entrypoint() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     private_beta = (ROOT / "docs" / "PRIVATE_BETA.md").read_text(encoding="utf-8")
 
-    assert "Public beta candidate" in readme
+    assert "Public beta" in readme
+    assert "Public beta candidate" not in readme
     assert "docs/BETA_START_HERE.md" not in readme
     assert "[`BETA_START_HERE.md`](BETA_START_HERE.md)" in private_beta
     assert "## Self-serve beta graduation bar" in private_beta

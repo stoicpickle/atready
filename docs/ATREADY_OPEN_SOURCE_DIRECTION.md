@@ -1,8 +1,8 @@
 # AtReady open-source direction
 
-Status: working product decision recorded on 2026-08-09. The local source identity is migrating from
-Quartermaster to AtReady. GitHub repositories, public packages, directory listings, domains, and
-other external accounts are not renamed or published by this decision.
+Status: product decision recorded on 2026-08-09 and updated after the first public source snapshot.
+The product and local source identity are AtReady. The public `stoicpickle/atready` repository is
+live; PyPI, directory listings, domains, and other external release channels remain separate gates.
 
 ## Decision
 
@@ -45,8 +45,8 @@ publishing it; registry availability can change.
 - Python module and CLI: `atready`
 - Codex plugin: `atready`
 - Codex skill: `project-atready`
-- Proposed private-development repository: `atready-dev`
-- Proposed reserved/public repository: `atready`
+- Private-development repository: `atready-dev`
+- Public source repository: `atready`
 
 Persisted v1 inventory state remains readable across the rename. Legacy private-state environment
 and hidden backup names are compatibility details, not public product identifiers.
@@ -60,14 +60,12 @@ and hidden backup names are compatibility details, not public product identifier
 
 ## Next mini-direction
 
-1. Complete and validate the local AtReady identity migration.
-2. Rename the private GitHub development repository only after the reviewed local migration is
-   ready to push; then update the local remote and verify the exact branch/SHA.
-3. Rename or create the reserved public repository without publishing a release.
-4. Produce a clean, reviewable public beta snapshot with one short install-and-first-plan path.
-5. Invite early users to try it and collect practical feedback
+1. Keep private development changes reviewed and green before promoting a clean public snapshot.
+2. Invite early users to try the source beta and collect practical feedback
    on setup, resource intake, plan usefulness, trust, and repeat use.
-6. Revisit public plugin submission only if beta users want that installation surface.
+3. Prioritize confusing first-use behavior over new providers, connectors, or routing features.
+4. Add a verified PyPI install only when it materially improves the early-user path.
+5. Revisit public plugin submission only if beta users want that installation surface.
 
 ## Beta success signal
 
