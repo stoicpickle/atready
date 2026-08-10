@@ -641,33 +641,27 @@ def main_smoke() -> None:
         )
         if _file_tree(installed_skill_root) != _file_tree(canonical_skill_root):
             raise AssertionError("installed wheel skill differs from the canonical plugin skill")
-        skill_contract_text = "\n".join(
-            path.read_text(encoding="utf-8") for path in sorted(installed_skill_root.rglob("*.md"))
-        )
-        required_recovery_contract = (
-            "inventory backup rollback",
-            "inventory backup delete",
-            "--allow-no-backups",
-            "Never infer approval for recovery, rollback, deletion",
-            "--resource-file",
-            "--resource-stdin",
-            "argv-safe only",
-            "review them in the source",
-            "hidden revision privacy nonce",
-            "Resource setup:",
-            "Project planning:",
-            "Maintenance or recovery:",
-            "Do not combine setup and routing merely because both are available",
+        skill_contract_text = installed_skill.read_text(encoding="utf-8")
+        required_planning_contract = (
+            "Use AtReady at the planning pivot",
+            "Ask at most one consolidated clarification",
+            "authorizes only the bounded, read-only inventory checks",
+            "inventory validate /absolute/path/to/inventory.yaml",
+            "inventory snapshot /absolute/path/to/inventory.yaml --format json",
+            "project template",
+            "project validate /absolute/path/to/project.yaml",
+            "direct the user to `atready add`",
+            "question budget is already used",
+            "A resource-fit plan is advice, not authorization",
             "No routed project resources were contacted or run.",
-            "Ask for a separate implementation instruction before",
         )
         normalized_skill_body = " ".join(skill_contract_text.split())
         missing_contract = [
-            phrase for phrase in required_recovery_contract if phrase not in normalized_skill_body
+            phrase for phrase in required_planning_contract if phrase not in normalized_skill_body
         ]
         if missing_contract:
             raise AssertionError(
-                f"installed wheel bundled a stale recovery skill: {missing_contract!r}"
+                f"installed wheel bundled a stale planning skill: {missing_contract!r}"
             )
 
         demo = InventoryCatalog.from_text(demo_inventory()).inventory
