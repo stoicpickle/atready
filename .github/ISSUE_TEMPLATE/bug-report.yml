@@ -55,7 +55,7 @@ body:
     attributes:
       label: AtReady version or commit
       description: Run `atready --version`, or paste the short commit identifier if you installed from source.
-      placeholder: atready 0.1.5 or abc1234
+      placeholder: atready 0.1.6 or abc1234
     validations:
       required: true
 

@@ -5,29 +5,34 @@ description: Add one user-declared resource to an AtReady roster through a conve
 
 # AtReady
 
-Use AtReady for one of two explicit jobs: add one declared resource to the local roster, or plan
-where saved resources fit before implementation. Route an add, onboard, register, or save request
-to resource intake before considering planning. The deterministic CLI owns roster mutations,
-eligibility, assignments, gaps, dispositions, and handoff packets.
+Use AtReady for two jobs: add resources or plan where saved resources fit. Route add requests to intake first.
+The CLI owns mutations, eligibility, assignments, gaps, dispositions, and handoff packets.
 
-Resolve the directory containing this `SKILL.md` once, without searching elsewhere, and replace
-`/absolute/path/to/project-atready` below with that exact directory. Use an already-installed
-Python 3.11 or newer interpreter to run only its bundled launcher. Never invoke a bare `atready`
-command or bypass the launcher. The launcher uses an already-installed trusted `uv`, offline and
-without configuration files, resolves its exact tool bin, verifies the runtime contract before
-delegation, and never searches `PATH` for `atready`.
+Resolve this `SKILL.md` directory once, without searching elsewhere, and replace
+`/absolute/path/to/project-atready` below with it. Use an already-installed Python 3.11 or newer interpreter to run only the bundled
+launcher. Never invoke a bare `atready` command or bypass the launcher. It uses trusted `uv`, offline and without
+configuration files, resolves its exact tool bin, verifies the runtime contract, and never searches
+`PATH` for `atready`.
+
+## Response discipline
+
+Respect concise, short, brief, quick, promo, or on-screen requests and explicit response limits.
+Concision changes presentation, never evidence. For a direct question without routing or
+state change, answer in no more than three short sentences or bullets. During a
+workflow, give only the facts needed for the current state and one next action or approval. Do not repeat
+boundaries or restate the prompt. Never omit an exact target, actual CLI
+preview or receipt, mutation state, material uncertainty, required separate approval, or the
+successful-route boundary. Never change the actual route or mutation status to fit a response limit.
 
 ## Resource intake workflow
 
-Use this branch before planning when the user asks to add one resource. Read
-[resource-onboarding.md](references/resource-onboarding.md) completely and follow its Quick Setup
-or Detailed Setup contract.
+Use this branch before planning when the user asks to add one resource. Read the complete
+[resource-onboarding.md](references/resource-onboarding.md) and follow its setup contract.
 
 ### 1. Check the local boundary
 
-Proceed only when the host grants approved local command execution and filesystem access. Otherwise
-say that this chat can prepare the entry but cannot save the local roster, and direct the user to
-run `atready add` in a local terminal. Do not imply that the roster changed.
+Without approved local execution and filesystem access, say chat cannot save. Offer `atready add`
+only as a user-run terminal fallback; the skill must not invoke it or claim authority or changes.
 
 Resolve the target and declaration contract through the launcher exactly once:
 
@@ -38,9 +43,8 @@ python3 "/absolute/path/to/project-atready/scripts/atready.py" \
 python3 "/absolute/path/to/project-atready/scripts/atready.py" schema resource-declaration
 ```
 
-Use a user-provided inventory path when present; otherwise use the exact `config path` result. If
-the inventory is missing, ask whether to create one empty personal roster at that exact path, then
-stop. The add request does not authorize initialization. After separate approval, run only:
+Use a user-provided path or the exact `config path` result. If missing, ask whether to create one
+empty personal roster there, then stop. The add request does not authorize initialization. After separate approval:
 
 ```bash
 python3 "/absolute/path/to/project-atready/scripts/atready.py" \
@@ -48,17 +52,14 @@ python3 "/absolute/path/to/project-atready/scripts/atready.py" \
 ```
 
 Continue only when the receipt names the exact path, says `inventory_kind: personal`, reports zero
-resources, and reports `revision_protection: nonce-v1-present`. If an inventory already exists or is
-invalid, never overwrite it; report the problem and use the documented local recovery path. Keep
-provider discovery, computer scans, account inspection, billing checks, credentials, tokens, and
-private notes outside this workflow. Use only facts the user states. Handle one resource at a time.
+resources, and reports `revision_protection: nonce-v1-present`. If it exists or is invalid, never overwrite it.
+Keep provider discovery, computer scans, account inspection, billing checks, credentials,
+tokens, and private notes outside this workflow. Use only facts the user states. Handle one resource at a time.
 
 ### 2. Gather and recap
 
-Ask one friendly, consolidated intake card, using a matching catalog profile only as editable
-suggestions. Accept corrections and `unknown` values. Recap the complete routing-visible entry in
-plain language. Treat answers as facts, not authorization. Ask whether to create the exact no-write
-preview, then stop.
+Ask one friendly, consolidated intake card with editable catalog suggestions. Accept corrections and
+`unknown`. Treat answers as facts, not authorization. Recap, ask for a no-write preview, and stop.
 
 ### 3. Preview, approve, and save
 
@@ -76,10 +77,8 @@ python3 "/absolute/path/to/project-atready/scripts/atready.py" inventory add \
   --resource-file /absolute/path/to/declaration.yaml --json
 ```
 
-Show the actual CLI preview without changing its fields. Remove only the exact temporary
-declaration and exact empty directory; report any retained path if cleanup fails. Ask `Save exactly
-this entry?`, naming the target and change, then stop. A general request to add a resource is not
-authorization to save it.
+Show the actual CLI preview without changing its fields. Remove only the exact declaration and empty directory;
+report retained paths. Ask `Save exactly this entry?`, name the target and change, then stop. An add request is not save authorization.
 
 After a separate exact-save authorization, recreate the same protected declaration and run:
 
@@ -92,9 +91,8 @@ python3 "/absolute/path/to/project-atready/scripts/atready.py" inventory add \
   --expect-plan PREVIEW_EXPECT_PLAN --json
 ```
 
-Use only the preview's exact revision and plan token. Treat any changed declaration, target,
-revision, or plan as a new preview. Remove the exact temporary input and empty directory on every
-path, reporting any retained path, then run:
+Use only the preview's exact revision and plan token. Any changed declaration, target, revision, or
+plan needs a new preview. Remove the exact temporary input and directory on every path, report any retained path, then run:
 
 ```bash
 python3 "/absolute/path/to/project-atready/scripts/atready.py" \
@@ -103,14 +101,13 @@ python3 "/absolute/path/to/project-atready/scripts/atready.py" \
   inventory list /absolute/path/to/inventory.yaml --json
 ```
 
-Call the save verified only when the receipt says `applied: true`, names the intended resource ID,
-has `replacement_verified: true`, has `revision` equal to `candidate_revision`, has no warnings,
-has `observed_revision_protection`, and, on POSIX, has `directory_synced: true`. Require the list to
-show the intended resource ID and the same revision. Report strict-mode unknown or stale warnings as
-selection-fact gaps rather than storage corruption. Return the receipt and validation result in
-plain language. If apply or validation is uncertain, report the exact status without claiming
-success or retrying the apply. Do not use the planning output contract, `Plan`, or `Resource fit`
-headings for roster work. Do not append the routing boundary sentence because no route occurred.
+Call save verified only when the receipt says `applied: true`, names the intended resource ID, has
+`replacement_verified: true`, has `revision` equal to `candidate_revision`, no warnings, has
+`observed_revision_protection`, and, on POSIX, `directory_synced: true`. Require the list to show the
+same revision and ID. Treat strict unknown or stale warnings as selection gaps. Return the receipt and
+validation result. If uncertain, report exact status without claiming success or retrying the apply.
+Do not use the planning output contract, `Plan`, or `Resource fit` for roster work. Do not append the
+routing boundary sentence because no route occurred.
 
 ## Planning workflow
 
@@ -147,8 +144,12 @@ Use a user-provided inventory path when present; otherwise use the exact path re
 `config path`.
 
 If the launcher, trusted `uv`, compatible runtime, or inventory is unavailable, read
-[runtime-setup.md](references/runtime-setup.md). Explain the exact setup problem and stop without
-claiming that a roster was loaded. If the roster is empty, offer the resource intake workflow.
+[runtime-setup.md](references/runtime-setup.md). Do not use the planning output contract or its
+headings. In no more than three short sentences and 60 words, name the exact blocker, give one
+recovery or authorization action, and say no routed project resources were contacted or run.
+Launcher/runtime checks are not project-resource execution. Do not enumerate unset
+routing roles or add a generic price, quota, privacy, rights, licensing, or provider checklist. Stop
+without claiming a roster loaded. If it is empty, offer intake within the same limit.
 
 The snapshot is sanitized, but its resource names and usage facts can still be sensitive and may
 enter the user's configured host/model context. Keep credentials, private notes, revision nonces,
@@ -182,36 +183,36 @@ and validate again only after a permitted repair.
 
 ### 4. Route through the CLI
 
-Read [routing-rules.md](references/routing-rules.md), then run:
+Read [routing-rules.md](references/routing-rules.md) and
+[output-contract.md](references/output-contract.md), then run:
 
 ```bash
 python3 "/absolute/path/to/project-atready/scripts/atready.py" route \
   --project /absolute/path/to/project.yaml \
   --inventory /absolute/path/to/inventory.yaml \
-  --format json
+  --format presentation
 ```
 
-Treat the JSON as the complete evidence record. Preserve every assignment, gap, uncertainty,
-disposition, and CLI-returned reason. Keep one primary per satisfiable step, no more than one
-CLI-selected support, and only CLI-reserved alternates. Never promote an ineligible, unavailable,
-or unverified resource, choose a different winner, recalculate a score, or infer live access.
+Follow the reference's limit flags and `presentation_status` branches. Treat `route` as the complete
+evidence record. Preserve every assignment, gap, uncertainty, disposition, and CLI-returned reason.
+Accept exit `0`, or exit `3` for a route with gaps, only when stdout parses as the complete
+presentation envelope. Invalid or missing envelope data uses the no-route response.
+Keep one primary per satisfiable step, no more than one CLI-selected support, and only CLI-reserved
+alternates. Never promote an ineligible, unavailable, or unverified resource, choose a different
+winner, recalculate a score, or infer live access.
 
 ### 5. Explain and stop
+Follow the output contract for exact `ready` or `limit-conflict` summary handling and its cleanup
+failure exception. Use its detailed branch only when the user explicitly asks for detailed evidence
+or inert handoff packets. Build details from `route`, never from memory or the compact summary.
 
-Read [output-contract.md](references/output-contract.md). Return the plan in its exact default
-order and shared language: `Plan`, `Resource fit`, optional `Gaps and uncertainty`, then `Next`.
-Within each assigned step use `Use`, optional `Help from`, and `Why`. Include `Deliver` and `Check`
-when they help the user act. Give detailed evidence or inert handoff packets only when explicitly
-requested.
+Remove only the exact temporary file and exact empty temporary directory. Local cleanup does not
+erase content already processed or retained by the host, model provider, logs, backups, or sync
+systems.
 
-Before responding, remove only the exact temporary file and exact empty temporary directory. If
-cleanup fails, report the retained path. Local cleanup does not erase content already processed or
-retained by the host, model provider, logs, backups, or sync systems.
-
-Only after the `route` command succeeds, end the planning response with exactly:
-`No routed project resources were contacted or run.` Then stop. A resource-fit plan is advice, not
-authorization. Wait for a separate implementation instruction before project work or handoff
-execution.
+A `ready` summary already ends with the exact successful-route boundary. Do not append another
+boundary. Then stop. A resource-fit plan is advice, not authorization. Wait for a separate
+implementation instruction before project work or handoff execution.
 
 ## Boundaries
 

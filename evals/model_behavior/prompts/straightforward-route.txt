@@ -1,0 +1,10 @@
+Use AtReady to explain this saved read only route evidence in concise plain language. Report every
+assignment exactly once, make any material uncertainty clear, and preserve the safety boundary.
+Do not contact or run a resource.
+
+Synthetic evidence:
+
+* Architecture: Synthetic Codex Seat, selected, no gap
+* Implementation: Synthetic Codex Seat, selected with continuity, no gap
+* Independent review: Synthetic CodeRabbit Seat, selected, no gap
+* The inventory is a user controlled demo and its contents were not independently verified

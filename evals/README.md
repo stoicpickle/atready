@@ -16,11 +16,24 @@ handoffs, a repeatable plan hash, and no network calls. Run `uv run pytest tests
 
 Planning communication is checked separately across the default CLI summary and optional Codex
 skill. The [plan communication evaluation](PLAN_COMMUNICATION_EVAL.md) compares both human
-responses with the same CLI JSON evidence. It covers straightforward assignment, an unconfirmed
-resource that leaves a gap, complementary support, and a reserved alternate. It also measures five
-reader comprehension questions with a 100% safety comprehension requirement. Run
+responses with the same CLI JSON evidence. The Codex skill uses the deterministic `summary` from a
+single presentation envelope rather than asking the host model to rewrite the route. Explicit word
+and line limits are enforced by the CLI; an impossible limit returns deterministic conflict copy
+without changing route evidence. The evaluation covers straightforward assignment, an unconfirmed
+resource that leaves a gap, complementary support, a reserved alternate, and exact summary parity.
+It also measures five reader comprehension questions with a 100% safety comprehension requirement. Run
 `uv run pytest tests/test_plan_communication_eval_contract.py` for its static contract, then run
 the manual cases in fresh Codex tasks. Static tests do not prove real model behavior.
+
+Elevated checks add two bounded implementation lanes. `scripts/elevated_install_matrix.py`
+exercises a synthetic staged launcher handshake plus complete, incomplete, and conflicting
+duplicate-skill states. `tests/test_routing_stress.py` generates seeded synthetic route cases. The
+install matrix does not substitute for a clean-machine wheel installation.
+
+The [model behavior scorecard](model_behavior/README.md) is retained as a historical research
+comparison for the prose-rendering approach that preceded deterministic CLI presentation. It never
+calls a model and is not a current release gate. Actual model behavior still requires running the
+unchanged prompts in fresh host sessions and preserving the resulting local evidence.
 
 Resource-intake behavior is covered separately because it spans the host skill and the preview-first
 CLI contract rather than the deterministic routing fixture set. The synthetic first-user acceptance

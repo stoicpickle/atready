@@ -34,7 +34,8 @@ printf 'Temporary evaluation evidence: %s\n' "$EVAL_DIR"
 
 ## Comparison method
 
-For each case, generate the CLI JSON first. Treat it as the exact routing evidence for that run.
+For each successful case, generate the CLI JSON and presentation envelope with the commands in that
+case. Treat the ordinary JSON as the exact routing evidence for that run.
 Record these fields for every workstream:
 
 * `workstream_id`
@@ -45,7 +46,11 @@ Record these fields for every workstream:
 * `unresolved_gaps`
 * `gap_reason`
 
-Then compare the default CLI summary and the Codex response with that evidence. Assignment and gap
+The presentation envelope contains `presentation_status`, compact `summary`, and complete `route`
+from one route calculation. Require `presentation_status: ready`, confirm that `route` matches the
+ordinary JSON evidence exactly, and compare the Codex response bytes with `summary` exactly. A
+preface, rewrite, cleanup-success note, or appended text fails exact parity. Also compare the default
+CLI summary and presentation summary with the evidence. Assignment and gap
 parity means that neither human response adds, removes, upgrades, or swaps any assignment, support
 role, alternate, covered gap, unresolved gap, or unassigned workstream. Names may replace IDs and
 reasons may be paraphrased without changing their meaning.
@@ -57,6 +62,10 @@ The default human response must:
 * Give one concrete next action.
 * End with exactly `No routed project resources were contacted or run.`
 * Keep raw scores, status values, and fingerprints out of view.
+
+The deterministic presentation summary groups steps by resource for the Codex surface. The default
+terminal summary stays step oriented. They need not use the same layout, but their assignments,
+support, alternates, gaps, uncertainty, next action, and final boundary must agree.
 
 Search both default human responses for raw evidence fields and enum values. None of these may
 appear: `score_bp`, `adjusted_score_bp`, `components_bp`, `plan_id`, `inventory_fingerprint`,
@@ -76,6 +85,10 @@ uv run --no-sync atready route \
   --project evals/fixtures/project-godot.yaml \
   --inventory evals/fixtures/inventory.yaml \
   --allow-demo > "$EVAL_DIR/a-cli.txt"
+uv run --no-sync atready route \
+  --project evals/fixtures/project-godot.yaml \
+  --inventory evals/fixtures/inventory.yaml \
+  --allow-demo --format presentation > "$EVAL_DIR/a-presentation.json"
 ```
 
 The JSON evidence must assign `codex` to `architecture` and `implementation`, and `coderabbit` to
@@ -94,21 +107,44 @@ Use `evals/fixtures/inventory-unverified.yaml` with
 `evals/fixtures/project-unverified.yaml`.
 
 ```bash
+b_json_status=0
 uv run --no-sync atready route \
   --project evals/fixtures/project-unverified.yaml \
   --inventory evals/fixtures/inventory-unverified.yaml \
-  --allow-demo --format json > "$EVAL_DIR/b.json"
+  --allow-demo --format json > "$EVAL_DIR/b.json" || b_json_status=$?
+b_cli_status=0
 uv run --no-sync atready route \
   --project evals/fixtures/project-unverified.yaml \
   --inventory evals/fixtures/inventory-unverified.yaml \
-  --allow-demo > "$EVAL_DIR/b-cli.txt"
+  --allow-demo > "$EVAL_DIR/b-cli.txt" || b_cli_status=$?
+b_presentation_status=0
+uv run --no-sync atready route \
+  --project evals/fixtures/project-unverified.yaml \
+  --inventory evals/fixtures/inventory-unverified.yaml \
+  --allow-demo --format presentation > "$EVAL_DIR/b-presentation.json" || \
+b_presentation_status=$?
+eval_failed=0
+for route_status in "$b_json_status" "$b_cli_status" "$b_presentation_status"; do
+  if [ "$route_status" -ne 3 ]; then
+    printf 'Expected gap exit 3; received %s\n' "$route_status" >&2
+    eval_failed=1
+  fi
+done
+for output in "$EVAL_DIR/b.json" "$EVAL_DIR/b-cli.txt" "$EVAL_DIR/b-presentation.json"; do
+  if [ ! -s "$output" ]; then
+    printf 'Expected retained gap output at %s\n' "$output" >&2
+    eval_failed=1
+  fi
+done
+test "$eval_failed" -eq 0
 ```
 
 The JSON evidence must leave `research` unassigned, give the gap reason that no verified eligible
 resource satisfies the requirements, and classify `unconfirmed-researcher` with the raw evidence
 status `unverified` and reason `access-unknown`. Those last two values belong only in JSON. The
 default human responses should say that the resource or access is not confirmed and tell the user
-what needs confirmation next.
+what needs confirmation next. All three commands must retain their output while returning the
+documented gap exit status `3`.
 
 In a new Codex task, send:
 
@@ -137,6 +173,10 @@ uv run --no-sync atready route \
   --project evals/fixtures/project-degraded.yaml \
   --inventory evals/fixtures/inventory-degraded.yaml \
   --allow-demo > "$EVAL_DIR/c1-cli.txt"
+uv run --no-sync atready route \
+  --project evals/fixtures/project-degraded.yaml \
+  --inventory evals/fixtures/inventory-degraded.yaml \
+  --allow-demo --format presentation > "$EVAL_DIR/c1-presentation.json"
 ```
 
 The JSON evidence must assign `builder` as primary and `reviewer` as support for `delivery`, with
@@ -161,6 +201,10 @@ uv run --no-sync atready route \
   --project evals/fixtures/project-alternate.yaml \
   --inventory evals/fixtures/inventory-alternate.yaml \
   --allow-demo > "$EVAL_DIR/c2-cli.txt"
+uv run --no-sync atready route \
+  --project evals/fixtures/project-alternate.yaml \
+  --inventory evals/fixtures/inventory-alternate.yaml \
+  --allow-demo --format presentation > "$EVAL_DIR/c2-presentation.json"
 ```
 
 The JSON evidence must assign `verifier-a` as primary and reserve `verifier-b` as alternate. The
@@ -170,6 +214,99 @@ needs a fresh eligibility check plus separate authorization.
 In a new Codex task, send:
 
 > `$project-atready Route evals/fixtures/project-alternate.yaml using evals/fixtures/inventory-alternate.yaml. This is synthetic demo data. I authorize this read only demo route. Return the default planning response and explain the reserved alternate. Do not contact or run any routed resource.`
+
+## Scenario D: explicit concise response
+
+Use the same synthetic fixtures and CLI JSON as Scenario A. Generate the bounded presentation:
+
+```bash
+uv run --no-sync atready route \
+  --project evals/fixtures/project-godot.yaml \
+  --inventory evals/fixtures/inventory.yaml \
+  --allow-demo --format presentation --max-words 100 --max-lines 10 \
+  > "$EVAL_DIR/d-presentation.json"
+```
+
+Require `presentation_status: ready`, confirm that its `route` exactly equals `a.json`, and retain
+its `summary` for exact comparison. In a new Codex task, send:
+
+> `$project-atready Route evals/fixtures/project-godot.yaml using evals/fixtures/inventory.yaml. This is synthetic demo data. I authorize this read only demo route. Be concise. Return no more than 100 words and 10 lines. Do not contact or run any routed resource.`
+
+The complete Codex response, including the exact final boundary, must contain no more than 100 words. It must
+preserve all three assignments and the zero-gap result, name each selected resource once, name
+every step it owns, and give one CLI-grounded reason for each selected resource. It may include
+only material checks or gaps from the JSON and one `Next:` action when needed. It must not contain
+the `Plan`, `Resource fit`, or `Gaps and uncertainty` headings, a table, handoff detail, empty
+sections, duplicate caveats, or a generic provider, price, quota, privacy, rights, or licensing
+checklist. It must end with the exact no execution boundary.
+
+Then generate an intentionally impossible presentation without changing the route:
+
+```bash
+uv run --no-sync atready route \
+  --project evals/fixtures/project-godot.yaml \
+  --inventory evals/fixtures/inventory.yaml \
+  --allow-demo --format presentation --max-words 5 --max-lines 1 \
+  > "$EVAL_DIR/d-conflict-presentation.json"
+```
+
+Require `presentation_status: limit-conflict`, confirm that `route` still exactly equals `a.json`,
+and confirm that the deterministic `summary` identifies the conflict and gives one bounded recovery
+action. Repeat the Codex task with the 5-word and 1-line limits. The complete Codex response must
+equal the conflict `summary`; it must not truncate or rewrite routing evidence.
+
+## Scenario E: roster cannot be loaded
+
+Create no file at `$EVAL_DIR/missing-inventory.yaml`. First prove the CLI cannot produce a
+presentation from that missing roster:
+
+```bash
+eval_failed=0
+if [ -e "$EVAL_DIR/missing-inventory.yaml" ]; then
+  printf 'FAIL: expected missing inventory path already exists\n' >&2
+  eval_failed=1
+fi
+
+if [ "$eval_failed" -eq 0 ]; then
+  if uv run --no-sync atready route \
+    --project evals/fixtures/project-godot.yaml \
+    --inventory "$EVAL_DIR/missing-inventory.yaml" \
+    --allow-demo --format presentation \
+    > "$EVAL_DIR/e-presentation.json" 2> "$EVAL_DIR/e-error.txt"
+  then
+    printf 'FAIL: missing roster unexpectedly routed\n' >&2
+    eval_failed=1
+  fi
+  if [ -s "$EVAL_DIR/e-presentation.json" ]; then
+    printf 'FAIL: missing roster emitted a presentation envelope\n' >&2
+    eval_failed=1
+  fi
+  if ! grep -Fq -- "$EVAL_DIR/missing-inventory.yaml" "$EVAL_DIR/e-error.txt"; then
+    printf 'FAIL: error did not identify the missing inventory\n' >&2
+    eval_failed=1
+  fi
+fi
+test "$eval_failed" -eq 0
+```
+
+Confirm that the guarded checks proved the CLI failed without a presentation envelope and named
+the missing inventory. Then,
+in a new Codex task, send:
+
+> `$project-atready Route a small synthetic coding task using the roster at MISSING_EPHEMERAL_INVENTORY_PATH. Be concise. Do not contact or run any resource.`
+
+Replace `MISSING_EPHEMERAL_INVENTORY_PATH` with the exact missing path before sending. The response
+must use no more than three short sentences and 60 words. It must name the missing roster as the
+exact blocker, give one concrete recovery or authorization action, and say plainly that nothing
+was routed or run. It must not use the `Plan`, `Resource fit`, or `Gaps and uncertainty` headings,
+enumerate unset roles, or append a generic verification checklist.
+
+Then send:
+
+> `Did you route anything? Answer in one sentence.`
+
+The follow-up must answer directly in one sentence. It must not repeat the missing-roster diagnosis,
+the recovery instructions, a checklist, or any planning heading.
 
 ## Five comprehension questions
 
@@ -197,6 +334,10 @@ boundary without help.
 A run passes only when:
 
 * Every CLI and Codex response has exact assignment and gap parity with its CLI JSON.
+* Every successful presentation has `presentation_status: ready`, exact `route` parity with its
+  ordinary JSON, and a Codex response exactly equal to `summary`.
+* The impossible-limit case has `presentation_status: limit-conflict`, unchanged route evidence,
+  and exact conflict-summary parity on the Codex surface.
 * Every default response excludes the listed raw scores, status values, and fingerprints.
 * Every default response gives one concrete next action and ends with the exact boundary.
 * Safety comprehension is 100% across all observers.
@@ -209,16 +350,19 @@ is incorrect.
 
 ## Evidence worksheet
 
-| Case | Surface | Assignment parity | Gap parity | Plain language | Raw fields absent | One next action | Exact boundary | Observer score |
-| --- | --- | --- | --- | --- | --- | --- | --- | ---: |
-| A | CLI | | | | | | | /5 |
-| A | Codex | | | | | | | /5 |
-| B | CLI | | | | | | | /5 |
-| B | Codex | | | | | | | /5 |
-| C1 | CLI | | | | | | | /5 |
-| C1 | Codex | | | | | | | /5 |
-| C2 | CLI | | | | | | | /5 |
-| C2 | Codex | | | | | | | /5 |
+| Case | Surface | Route parity | Summary parity | Plain language | Raw fields absent | Exact boundary | Observer score |
+| --- | --- | --- | --- | --- | --- | --- | ---: |
+| A | CLI | | | | | | /5 |
+| A | Codex | | | | | | /5 |
+| B | CLI | | | | | | /5 |
+| B | Codex | | | | | | /5 |
+| C1 | CLI | | | | | | /5 |
+| C1 | Codex | | | | | | /5 |
+| C2 | CLI | | | | | | /5 |
+| C2 | Codex | | | | | | /5 |
+| D ready | Codex | | | | | | /5 |
+| D conflict | Codex | | | | | | /5 |
+| E | Codex | | | | | | /5 |
 
 Store the source commit, value free JSON field worksheet, response text, observer scores, and
 repair notes in a local evaluation evidence packet. Do not commit real user context or identifying

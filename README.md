@@ -243,9 +243,9 @@ restarts, try:
 $project-atready I have a rough project idea. Use my saved AtReady resources to show where they fit.
 ```
 
-The skill asks at most one consolidated routing question, uses the CLI's JSON result as evidence,
-and stops before implementation. The public beta does not depend on OpenAI Plugin Directory
-publication.
+The skill asks at most one consolidated routing question. The CLI produces the readable response
+and complete JSON evidence together, so Codex does not have to rewrite the route. The skill stops
+before implementation. The public beta does not depend on OpenAI Plugin Directory publication.
 
 ## Useful commands
 

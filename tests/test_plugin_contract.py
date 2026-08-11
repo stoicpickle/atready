@@ -515,6 +515,7 @@ def test_launcher_uses_a_fixed_doctor_vector_and_accepts_product_version_drift()
         "--bin",
     )
     assert "resource.discovery-consent.v1" not in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
+    assert "routing.presentation-bundle.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
 
     compatible = subprocess.CompletedProcess(
         args=["/resolved/atready", *_doctor_arguments(namespace)],
@@ -541,6 +542,28 @@ def test_launcher_uses_a_fixed_doctor_vector_and_accepts_product_version_drift()
     with mock.patch.dict(
         verify_runtime_contract.__globals__,
         {"_run_bounded": mock.Mock(return_value=incomplete)},
+    ):
+        with pytest.raises(SystemExit, match="incomplete local runtime"):
+            verify_runtime_contract(["/resolved/atready"])
+
+    without_presentation = subprocess.CompletedProcess(
+        args=["/resolved/atready", *_doctor_arguments(namespace)],
+        returncode=0,
+        stdout=json.dumps(
+            _doctor_payload(
+                namespace,
+                runtime_features=[
+                    feature
+                    for feature in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
+                    if feature != "routing.presentation-bundle.v1"
+                ],
+            )
+        ),
+        stderr="",
+    )
+    with mock.patch.dict(
+        verify_runtime_contract.__globals__,
+        {"_run_bounded": mock.Mock(return_value=without_presentation)},
     ):
         with pytest.raises(SystemExit, match="incomplete local runtime"):
             verify_runtime_contract(["/resolved/atready"])

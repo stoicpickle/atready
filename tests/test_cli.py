@@ -35,6 +35,56 @@ def test_bare_cli_is_a_plain_language_welcome(capsys) -> None:
     assert captured.err == ""
 
 
+def test_presentation_line_limit_uses_widest_default_before_reporting_conflict(capsys) -> None:
+    fixtures = Path(__file__).parents[1] / "evals" / "fixtures"
+
+    assert (
+        main(
+            [
+                "route",
+                "--project",
+                str(fixtures / "project-godot.yaml"),
+                "--inventory",
+                str(fixtures / "inventory.yaml"),
+                "--allow-demo",
+                "--format",
+                "presentation",
+                "--width",
+                "80",
+                "--max-lines",
+                "8",
+            ]
+        )
+        == 0
+    )
+    narrow = json.loads(capsys.readouterr().out)
+    assert narrow["presentation_status"] == "limit-conflict"
+    assert narrow["limits"]["required"]["lines"] > 8
+
+    assert (
+        main(
+            [
+                "route",
+                "--project",
+                str(fixtures / "project-godot.yaml"),
+                "--inventory",
+                str(fixtures / "inventory.yaml"),
+                "--allow-demo",
+                "--format",
+                "presentation",
+                "--max-lines",
+                "8",
+            ]
+        )
+        == 0
+    )
+    presentation = json.loads(capsys.readouterr().out)
+
+    assert presentation["presentation_status"] == "ready"
+    assert presentation["limits"]["requested"] == {"lines": 8, "words": None}
+    assert presentation["limits"]["required"]["lines"] == 8
+
+
 def test_welcome_supports_explicit_plain_and_gradient_output(capsys) -> None:
     assert main(["welcome", "--color", "never"]) == 0
     plain = capsys.readouterr().out
@@ -886,6 +936,21 @@ def test_project_route_yaml_snapshot_and_all_schemas(tmp_path: Path, monkeypatch
     assert plan["assignments"][0]["primary"]["resource_id"] == "local-coding-agent"
     assert plan["warnings"] == []
 
+    assert main(["route", "--project", str(project_path), "--format", "presentation"]) == 0
+    presentation = json.loads(capsys.readouterr().out)
+    assert presentation["format"] == "atready-route-presentation-v1"
+    assert presentation["presentation_status"] == "ready"
+    assert presentation["route"] == plan
+    assert presentation["limits"]["requested"] == {"lines": None, "words": None}
+    assert presentation["limits"]["required"]["words"] == len(presentation["summary"].split())
+    assert presentation["limits"]["required"]["lines"] == len(presentation["summary"].splitlines())
+    assert presentation["summary"].startswith(
+        "Goal: Ship a tested local CLI without network access or telemetry.\n"
+        "Route: 1 step assigned.\n"
+    )
+    assert presentation["summary"].count("Personal Local Coding Agent") == 1
+    assert presentation["summary"].endswith("No routed project resources were contacted or run.\n")
+
     assert main(["route", "--project", str(project_path), "--format", "markdown"]) == 0
     markdown = capsys.readouterr().out
     assert "# AtReady route" in markdown
@@ -912,7 +977,100 @@ def test_project_route_yaml_snapshot_and_all_schemas(tmp_path: Path, monkeypatch
     assert "expected an integer from 40 to 120" in capsys.readouterr().err
 
     assert main(["route", "--project", str(project_path), "--format", "json", "--width", "80"]) == 2
-    assert "--width is only available with --format summary" in capsys.readouterr().err
+    assert (
+        "--width is only available with --format summary or presentation" in capsys.readouterr().err
+    )
+
+    assert (
+        main(
+            [
+                "route",
+                "--project",
+                str(project_path),
+                "--format",
+                "presentation",
+                "--width",
+                "40",
+            ]
+        )
+        == 0
+    )
+    narrow_presentation = json.loads(capsys.readouterr().out)
+    assert narrow_presentation["route"] == plan
+    assert all(
+        len(line) <= 40 or line == "No routed project resources were contacted or run."
+        for line in narrow_presentation["summary"].splitlines()
+    )
+
+    assert (
+        main(
+            [
+                "route",
+                "--project",
+                str(project_path),
+                "--format",
+                "presentation",
+                "--max-words",
+                "1",
+                "--max-lines",
+                "1",
+            ]
+        )
+        == 0
+    )
+    limited_presentation = json.loads(capsys.readouterr().out)
+    assert limited_presentation["presentation_status"] == "limit-conflict"
+    assert limited_presentation["route"] == plan
+    assert limited_presentation["limits"]["requested"] == {"lines": 1, "words": 1}
+    assert (
+        limited_presentation["limits"]["required"]["words"]
+        == presentation["limits"]["required"]["words"]
+    )
+    assert (
+        limited_presentation["limits"]["required"]["lines"]
+        <= presentation["limits"]["required"]["lines"]
+    )
+    assert "Requested maximum: 1 word and 1 line." in limited_presentation["summary"]
+    assert "Rerun without --max-words and --max-lines" in limited_presentation["summary"]
+    assert limited_presentation["summary"].endswith(
+        "No routed project resources were contacted or run.\n"
+    )
+
+    assert main(["route", "--project", str(project_path), "--max-words", "20"]) == 2
+    assert (
+        "--max-words and --max-lines are only available with --format presentation"
+        in capsys.readouterr().err
+    )
+
+    with pytest.raises(SystemExit) as invalid_max_words:
+        main(
+            [
+                "route",
+                "--project",
+                str(project_path),
+                "--format",
+                "presentation",
+                "--max-words",
+                "501",
+            ]
+        )
+    assert invalid_max_words.value.code == 2
+    assert "expected an integer from 1 to 500" in capsys.readouterr().err
+
+    with pytest.raises(SystemExit) as invalid_max_lines:
+        main(
+            [
+                "route",
+                "--project",
+                str(project_path),
+                "--format",
+                "presentation",
+                "--max-lines",
+                "0",
+            ]
+        )
+    assert invalid_max_lines.value.code == 2
+    assert "expected an integer from 1 to 50" in capsys.readouterr().err
 
     assert main(["skill", "path"]) == 0
     skill_path = Path(capsys.readouterr().out.strip())
@@ -953,6 +1111,13 @@ def test_route_returns_gap_exit_when_required_alternate_is_unavailable(
             ),
         }
     ]
+
+    assert main(["route", "--project", str(project_path), "--format", "presentation"]) == 3
+    presentation = json.loads(capsys.readouterr().out)
+    assert presentation["presentation_status"] == "ready"
+    assert presentation["route"] == plan
+    assert "1 open gap" in presentation["summary"]
+    assert presentation["summary"].endswith("No routed project resources were contacted or run.\n")
 
     assert main(["route", "--project", str(project_path), "--format", "markdown"]) == 3
     markdown = capsys.readouterr().out
