@@ -165,10 +165,12 @@ def test_deterministic_agent_presentations_preserve_the_cross_surface_contract(
         "components_bp",
         "plan_id",
         "inventory_fingerprint",
+        "project_fingerprint",
         "selected-primary",
         "selected-support",
         "reserved-alternate",
         "access-unknown",
+        "unknown-provenance",
     )
 
     straightforward = render_agent_summary(_route_fixture("godot", "inventory.yaml"))

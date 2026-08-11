@@ -298,18 +298,19 @@ def _score_case(
         )
 
     gap_word_count = case.get("gap_word_count")
-    if (
-        not isinstance(gap_word_count, int)
-        or isinstance(gap_word_count, bool)
-        or gap_word_count < 0
-    ):
-        raise ManifestError(f"{case_id}.gap_word_count must be a non-negative integer")
-    actual_gap_word_count = len(re.findall(r"(?i)(?<!\w)gaps?(?!\w)", response))
-    check(
-        "gap-parity",
-        actual_gap_word_count == gap_word_count,
-        f"found {actual_gap_word_count} gap claims, expected {gap_word_count}",
-    )
+    if gap_word_count is not None:
+        if (
+            not isinstance(gap_word_count, int)
+            or isinstance(gap_word_count, bool)
+            or gap_word_count < 0
+        ):
+            raise ManifestError(f"{case_id}.gap_word_count must be a non-negative integer")
+        actual_gap_word_count = len(re.findall(r"(?i)(?<!\w)gaps?(?!\w)", response))
+        check(
+            "gap-parity",
+            actual_gap_word_count == gap_word_count,
+            f"found {actual_gap_word_count} gap claims, expected {gap_word_count}",
+        )
 
     forbidden_facts = case.get("forbidden_facts", [])
     if not isinstance(forbidden_facts, list):

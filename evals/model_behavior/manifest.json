@@ -95,7 +95,6 @@
         }
       ],
       "gaps": [],
-      "gap_word_count": 1,
       "forbidden_facts": [
         {"terms": ["review", "unfilled"]}
       ],

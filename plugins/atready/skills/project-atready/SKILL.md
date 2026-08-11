@@ -31,8 +31,8 @@ Use this branch before planning when the user asks to add one resource. Read the
 
 ### 1. Check the local boundary
 
-Proceed only with approved local command execution and filesystem access. Otherwise say the chat
-cannot save the roster, direct the user to run `atready add` in a local terminal, and do not claim it changed.
+Without approved local execution and filesystem access, say chat cannot save. Offer `atready add`
+only as a user-run terminal fallback; the skill must not invoke it or claim authority or changes.
 
 Resolve the target and declaration contract through the launcher exactly once:
 

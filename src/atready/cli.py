@@ -808,16 +808,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-words",
         type=_presentation_max_words,
         help=(
-            "Require the presentation summary to fit within 1-500 words; complete evidence is "
-            "never truncated"
+            "Require a complete ready presentation summary to fit within 1-500 words; an "
+            "impossible limit returns untruncated conflict guidance"
         ),
     )
     route_parser.add_argument(
         "--max-lines",
         type=_presentation_max_lines,
         help=(
-            "Require the presentation summary to fit within 1-50 lines; complete evidence is "
-            "never truncated"
+            "Require a complete ready presentation summary to fit within 1-50 lines; an "
+            "impossible limit returns untruncated conflict guidance"
         ),
     )
     route_parser.add_argument(

@@ -122,19 +122,21 @@ uv run --no-sync atready route \
   --project evals/fixtures/project-unverified.yaml \
   --inventory evals/fixtures/inventory-unverified.yaml \
   --allow-demo --format presentation > "$EVAL_DIR/b-presentation.json" || \
-  b_presentation_status=$?
+b_presentation_status=$?
+eval_failed=0
 for route_status in "$b_json_status" "$b_cli_status" "$b_presentation_status"; do
   if [ "$route_status" -ne 3 ]; then
     printf 'Expected gap exit 3; received %s\n' "$route_status" >&2
-    exit 1
+    eval_failed=1
   fi
 done
 for output in "$EVAL_DIR/b.json" "$EVAL_DIR/b-cli.txt" "$EVAL_DIR/b-presentation.json"; do
   if [ ! -s "$output" ]; then
     printf 'Expected retained gap output at %s\n' "$output" >&2
-    exit 1
+    eval_failed=1
   fi
 done
+test "$eval_failed" -eq 0
 ```
 
 The JSON evidence must leave `research` unassigned, give the gap reason that no verified eligible
@@ -259,28 +261,32 @@ Create no file at `$EVAL_DIR/missing-inventory.yaml`. First prove the CLI cannot
 presentation from that missing roster:
 
 ```bash
+eval_failed=0
 if [ -e "$EVAL_DIR/missing-inventory.yaml" ]; then
   printf 'FAIL: expected missing inventory path already exists\n' >&2
-  exit 1
+  eval_failed=1
 fi
 
-if uv run --no-sync atready route \
-  --project evals/fixtures/project-godot.yaml \
-  --inventory "$EVAL_DIR/missing-inventory.yaml" \
-  --allow-demo --format presentation \
-  > "$EVAL_DIR/e-presentation.json" 2> "$EVAL_DIR/e-error.txt"
-then
-  printf 'FAIL: missing roster unexpectedly routed\n' >&2
-  exit 1
+if [ "$eval_failed" -eq 0 ]; then
+  if uv run --no-sync atready route \
+    --project evals/fixtures/project-godot.yaml \
+    --inventory "$EVAL_DIR/missing-inventory.yaml" \
+    --allow-demo --format presentation \
+    > "$EVAL_DIR/e-presentation.json" 2> "$EVAL_DIR/e-error.txt"
+  then
+    printf 'FAIL: missing roster unexpectedly routed\n' >&2
+    eval_failed=1
+  fi
+  if [ -s "$EVAL_DIR/e-presentation.json" ]; then
+    printf 'FAIL: missing roster emitted a presentation envelope\n' >&2
+    eval_failed=1
+  fi
+  if ! grep -Fq -- "$EVAL_DIR/missing-inventory.yaml" "$EVAL_DIR/e-error.txt"; then
+    printf 'FAIL: error did not identify the missing inventory\n' >&2
+    eval_failed=1
+  fi
 fi
-if [ -s "$EVAL_DIR/e-presentation.json" ]; then
-  printf 'FAIL: missing roster emitted a presentation envelope\n' >&2
-  exit 1
-fi
-if ! grep -Fq -- "$EVAL_DIR/missing-inventory.yaml" "$EVAL_DIR/e-error.txt"; then
-  printf 'FAIL: error did not identify the missing inventory\n' >&2
-  exit 1
-fi
+test "$eval_failed" -eq 0
 ```
 
 Confirm that the guarded checks proved the CLI failed without a presentation envelope and named

@@ -49,6 +49,29 @@ def test_presentation_line_limit_uses_widest_default_before_reporting_conflict(c
                 "--allow-demo",
                 "--format",
                 "presentation",
+                "--width",
+                "80",
+                "--max-lines",
+                "8",
+            ]
+        )
+        == 0
+    )
+    narrow = json.loads(capsys.readouterr().out)
+    assert narrow["presentation_status"] == "limit-conflict"
+    assert narrow["limits"]["required"]["lines"] > 8
+
+    assert (
+        main(
+            [
+                "route",
+                "--project",
+                str(fixtures / "project-godot.yaml"),
+                "--inventory",
+                str(fixtures / "inventory.yaml"),
+                "--allow-demo",
+                "--format",
+                "presentation",
                 "--max-lines",
                 "8",
             ]

@@ -151,6 +151,7 @@ def test_scorecard_rejects_missing_assignment_boundary_and_invented_action(
     failed_checks = {check["name"] for check in failed["checks"] if not check["passed"]}
 
     assert report["passed"] is False
+    assert "assignment-1" not in failed_checks
     assert "assignment-2" in failed_checks
     assert "assignment-3" in failed_checks
     assert "gap-parity" not in failed_checks
@@ -190,7 +191,7 @@ def test_scorecard_enforces_caps_gap_parity_and_resource_mentions(tmp_path: Path
 
     assert "line-cap" in failures["straightforward-route"]
     assert "word-cap" in failures["unconfirmed-gap"]
-    assert "gap-parity" in failures["support-route"]
+    assert "forbidden-pattern-1" in failures["support-route"]
     assert "resource-mention-Synthetic Reviewer Seat" in failures["support-route"]
 
 

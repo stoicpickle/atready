@@ -132,7 +132,7 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "already-installed Python 3.11 or newer interpreter" in normalized_body
     assert "## Resource intake workflow" in body
     assert "before planning when the user asks to add one resource" in normalized_body
-    assert "approved local command execution and filesystem access" in normalized_body
+    assert "approved local execution and filesystem access" in normalized_body
     assert "schema resource-declaration" in body
     assert "inventory add" in body
     assert "--resource-file /absolute/path/to/declaration.yaml --json" in body
@@ -193,7 +193,9 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "never overwrite it" in body_normalized
     assert "Keep provider discovery, computer scans, account inspection" in body_normalized
     assert "credentials, tokens, and private notes outside this workflow" in body_normalized
-    assert "direct the user to run `atready add` in a local terminal" in body_normalized
+    assert "user-run terminal fallback" in body_normalized
+    assert "the skill must not invoke it" in body_normalized
+    assert "claim authority or changes" in body_normalized
     assert "Show the actual CLI preview without changing its fields" in body_normalized
     assert "After a separate exact-save authorization" in body_normalized
     assert "create the declaration exclusively as `0600`" in body_normalized
@@ -242,6 +244,9 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "`presentation_status: limit-conflict`" in output_contract
     assert "`--max-words N` and `--max-lines N`" in output_contract
     assert "Both limits include the mandatory final boundary" in output_folded
+    assert "explicit exception to the requested ready-summary limit" in output_folded
+    assert "can exceed it" in output_folded
+    assert "not the conflict notice" in output_folded
     assert "widest supported presentation width" in output_folded
     assert "documented gap exit `3`" in output_folded
     assert "invalid or missing envelope data" in output_folded

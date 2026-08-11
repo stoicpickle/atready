@@ -6,8 +6,8 @@ the normal response so the host cannot change assignments, gaps, or uncertainty 
 ## Deterministic response
 
 The `route --format presentation` result contains `presentation_status`, `summary`, and `route` from
-one calculation. Pass explicit positive-integer whole-response limits to the CLI with
-`--max-words N` and `--max-lines N`. Both limits include the mandatory final boundary.
+one calculation. Pass explicit positive-integer limits for a complete `ready` summary to the CLI
+with `--max-words N` and `--max-lines N`. Both limits include the mandatory final boundary.
 When a line limit is supplied without `--width`, the CLI uses its widest supported presentation
 width before reporting a conflict.
 Accept exit `0`, or the documented gap exit `3`, only when stdout parses as the complete
@@ -20,7 +20,10 @@ presentation envelope. Any other exit, or invalid or missing envelope data, is a
 | `0` or `3` | `limit-conflict` | Complete route evidence with deterministic limit guidance; return `summary` verbatim. |
 
 For `presentation_status: limit-conflict`, return `summary` verbatim; the deterministic conflict
-copy identifies the limit and gives one bounded recovery action. For `presentation_status: ready`,
+copy identifies the limit and gives one bounded recovery action. Because an impossible limit may
+be smaller than the mandatory boundary itself, this conflict copy is an explicit exception to the
+requested ready-summary limit and can exceed it. `limits.required` describes the complete route
+summary, not the conflict notice. For `presentation_status: ready`,
 return `summary` verbatim for a normal or concise request. Only an explicit request for detailed
 evidence or inert handoff packets selects the detailed branch below instead. Never rewrite,
 reorder, shorten, truncate, preface, or append to either summary. Do not add the `Plan`,
