@@ -90,6 +90,7 @@ def test_runtime_contract_is_deterministic_value_free_and_side_effect_free(capsy
         "writes_performed": False,
     }
     assert list(SUPPORTED_RUNTIME_FEATURE_IDS) == sorted(set(SUPPORTED_RUNTIME_FEATURE_IDS))
+    assert "routing.presentation-bundle.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
 
     assert main(["runtime", "contract", "--json"]) == 0
     first = capsys.readouterr()

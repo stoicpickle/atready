@@ -1,0 +1,9 @@
+Use AtReady to explain this saved read only route evidence in concise plain language. Preserve the
+gap and safety boundary. Do not treat an unconfirmed resource as eligible and do not contact or run
+it.
+
+Synthetic evidence:
+
+* Evidence research: unassigned
+* Synthetic Research Seat: unconfirmed, therefore ineligible
+* Gap: evidence research has no confirmed eligible resource

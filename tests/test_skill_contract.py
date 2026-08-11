@@ -117,9 +117,10 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "project template" in body
     assert "project validate /absolute/path/to/project.yaml" in body
     assert "--inventory /absolute/path/to/inventory.yaml" in body
-    assert "--format json" in body
+    assert "--format presentation" in body
+    assert "[output-contract.md](references/output-contract.md)" in body
     assert "## Planning workflow" in body
-    assert "Use AtReady for one of two explicit jobs" in normalized_body
+    assert "Use AtReady for two jobs" in normalized_body
     assert "natural-language goal, loose plan, or existing brief" in normalized_body
     assert "A formal project file is not a prerequisite" in normalized_body
     assert "smallest useful ordered steps" in normalized_body
@@ -143,15 +144,22 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "fresh unpredictable temporary directory" in normalized_body
     assert "`0700` directory" in normalized_body
     assert "`0600` `project.yaml`" in normalized_body
-    assert "remove only the exact temporary file" in normalized_body
+    assert "remove only the exact temporary file" in normalized_body.casefold()
     assert "complete evidence record" in normalized_body
+    assert "Treat `route` as the complete evidence record" in normalized_body
+    assert (
+        "Follow the reference's limit flags and `presentation_status` branches" in normalized_body
+    )
+    assert "exit `3` for a route with gaps" in normalized_body
+    assert "invalid or missing envelope data" in normalized_body.casefold()
+    assert "Follow the output contract for exact `ready` or `limit-conflict`" in normalized_body
     assert "Preserve every assignment, gap, uncertainty, disposition" in normalized_body
     assert "references/runtime-setup.md" in body
     assert "references/routing-rules.md" in body
     assert "references/output-contract.md" in body
     assert "choose a different winner" in normalized_body
     assert "detailed evidence or inert handoff packets" in normalized_body
-    assert "only when explicitly requested" in normalized_body
+    assert "only when the user explicitly asks" in normalized_body
     assert "A resource-fit plan is advice, not authorization" in normalized_body
     assert "Do not activate for ordinary project planning" in metadata["description"]
     assert "Add one user-declared resource" in metadata["description"]
@@ -215,23 +223,49 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
 
     output_contract = (SKILL / "references" / "output-contract.md").read_text(encoding="utf-8")
     output_folded = " ".join(output_contract.split())
+    assert "## Response discipline" in body
+    assert "concise, short, brief, quick, promo, or on-screen" in body_normalized
+    assert "no more than three short sentences or bullets" in body_normalized
+    assert "only the facts needed for the current state and one next action" in body_normalized
+    assert "actual CLI preview or receipt" in body_normalized
+    assert "required separate approval" in body_normalized
+    assert "no more than three short sentences and 60 words" in body_normalized
+    assert "Do not enumerate unset routing roles" in body_normalized
+    assert "generic price, quota, privacy, rights, licensing" in body_normalized
+    assert "Do not use the planning output contract or its headings" in body_normalized
+    assert "explicitly asks for detailed evidence" in body_normalized
     assert "the user's project as the subject" in output_folded
-    assert "Use this order for a normal planning response" in output_folded
-    assert "short vertical blocks rather than a table" in output_folded
-    assert "**Plan.**" in output_contract
-    assert "**Resource fit.**" in output_contract
-    assert "**Gaps and uncertainty.**" in output_contract
-    assert "**Next.**" in output_contract
-    assert "`Use:`" in output_contract
-    assert "`Help from:`" in output_contract
-    assert "`Why:`" in output_contract
-    assert "`Deliver:`" in output_contract
-    assert "`Check:`" in output_contract
-    assert "steps, assignments, and material gaps" in output_folded
-    assert "scores, score components, plan IDs, fingerprints" in output_folded
-    assert "unless the user asks for details" in output_folded
-    assert output_contract.count("No routed project resources were contacted or run.") == 1
-    assert "When the user asks for details" in output_folded
+    assert "## Deterministic response" in output_contract
+    assert "return `summary` verbatim" in output_folded
+    assert "Never rewrite, reorder, shorten, truncate, preface, or append" in output_folded
+    assert "`presentation_status: ready`" in output_contract
+    assert "`presentation_status: limit-conflict`" in output_contract
+    assert "`--max-words N` and `--max-lines N`" in output_contract
+    assert "Both limits include the mandatory final boundary" in output_folded
+    assert "widest supported presentation width" in output_folded
+    assert "documented gap exit `3`" in output_folded
+    assert "invalid or missing envelope data" in output_folded
+    assert "Complete route with one or more gaps" in output_contract
+    assert "Launcher and runtime compatibility checks" in output_contract
+    assert "one bounded recovery action" in output_folded
+    assert "return `summary` verbatim for a normal or concise request" in output_folded
+    assert "Only an explicit request for detailed evidence" in output_folded
+    assert "A CLI-provided `Next:` line is valid" in output_contract
+    assert "Do not add the `Plan`, `Resource fit`, or" in output_folded
+    assert "`Gaps and uncertainty` headings" in output_folded
+    assert "## No-route response" in output_contract
+    assert "no more than three short sentences and 60 words" in output_folded
+    assert "do not use the planning headings" in output_folded
+    assert "report the retained path before the unchanged `summary`" in output_folded
+    assert "only exception to whole-response verbatim output" in output_folded
+    assert "never hide a retained path" in output_folded
+    assert "never change the actual route or mutation status" in body_normalized.casefold()
+    assert "Use this branch only when the user explicitly asks" in output_folded
+    assert "Build it from `route`, not from the summary or memory" in output_folded
+    assert "Keep scores, plan IDs, fingerprints, raw status labels" in output_folded
+    assert "## Concise response" not in output_contract
+    assert "## Default response" not in output_contract
+    assert output_contract.count("No routed project resources were contacted or run.") == 2
     assert "lead with the proposed useful entry" in folded
     assert "a lowercase resource id only as a proposal" in folded
     assert "require the user to confirm it" in folded
@@ -541,7 +575,9 @@ def test_popular_coding_agent_quick_setups_share_the_planning_only_boundary() ->
 
 def test_planning_skill_uses_a_protected_temporary_project_and_exact_cleanup() -> None:
     body = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    output_contract = (SKILL / "references" / "output-contract.md").read_text(encoding="utf-8")
     folded = " ".join(body.split()).casefold()
+    output_folded = " ".join(output_contract.split()).casefold()
 
     assert "fresh unpredictable temporary directory" in folded
     assert "outside every repository" in folded
@@ -551,7 +587,9 @@ def test_planning_skill_uses_a_protected_temporary_project_and_exact_cleanup() -
     assert "`0600` `project.yaml`" in folded
     assert "remove only the exact temporary file" in folded
     assert "exact empty temporary directory" in folded
-    assert "if cleanup fails, report the retained path" in folded
+    assert "if cleanup fails, report the retained path" in output_folded
+    assert "before the unchanged `summary`" in output_folded
+    assert "only exception to whole-response verbatim output" in output_folded
 
 
 def test_openai_metadata_matches_skill_name() -> None:

@@ -18,10 +18,10 @@ uv run --no-sync twine check --strict dist/*
 uv run --no-sync python scripts/verify_readme_rendering.py
 uv run --no-sync python scripts/verify_release_artifacts.py --dist dist
 uv run --isolated --no-project \
-  --with ./dist/project_atready-0.1.5-py3-none-any.whl \
+  --with ./dist/project_atready-0.1.6-py3-none-any.whl \
   python scripts/smoke_wheel.py
 uv run --isolated --no-project \
-  --with ./dist/project_atready-0.1.5-py3-none-any.whl \
+  --with ./dist/project_atready-0.1.6-py3-none-any.whl \
   python scripts/smoke_plugin.py
 ```
 

@@ -1,0 +1,10 @@
+Use AtReady to explain this saved read only route evidence in concise plain language. Distinguish
+the primary and support roles, report each resource exactly once, and preserve the safety boundary.
+Do not contact or run a resource.
+
+Synthetic evidence:
+
+* Delivery primary: Synthetic Builder Seat
+* Delivery support: Synthetic Reviewer Seat
+* The support role closes the review capability gap
+* No capability gap remains after support is included

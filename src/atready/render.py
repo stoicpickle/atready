@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import ast
 import re
 from collections import defaultdict
+from dataclasses import dataclass
 from textwrap import TextWrapper
+from typing import Literal
 
 from atready.models import CandidateEvaluation, DispositionStatus, RouteAssignment, RoutePlan
+
+_FINAL_SAFETY_BOUNDARY = "No routed project resources were contacted or run."
+_RESERVED_PRESENTATION_MARKERS = ("Goal:", "Route:", "Gap:", "Uncertainty:", "Next:")
 
 
 def _text(value: str) -> str:
@@ -32,6 +38,18 @@ def _terminal_text(value: object) -> str:
         for character in str(value)
     )
     return " ".join(escaped.split())
+
+
+def _untrusted_presentation_text(value: object) -> str:
+    """Flatten untrusted display text without allowing it to forge response structure."""
+
+    text = _terminal_text(value).replace(
+        _FINAL_SAFETY_BOUNDARY,
+        "No routed project resources were contacted or run [quoted].",
+    )
+    for marker in _RESERVED_PRESENTATION_MARKERS:
+        text = text.replace(marker, f"{marker[:-1]} [quoted]:")
+    return text
 
 
 def _append_wrapped(
@@ -62,24 +80,60 @@ def _plain_selection_reason(reason: str) -> str:
     return reason
 
 
+_QUOTED_LITERAL = r'(?:\'(?:\\.|[^\'\\])*\'|"(?:\\.|[^"\\])*")'
+_SELECTED_UNVERIFIED_PATTERN = re.compile(
+    rf"\[selected-unverified-resource\] workstream (?P<workstream>{_QUOTED_LITERAL}) "
+    rf"selected (?P<role>primary|support|alternate) resource "
+    rf"(?P<resource>{_QUOTED_LITERAL}) with allowed unverified state: "
+    rf"(?P<issues>[a-z0-9-]+(?:, [a-z0-9-]+)*)"
+)
+_UNVERIFIED_ISSUE_LABELS = {
+    "stale-provenance": "verification is stale",
+    "unknown-access": "access is unknown",
+    "unknown-provenance": "the declaration source is unknown",
+    "unknown-quota": "remaining usage is unknown",
+    "unknown-session": "current availability is unknown",
+}
+
+
+def _selected_unverified_warning(warning: str) -> tuple[str, str, str, list[str]] | None:
+    match = _SELECTED_UNVERIFIED_PATTERN.fullmatch(warning)
+    if not match:
+        return None
+    try:
+        workstream = ast.literal_eval(match.group("workstream"))
+        resource = ast.literal_eval(match.group("resource"))
+    except (SyntaxError, ValueError):
+        return None
+    if not isinstance(workstream, str) or not isinstance(resource, str):
+        return None
+    return (
+        workstream,
+        match.group("role"),
+        resource,
+        [
+            _UNVERIFIED_ISSUE_LABELS.get(code, code.replace("-", " "))
+            for code in match.group("issues").split(", ")
+        ],
+    )
+
+
 def _plain_warning(warning: str) -> str:
     if warning.startswith("[demo-inventory]"):
         return "This uses a demo inventory. Its contents are not verified as resources you can use."
-    unverified = re.fullmatch(
-        r"\[selected-unverified-resource\] workstream '([^']+)' selected "
-        r"(primary|support|alternate) resource '([^']+)' with allowed unverified state: (.+)",
-        warning,
-    )
+    unverified = _selected_unverified_warning(warning)
     if unverified:
-        workstream, role, resource, issue_text = unverified.groups()
-        issue_labels = {
-            "stale-provenance": "its verification is stale",
-            "unknown-access": "its access is unknown",
-            "unknown-provenance": "its verification source is unknown",
-            "unknown-quota": "its remaining quota is unknown",
-            "unknown-session": "its current availability is unknown",
-        }
-        issues = [issue_labels.get(code, code.replace("-", " ")) for code in issue_text.split(", ")]
+        workstream, role, resource, issues = unverified
+        issues = [
+            {
+                "verification is stale": "its verification is stale",
+                "access is unknown": "its access is unknown",
+                "the declaration source is unknown": "its verification source is unknown",
+                "remaining usage is unknown": "its remaining quota is unknown",
+                "current availability is unknown": "its current availability is unknown",
+            }.get(issue, issue)
+            for issue in issues
+        ]
         return f"{resource} is selected as {role} for {workstream}, but " + "; ".join(issues) + "."
     return warning
 
@@ -131,6 +185,11 @@ def _next_action(plan: RoutePlan, *, has_gaps: bool) -> str:
         else:
             detail = ", ".join(confirmations[:-1]) + f", and {confirmations[-1]}"
         return f"Confirm {detail}, then route again."
+    if has_gaps:
+        return (
+            "Add or update a resource that meets the open capability and project constraints, "
+            "then route again."
+        )
     return "Review the assignments. Use --format markdown for scores and full handoff details."
 
 
@@ -155,11 +214,15 @@ def render_summary(
     else:
         gap_label = f"{gap_count} open {'gap' if gap_count == 1 else 'gaps'}"
     lines: list[str] = []
-    _append_wrapped(lines, f"Resource plan: {plan.project_name}", width=width)
+    _append_wrapped(
+        lines,
+        f"Resource plan: {_untrusted_presentation_text(plan.project_name)}",
+        width=width,
+    )
     if goal:
         _append_wrapped(
             lines,
-            goal,
+            _untrusted_presentation_text(goal),
             width=width,
             initial_indent="Goal: ",
             subsequent_indent="      ",
@@ -184,7 +247,7 @@ def render_summary(
         for warning in visible_warnings:
             _append_wrapped(
                 lines,
-                _plain_warning(warning),
+                _untrusted_presentation_text(_plain_warning(warning)),
                 width=width,
                 initial_indent="- ",
                 subsequent_indent="  ",
@@ -194,7 +257,7 @@ def render_summary(
         lines.append("")
         _append_wrapped(
             lines,
-            f"{index}. {assignment.workstream_name}",
+            f"{index}. {_untrusted_presentation_text(assignment.workstream_name)}",
             width=width,
             subsequent_indent="   ",
         )
@@ -210,14 +273,14 @@ def render_summary(
 
         _append_wrapped(
             lines,
-            assignment.primary.resource_name,
+            _untrusted_presentation_text(assignment.primary.resource_name),
             width=width,
             initial_indent="   Use: ",
             subsequent_indent="        ",
         )
         _append_wrapped(
             lines,
-            _plain_selection_reason(assignment.primary.reason),
+            _untrusted_presentation_text(_plain_selection_reason(assignment.primary.reason)),
             width=width,
             initial_indent="   Why: ",
             subsequent_indent="        ",
@@ -226,7 +289,8 @@ def render_summary(
             support_gaps = ", ".join(gap.replace("-", " ") for gap in assignment.support_gap)
             _append_wrapped(
                 lines,
-                f"{assignment.support.resource_name} (covers {support_gaps})",
+                f"{_untrusted_presentation_text(assignment.support.resource_name)} "
+                f"(covers {_untrusted_presentation_text(support_gaps)})",
                 width=width,
                 initial_indent="   Help from: ",
                 subsequent_indent="              ",
@@ -234,14 +298,14 @@ def render_summary(
         if assignment.alternate:
             _append_wrapped(
                 lines,
-                assignment.alternate.resource_name,
+                _untrusted_presentation_text(assignment.alternate.resource_name),
                 width=width,
                 initial_indent="   Backup option: ",
                 subsequent_indent="                  ",
             )
             _append_wrapped(
                 lines,
-                assignment.alternate_activation_condition,
+                _untrusted_presentation_text(assignment.alternate_activation_condition),
                 width=width,
                 initial_indent="   Condition: ",
                 subsequent_indent="              ",
@@ -258,7 +322,7 @@ def render_summary(
         if primary_handoff:
             _append_wrapped(
                 lines,
-                primary_handoff.deliverable,
+                _untrusted_presentation_text(primary_handoff.deliverable),
                 width=width,
                 initial_indent="   Deliver: ",
                 subsequent_indent="            ",
@@ -270,7 +334,7 @@ def render_summary(
                 )
             _append_wrapped(
                 lines,
-                verification,
+                _untrusted_presentation_text(verification),
                 width=width,
                 initial_indent="   Check: ",
                 subsequent_indent="          ",
@@ -291,7 +355,8 @@ def render_summary(
         for workstream_name, reason in gaps:
             _append_wrapped(
                 lines,
-                f"{workstream_name}: {reason or 'Unresolved.'}",
+                f"{_untrusted_presentation_text(workstream_name)}: "
+                f"{_untrusted_presentation_text(reason or 'Unresolved.')}",
                 width=width,
                 initial_indent="- ",
                 subsequent_indent="  ",
@@ -312,7 +377,9 @@ def render_summary(
         for items, label in disposition_groups:
             if not items:
                 continue
-            visible = ", ".join(item.resource_name for item in items[:5])
+            visible = ", ".join(
+                _untrusted_presentation_text(item.resource_name) for item in items[:5]
+            )
             if len(items) > 5:
                 visible += f" (+{len(items) - 5} more)"
             _append_wrapped(
@@ -337,8 +404,277 @@ def render_summary(
         "AtReady made this plan only.",
         width=width,
     )
-    lines.append("No routed project resources were contacted or run.")
+    lines.append(_FINAL_SAFETY_BOUNDARY)
     return "\n".join(lines) + "\n"
+
+
+def _render_complete_agent_summary(
+    plan: RoutePlan,
+    *,
+    goal: str | None,
+    width: int,
+) -> str:
+    """Render the exact compact response used by the bundled agent workflow.
+
+    Unlike the terminal-oriented summary, this view groups assignments by resource so the host
+    can return it verbatim without duplicating names or reconstructing route evidence.
+    """
+
+    width = max(width, 20)
+    assigned_count = sum(assignment.primary is not None for assignment in plan.assignments)
+    gaps = [assignment for assignment in plan.assignments if assignment.primary is None]
+    unresolved_count = sum(len(assignment.unresolved_gaps) for assignment in plan.assignments)
+    gap_count = len(gaps) + unresolved_count
+    lines: list[str] = []
+    if goal:
+        _append_wrapped(
+            lines,
+            _untrusted_presentation_text(goal),
+            width=width,
+            initial_indent="Goal: ",
+            subsequent_indent="      ",
+        )
+    if gap_count:
+        noun = "gap" if gap_count == 1 else "gaps"
+        status = (
+            f"Route: {assigned_count} of {len(plan.assignments)} steps assigned; "
+            f"{gap_count} open {noun}."
+        )
+    else:
+        noun = "step" if assigned_count == 1 else "steps"
+        status = f"Route: {assigned_count} {noun} assigned."
+    _append_wrapped(lines, status, width=width)
+
+    unverified_by_resource: dict[str, list[str]] = defaultdict(list)
+    general_warnings: list[str] = []
+    unresolved_codes = {
+        gap.code for assignment in plan.assignments for gap in assignment.unresolved_gaps
+    }
+    for warning in plan.warnings:
+        if "unresolved capability gap" in warning or any(
+            f"[{code}]" in warning for code in unresolved_codes
+        ):
+            continue
+        unverified = _selected_unverified_warning(warning)
+        if unverified:
+            workstream, role, resource, issues = unverified
+            assignment = next(
+                (item for item in plan.assignments if item.workstream_id == workstream),
+                None,
+            )
+            selection = getattr(assignment, role, None) if assignment else None
+            resource_key = (
+                selection.resource_id
+                if selection is not None
+                and resource in {selection.resource_id, selection.resource_name}
+                else resource
+            )
+            for issue in issues:
+                if issue not in unverified_by_resource[resource_key]:
+                    unverified_by_resource[resource_key].append(issue)
+        else:
+            general_warnings.append(_plain_warning(warning))
+
+    primary_groups: dict[str, list[RouteAssignment]] = defaultdict(list)
+    support_groups: dict[str, list[RouteAssignment]] = defaultdict(list)
+    alternate_groups: dict[str, list[RouteAssignment]] = defaultdict(list)
+    resource_order: list[str] = []
+    resource_names: dict[str, str] = {}
+    for assignment in plan.assignments:
+        for selection, groups in (
+            (assignment.primary, primary_groups),
+            (assignment.support, support_groups),
+            (assignment.alternate, alternate_groups),
+        ):
+            if selection is None:
+                continue
+            groups[selection.resource_id].append(assignment)
+            resource_names[selection.resource_id] = selection.resource_name
+            if selection.resource_id not in resource_order:
+                resource_order.append(selection.resource_id)
+
+    for resource_id in resource_order:
+        name = resource_names[resource_id]
+        primary_assignments = primary_groups[resource_id]
+        support_assignments = support_groups[resource_id]
+        alternate_assignments = alternate_groups[resource_id]
+        clauses: list[str] = []
+        if primary_assignments:
+            steps = ", ".join(
+                _untrusted_presentation_text(item.workstream_name) for item in primary_assignments
+            )
+            clauses.append(steps)
+            selection = primary_assignments[0].primary
+            assert selection is not None
+            reason = _untrusted_presentation_text(_plain_selection_reason(selection.reason))
+            has_continuity = any(
+                adjustment.code == "same-primary-continuity"
+                for assignment in primary_assignments
+                for candidate in assignment.candidates
+                if candidate.resource_id == resource_id
+                for adjustment in candidate.adjustments
+            )
+            if has_continuity and len(primary_assignments) > 1:
+                reason = (
+                    "Best eligible match after project constraints; continuity kept related "
+                    "steps together."
+                )
+            clauses.append(f"Why: {reason.rstrip('.')}")
+        if support_assignments:
+            steps = ", ".join(
+                _untrusted_presentation_text(item.workstream_name) for item in support_assignments
+            )
+            covered = sorted(
+                {gap.replace("-", " ") for item in support_assignments for gap in item.support_gap}
+            )
+            support_text = f"Supports {steps}, covering {', '.join(covered)}"
+            if not primary_assignments:
+                support_text += (
+                    ". Why: It covers a required capability the primary resource does not "
+                    "cover alone"
+                )
+            clauses.append(support_text)
+        if alternate_assignments:
+            steps = ", ".join(
+                _untrusted_presentation_text(item.workstream_name) for item in alternate_assignments
+            )
+            clauses.append(
+                f"Backup option for {steps}. Recheck eligibility and obtain separate "
+                "authorization before use. AtReady will not switch automatically"
+            )
+        text = f"{_untrusted_presentation_text(name)}: " + ". ".join(clauses) + "."
+        issues = unverified_by_resource.pop(resource_id, [])
+        if issues:
+            text += " Uncertainty: " + "; ".join(issues) + "."
+        _append_wrapped(lines, text, width=width)
+
+    for assignment in gaps:
+        _append_wrapped(
+            lines,
+            f"Gap: {_untrusted_presentation_text(assignment.workstream_name)} is unassigned. "
+            f"{_untrusted_presentation_text(assignment.gap_reason)}",
+            width=width,
+        )
+    for assignment in plan.assignments:
+        for gap in assignment.unresolved_gaps:
+            _append_wrapped(
+                lines,
+                f"Gap: {_untrusted_presentation_text(assignment.workstream_name)}. "
+                f"{_untrusted_presentation_text(gap.reason)}",
+                width=width,
+            )
+
+    for warning in general_warnings:
+        _append_wrapped(
+            lines,
+            f"Uncertainty: {_untrusted_presentation_text(warning)}",
+            width=width,
+        )
+    for resource, issues in unverified_by_resource.items():
+        _append_wrapped(
+            lines,
+            f"Uncertainty: {_untrusted_presentation_text(resource)}: " + "; ".join(issues) + ".",
+            width=width,
+        )
+
+    if gaps:
+        next_action = _next_action(plan, has_gaps=True)
+    elif unresolved_count:
+        next_action = "Resolve the open gaps before separately authorizing implementation."
+    else:
+        next_action = "Review the assignments before separately authorizing implementation."
+    _append_wrapped(
+        lines,
+        _untrusted_presentation_text(next_action),
+        width=width,
+        initial_indent="Next: ",
+        subsequent_indent="      ",
+    )
+    lines.append(_FINAL_SAFETY_BOUNDARY)
+    return "\n".join(lines) + "\n"
+
+
+@dataclass(frozen=True)
+class AgentPresentation:
+    """A complete deterministic summary or an explicit limit-conflict response."""
+
+    summary: str
+    status: Literal["ready", "limit-conflict"]
+    required_words: int
+    required_lines: int
+    max_words: int | None
+    max_lines: int | None
+
+
+def render_agent_presentation(
+    plan: RoutePlan,
+    *,
+    goal: str | None = None,
+    width: int = 100,
+    max_words: int | None = None,
+    max_lines: int | None = None,
+) -> AgentPresentation:
+    """Render complete route evidence, or report deterministically that limits conflict.
+
+    The renderer never drops assignments, gaps, uncertainty, or the authorization boundary to
+    satisfy a requested limit. The complete route remains available in the presentation envelope.
+    """
+
+    complete = _render_complete_agent_summary(plan, goal=goal, width=max(width, 20))
+    required_words = len(complete.split())
+    required_lines = len(complete.splitlines())
+    word_conflict = max_words is not None and required_words > max_words
+    line_conflict = max_lines is not None and required_lines > max_lines
+    conflicts = word_conflict or line_conflict
+    requested_parts: list[str] = []
+    required_parts: list[str] = []
+    conflicting_flags: list[str] = []
+    if max_words is not None:
+        requested_parts.append(f"{max_words} {'word' if max_words == 1 else 'words'}")
+        required_parts.append(f"{required_words} {'word' if required_words == 1 else 'words'}")
+        if word_conflict:
+            conflicting_flags.append("--max-words")
+    if max_lines is not None:
+        requested_parts.append(f"{max_lines} {'line' if max_lines == 1 else 'lines'}")
+        required_parts.append(f"{required_lines} {'line' if required_lines == 1 else 'lines'}")
+        if line_conflict:
+            conflicting_flags.append("--max-lines")
+    requested_text = " and ".join(requested_parts)
+    required_text = " and ".join(required_parts)
+    flags_text = " and ".join(conflicting_flags)
+    conflict_summary = (
+        "Presentation limit conflict.\n"
+        f"Requested maximum: {requested_text}. Complete route summary requires {required_text}.\n"
+        f"Rerun without {flags_text} to receive the complete route summary.\n"
+        f"{_FINAL_SAFETY_BOUNDARY}\n"
+    )
+    return AgentPresentation(
+        summary=conflict_summary if conflicts else complete,
+        status="limit-conflict" if conflicts else "ready",
+        required_words=required_words,
+        required_lines=required_lines,
+        max_words=max_words,
+        max_lines=max_lines,
+    )
+
+
+def render_agent_summary(
+    plan: RoutePlan,
+    *,
+    goal: str | None = None,
+    width: int = 100,
+    max_words: int | None = None,
+    max_lines: int | None = None,
+) -> str:
+    """Render the exact host response, without truncating complete route evidence."""
+
+    return render_agent_presentation(
+        plan,
+        goal=goal,
+        width=width,
+        max_words=max_words,
+        max_lines=max_lines,
+    ).summary
 
 
 def _runner_up(

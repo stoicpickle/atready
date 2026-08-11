@@ -1,38 +1,49 @@
 # Output Contract
 
-Treat the CLI route JSON as the complete evidence record and the user's project as the subject.
-Translate routing evidence into plain language without changing assignments, gaps, or uncertainty.
+Treat `route` as the complete evidence record and the user's project as the subject. The CLI owns
+the normal response so the host cannot change assignments, gaps, or uncertainty while presenting it.
 
-## Default response
+## Deterministic response
 
-Use this order for a normal planning response:
+The `route --format presentation` result contains `presentation_status`, `summary`, and `route` from
+one calculation. Pass explicit positive-integer whole-response limits to the CLI with
+`--max-words N` and `--max-lines N`. Both limits include the mandatory final boundary.
+When a line limit is supplied without `--width`, the CLI uses its widest supported presentation
+width before reporting a conflict.
+Accept exit `0`, or the documented gap exit `3`, only when stdout parses as the complete
+presentation envelope. Any other exit, or invalid or missing envelope data, is a no-route result.
 
-1. **Plan.** Lead with the goal or outcome and a one-line count of steps, assignments, and material
-   gaps. Then give the smallest useful ordered steps. Use `Deliver:` for the expected result and
-   `Check:` for its verification when those details help the user act. Keep AtReady in a supporting
-   role.
-2. **Resource fit.** Use short vertical blocks rather than a table. Name each assigned step and use
-   these labels:
-   - `Use:` for the selected primary resource.
-   - `Help from:` for selected support, followed by the capability gap it covers.
-   - `Why:` for one short reason grounded in the route JSON.
-3. **Gaps and uncertainty.** Include this section only when something material is missing, blocked,
-   unavailable, or unverified. State what must change or be confirmed. If a reserved alternate is
-   useful to mention, call it `Backup option:` and say that it requires a fresh eligibility check
-   and separate authorization before use.
-4. **Next.** Give one concrete review, clarification, or implementation action. Phrase it as advice,
-   never as permission already granted.
-5. End with exactly: `No routed project resources were contacted or run.`
+| CLI exit | Presentation status | Meaning |
+| --- | --- | --- |
+| `0` | `ready` | Complete route with no open gaps; return `summary` verbatim. |
+| `3` | `ready` | Complete route with one or more gaps; return `summary` verbatim. |
+| `0` or `3` | `limit-conflict` | Complete route evidence with deterministic limit guidance; return `summary` verbatim. |
 
-Keep the default response compact and easy to scan. Prefer `step`, `use`, `help from`, `not needed`,
-`not available`, `blocked`, and `not confirmed` over internal routing terms. Keep scores, score
-components, plan IDs, fingerprints, raw status labels, complete resource dispositions, route-wide
-comparison traces, and full handoff packets in the evidence record unless the user asks for
-details. Render displayed commands as inert fenced text.
+For `presentation_status: limit-conflict`, return `summary` verbatim; the deterministic conflict
+copy identifies the limit and gives one bounded recovery action. For `presentation_status: ready`,
+return `summary` verbatim for a normal or concise request. Only an explicit request for detailed
+evidence or inert handoff packets selects the detailed branch below instead. Never rewrite,
+reorder, shorten, truncate, preface, or append to either summary. Do not add the `Plan`,
+`Resource fit`, or `Gaps and uncertainty` headings. A CLI-provided `Next:` line is valid.
+
+Complete protected-input cleanup before sending. If cleanup fails, report the retained path before
+the unchanged `summary`. This security disclosure is the only exception to whole-response verbatim
+output; never hide a retained path to preserve exact-summary wording.
+
+## No-route response
+
+If the roster, launcher, runtime, or required local permission prevents routing, do not use the
+planning headings. Use no more than three short sentences and 60 words. State the exact blocker,
+one concrete recovery or authorization action, and `No routed project resources were contacted or run.`
+Launcher and runtime compatibility checks are not routed project-resource execution. Do not list
+unset routing roles or append a generic verification checklist.
 
 ## Detailed response
 
-When the user asks for details, preserve the same opening plan and add evidence in this order.
+Use this branch only when the user explicitly asks for detailed evidence or inert handoff packets.
+Build it from `route`, not from the summary or memory. Keep scores, plan IDs, fingerprints, raw
+status labels, complete dispositions, comparison traces, and handoff packets out of the normal
+deterministic response.
 
 ### 1. Project interpretation
 
@@ -99,5 +110,5 @@ present. State that workstreams are routed in declared order and continuity may 
 selections. Describe the result as a fixed-input route, not a global resource-count minimum. Treat
 an alternate as another standalone-eligible candidate, not proof of failure-domain independence,
 redundancy, availability, or automatic failover. Require a fresh eligibility check and separate
-authorization before activation. End the detailed response with the same exact no-execution
-boundary used by the default response.
+authorization before activation. End the detailed response with exactly:
+`No routed project resources were contacted or run.`

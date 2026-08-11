@@ -1,0 +1,22 @@
+Format the supplied AtReady route evidence as a compact final answer.
+
+Use at most 80 words and six nonempty lines. Count the required final boundary within both limits.
+Write plain text with no heading, introduction, analysis, recap, table, or generic checklist. Name
+each resource exactly once. When one resource owns several steps, combine those steps on its one
+line. Preserve primary, support, alternate, unconfirmed, gap, and uncertainty states exactly as
+supplied. Add no new risks, facts, scores,
+permissions, or actions.
+
+Use only the lines that the evidence needs, in this order:
+
+Route: <short assigned or open-gap status without saying "gap" when none is open>.
+<Resource>: <owned steps and role>. Why: <one reason present in the evidence>.
+Gap: <unassigned step and the exact reason it remains open>.
+Uncertainty: <one material uncertainty present in the evidence>.
+Next: <one action required to resolve an open gap or activate an alternate>.
+No routed project resources were contacted or run.
+
+For support, state on the support resource's line which capability shortfall it closes and whether
+any shortfall remains. For an alternate, state on the alternate resource's line that eligibility
+must be rechecked and separate authorization obtained before use. The final boundary above must
+appear exactly once as the final line.

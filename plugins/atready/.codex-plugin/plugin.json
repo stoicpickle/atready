@@ -1,6 +1,6 @@
 {
   "name": "atready",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Add declared resources through a preview-first conversation, then plan around what you have.",
   "author": {
     "name": "stoicpickle",

@@ -14,6 +14,7 @@ from pathlib import Path
 import atready
 from atready.catalog import InventoryCatalog
 from atready.errors import ConfigurationError
+from atready.models import RoutePlan
 from atready.project import project_from_text
 from atready.routing import route
 from atready.runtime_contract import RUNTIME_CONTRACT_VERSION
@@ -643,7 +644,7 @@ def main_smoke() -> None:
             raise AssertionError("installed wheel skill differs from the canonical plugin skill")
         skill_contract_text = installed_skill.read_text(encoding="utf-8")
         required_planning_contract = (
-            "Use AtReady for one of two explicit jobs",
+            "Use AtReady for two jobs",
             "Ask at most one consolidated clarification",
             "authorizes only the bounded, read-only inventory checks",
             "inventory validate /absolute/path/to/inventory.yaml",
@@ -652,8 +653,11 @@ def main_smoke() -> None:
             "project validate /absolute/path/to/project.yaml",
             "direct the user to run `atready add` in a local terminal",
             "question budget is already used",
+            "--format presentation",
+            "presentation_status",
+            "exit `3` for a route with gaps",
+            "exact `ready` or `limit-conflict` summary handling",
             "A resource-fit plan is advice, not authorization",
-            "No routed project resources were contacted or run.",
         )
         normalized_skill_body = " ".join(skill_contract_text.split())
         missing_contract = [
@@ -662,6 +666,111 @@ def main_smoke() -> None:
         if missing_contract:
             raise AssertionError(
                 f"installed wheel bundled a stale planning skill: {missing_contract!r}"
+            )
+        output_contract = (installed_skill_root / "references" / "output-contract.md").read_text(
+            encoding="utf-8"
+        )
+        if (
+            "`--max-words N` and `--max-lines N`" not in output_contract
+            or "documented gap exit `3`" not in output_contract
+            or "No routed project resources were contacted or run." not in output_contract
+        ):
+            raise AssertionError("installed wheel bundled a stale planning output contract")
+
+        presentation_inventory = Path(directory) / "presentation-inventory.yaml"
+        presentation_project = Path(directory) / "presentation-project.yaml"
+        presentation_inventory.write_text(demo_inventory(), encoding="utf-8")
+        presentation_project.write_text(starter_project(), encoding="utf-8")
+        presentation_args = [
+            "route",
+            "--project",
+            str(presentation_project),
+            "--inventory",
+            str(presentation_inventory),
+            "--allow-demo",
+        ]
+        presentation_state_before = _file_tree(Path(directory))
+        route_text, _ = _run([*presentation_args, "--format", "json"])
+        ready_text, _ = _run(
+            [
+                *presentation_args,
+                "--format",
+                "presentation",
+                "--max-words",
+                "500",
+                "--max-lines",
+                "50",
+            ]
+        )
+        conflict_text, _ = _run(
+            [*presentation_args, "--format", "presentation", "--max-words", "1"]
+        )
+        if _file_tree(Path(directory)) != presentation_state_before:
+            raise AssertionError("installed presentation route wrote private state")
+        route_payload = json.loads(route_text)
+        ready_payload = json.loads(ready_text)
+        conflict_payload = json.loads(conflict_text)
+        validated_route = RoutePlan.model_validate(route_payload)
+        if validated_route.model_dump(mode="json") != route_payload:
+            raise AssertionError("installed presentation route did not round-trip its full schema")
+        if (
+            validated_route.plan_id != "ar-65dc13c0b02c130b"
+            or [
+                (
+                    assignment.workstream_id,
+                    assignment.primary.resource_id if assignment.primary else None,
+                    len(assignment.handoffs),
+                )
+                for assignment in validated_route.assignments
+            ]
+            != [("implementation", "local-coding-agent", 1)]
+            or [
+                (disposition.resource_id, disposition.status.value, disposition.workstreams)
+                for disposition in validated_route.dispositions
+            ]
+            != [
+                ("asset-studio", "deliberately-unused", []),
+                ("interactive-debugger", "ineligible", []),
+                ("local-coding-agent", "selected-primary", ["implementation"]),
+            ]
+            or validated_route.assignments[0].handoffs[0].owner_resource_id != "local-coding-agent"
+        ):
+            raise AssertionError("installed presentation route changed the canonical demo result")
+        expected_ready_summary = (
+            "Goal: Ship a tested local CLI without network access or telemetry.\n"
+            "Route: 1 step assigned.\n"
+            "Synthetic Local Coding Agent: Core implementation. Why: Best eligible match\n"
+            "after applying the project constraints.\n"
+            "Uncertainty: This uses a demo inventory. Its contents are not verified as\n"
+            "resources you can use.\n"
+            "Next: Review the assignments before separately authorizing implementation.\n"
+            "No routed project resources were contacted or run.\n"
+        )
+        expected_conflict_summary = (
+            "Presentation limit conflict.\n"
+            "Requested maximum: 1 word. Complete route summary requires 62 words.\n"
+            "Rerun without --max-words to receive the complete route summary.\n"
+            "No routed project resources were contacted or run.\n"
+        )
+        if (
+            ready_payload.get("format") != "atready-route-presentation-v1"
+            or ready_payload.get("presentation_status") != "ready"
+            or ready_payload.get("route") != route_payload
+            or ready_payload.get("summary") != expected_ready_summary
+            or ready_payload.get("limits", {}).get("requested") != {"lines": 50, "words": 500}
+            or ready_payload.get("limits", {}).get("required") != {"lines": 8, "words": 62}
+        ):
+            raise AssertionError("installed wheel did not expose a complete ready presentation")
+        if (
+            conflict_payload.get("format") != "atready-route-presentation-v1"
+            or conflict_payload.get("presentation_status") != "limit-conflict"
+            or conflict_payload.get("route") != route_payload
+            or conflict_payload.get("summary") != expected_conflict_summary
+            or conflict_payload.get("limits", {}).get("requested") != {"lines": None, "words": 1}
+            or conflict_payload.get("limits", {}).get("required") != {"lines": 8, "words": 62}
+        ):
+            raise AssertionError(
+                "installed wheel did not expose a complete limit-conflict presentation"
             )
 
         demo = InventoryCatalog.from_text(demo_inventory()).inventory

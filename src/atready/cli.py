@@ -62,7 +62,7 @@ from atready.models import (
 )
 from atready.paths import create_private_file, resolve_paths
 from atready.project import project_from_path, project_from_text
-from atready.render import render_markdown, render_summary
+from atready.render import render_agent_presentation, render_markdown, render_summary
 from atready.resource_input import (
     ParsedResourceDeclaration,
     load_inventory_annotation_declaration_file,
@@ -386,7 +386,7 @@ def build_parser() -> argparse.ArgumentParser:
     guided_plan_parser.add_argument(
         "--width",
         type=_summary_width,
-        help="Wrap the summary to 40-120 columns (default: 80)",
+        help="Wrap summary text to 40-120 columns (default: 80)",
     )
     guided_plan_parser.add_argument(
         "--allow-demo", action="store_true", help="Explicitly permit synthetic demo resources"
@@ -790,14 +790,35 @@ def build_parser() -> argparse.ArgumentParser:
     route_parser.add_argument("--inventory", type=Path, help="Defaults to user config")
     route_parser.add_argument(
         "--format",
-        choices=("summary", "markdown", "json"),
+        choices=("summary", "markdown", "json", "presentation"),
         default="summary",
-        help="summary is concise; markdown includes scores and complete inert handoffs",
+        help=(
+            "summary is concise; markdown includes full evidence; presentation returns a JSON "
+            "envelope containing the exact agent response and complete route"
+        ),
     )
     route_parser.add_argument(
         "--width",
         type=_summary_width,
-        help="Wrap the summary to 40-120 columns (default: 80)",
+        help=(
+            "Wrap summary text, including the presentation summary, to 40-120 columns (default: 80)"
+        ),
+    )
+    route_parser.add_argument(
+        "--max-words",
+        type=_presentation_max_words,
+        help=(
+            "Require the presentation summary to fit within 1-500 words; complete evidence is "
+            "never truncated"
+        ),
+    )
+    route_parser.add_argument(
+        "--max-lines",
+        type=_presentation_max_lines,
+        help=(
+            "Require the presentation summary to fit within 1-50 lines; complete evidence is "
+            "never truncated"
+        ),
     )
     route_parser.add_argument(
         "--allow-demo", action="store_true", help="Explicitly permit synthetic demo resources"
@@ -859,6 +880,26 @@ def _summary_width(value: str) -> int:
     if not 40 <= width <= 120:
         raise argparse.ArgumentTypeError("expected an integer from 40 to 120")
     return width
+
+
+def _presentation_max_words(value: str) -> int:
+    try:
+        limit = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected an integer from 1 to 500") from exc
+    if not 1 <= limit <= 500:
+        raise argparse.ArgumentTypeError("expected an integer from 1 to 500")
+    return limit
+
+
+def _presentation_max_lines(value: str) -> int:
+    try:
+        limit = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected an integer from 1 to 50") from exc
+    if not 1 <= limit <= 50:
+        raise argparse.ArgumentTypeError("expected an integer from 1 to 50")
+    return limit
 
 
 def _capacity_number(value: str) -> int | float:
@@ -3028,8 +3069,12 @@ def _handle_project_validate(args: argparse.Namespace) -> int:
 
 
 def _handle_route(args: argparse.Namespace) -> int:
-    if args.width is not None and args.format != "summary":
-        raise ConfigurationError("--width is only available with --format summary")
+    if args.width is not None and args.format not in {"summary", "presentation"}:
+        raise ConfigurationError("--width is only available with --format summary or presentation")
+    if (args.max_words is not None or args.max_lines is not None) and args.format != "presentation":
+        raise ConfigurationError(
+            "--max-words and --max-lines are only available with --format presentation"
+        )
     project_path = args.project.expanduser()
     try:
         project = project_from_path(project_path)
@@ -3045,11 +3090,24 @@ def _handle_route(args: argparse.Namespace) -> int:
             exc.add_note("Create your roster first with: atready init")
         raise
     plan = route(catalog.inventory, project, allow_demo=args.allow_demo)
+    width = args.width or 80
+    if args.width is None and args.format == "presentation" and args.max_lines is not None:
+        default_presentation = render_agent_presentation(
+            plan,
+            goal=project.goal,
+            width=width,
+            max_words=args.max_words,
+            max_lines=args.max_lines,
+        )
+        if default_presentation.required_lines > args.max_lines:
+            width = 120
     return _emit_route_plan(
         plan,
         project,
         output_format=args.format,
-        width=args.width or 80,
+        width=width,
+        max_words=args.max_words,
+        max_lines=args.max_lines,
     )
 
 
@@ -3059,11 +3117,43 @@ def _emit_route_plan(
     *,
     output_format: str,
     width: int,
+    max_words: int | None = None,
+    max_lines: int | None = None,
 ) -> int:
     if output_format == "json":
         print(json.dumps(plan.model_dump(mode="json"), indent=2, sort_keys=True))
     elif output_format == "markdown":
         print(render_markdown(plan), end="")
+    elif output_format == "presentation":
+        presentation = render_agent_presentation(
+            plan,
+            goal=project.goal,
+            width=width,
+            max_words=max_words,
+            max_lines=max_lines,
+        )
+        print(
+            json.dumps(
+                {
+                    "format": "atready-route-presentation-v1",
+                    "presentation_status": presentation.status,
+                    "limits": {
+                        "requested": {
+                            "lines": presentation.max_lines,
+                            "words": presentation.max_words,
+                        },
+                        "required": {
+                            "lines": presentation.required_lines,
+                            "words": presentation.required_words,
+                        },
+                    },
+                    "route": plan.model_dump(mode="json"),
+                    "summary": presentation.summary,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
     else:
         print(render_summary(plan, goal=project.goal, width=width), end="")
     has_gap = any(
