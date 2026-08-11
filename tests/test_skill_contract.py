@@ -278,7 +278,8 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "exactly once for this onboarding task" in folded
     assert "default to assisted setup" in folded
     assert "default to quick setup without explaining modes" in folded
-    assert "Your roster is ready. What resource do you want to add?" in reference
+    assert "> What resource do you want to add?" in reference
+    assert "Your roster is ready" not in reference
     assert "A name is enough to start" in reference
     assert reference.index("If the user has not supplied a resource name") < reference.index(
         "resolve the explicit or default inventory target"

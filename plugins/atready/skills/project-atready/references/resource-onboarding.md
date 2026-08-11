@@ -9,7 +9,7 @@ authorization.
 
 If the user has not supplied a resource name, ask only:
 
-> Your roster is ready. What resource do you want to add?
+> What resource do you want to add?
 >
 > A name is enough to start. Do not include passwords, API keys, or private notes.
 

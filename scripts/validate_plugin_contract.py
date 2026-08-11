@@ -14,7 +14,12 @@ from typing import Any
 
 import yaml
 
-OFFICIAL_REFERENCE = "https://developers.openai.com/plugins/deploy/submission-errors"
+OFFICIAL_REFERENCE = (
+    "https://raw.githubusercontent.com/openai/codex/"
+    "d32cb2c6aca2626d1b1d05c4537a5b6c2eec20f2/"
+    "codex-rs/skills/src/assets/samples/plugin-creator/scripts/validate_plugin.py"
+)
+CURRENT_POLICY_SCHEMA = "https://developers.openai.com/plugins/deploy/submission-errors"
 ALLOWED_PRODUCTS = {"CHAT", "CODEX"}
 TRUSTED_UPSTREAM_VALIDATOR_SHA256 = (
     "a4712ddc7c02211edf009b4ef22728f2e4c47650b9ff5696b6b36596dc29fa4a"
@@ -240,7 +245,8 @@ def main() -> None:
             print(f"- {error}")
         raise SystemExit(1)
     print(f"Plugin validation passed: {plugin_root}")
-    print(f"Current policy schema: {OFFICIAL_REFERENCE}")
+    print(f"Reviewed OpenAI validator: {OFFICIAL_REFERENCE}")
+    print(f"Current policy schema: {CURRENT_POLICY_SCHEMA}")
 
 
 if __name__ == "__main__":

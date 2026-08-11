@@ -120,9 +120,10 @@ prompt:
 
 > `$project-atready Add Fogbox to <EPHEMERAL_INVENTORY_PATH> with Quick Setup. I use it manually for code review and it is solid. It may use public project data without the internet. I am not sure about current access, session, usage room, evidence, or when it was last checked. There is no measured limit or private note. Propose the rest, preserve what I do not know, and do not preview or save yet.`
 
-The assistant may clarify only a conflict, invalid value, unconfirmed label proposal, missing
-disclosure decision, or missing transport choice, and may use at most one consolidated repair. It
-must not infer, rediscover, inspect, or repeatedly request an unknown fact. Its compact recap must
+The assistant may clarify only a conflict, invalid value, or unconfirmed label proposal, and may
+use at most one consolidated repair. Target, transport, and disclosure remain editable preview
+proposals rather than conversational questions. It must not infer, rediscover, inspect, or
+repeatedly request an unknown fact. Its compact recap must
 preserve all five unknown selection facts in plain language, omit measured capacity, say nothing is
 saved, and ask for preview. After the latest recap is approved, the rendered CLI preview must map
 `solid` to `0.65`, assign `requires-verification`, report

@@ -9,7 +9,8 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).parents[1]
-validate = runpy.run_path(str(ROOT / "scripts" / "validate_plugin_contract.py"))["validate"]
+VALIDATOR_NAMESPACE = runpy.run_path(str(ROOT / "scripts" / "validate_plugin_contract.py"))
+validate = VALIDATOR_NAMESPACE["validate"]
 
 
 def _write_candidate(tmp_path: Path, products: object) -> Path:
@@ -72,6 +73,17 @@ def test_current_products_field_can_bridge_one_legacy_validator_error(tmp_path: 
     errors = _validate(plugin, system_skills)
 
     assert errors == []
+
+
+def test_production_validator_digest_is_bound_to_an_immutable_official_artifact() -> None:
+    assert VALIDATOR_NAMESPACE["OFFICIAL_REFERENCE"] == (
+        "https://raw.githubusercontent.com/openai/codex/"
+        "d32cb2c6aca2626d1b1d05c4537a5b6c2eec20f2/"
+        "codex-rs/skills/src/assets/samples/plugin-creator/scripts/validate_plugin.py"
+    )
+    assert VALIDATOR_NAMESPACE["TRUSTED_UPSTREAM_VALIDATOR_SHA256"] == (
+        "a4712ddc7c02211edf009b4ef22728f2e4c47650b9ff5696b6b36596dc29fa4a"
+    )
 
 
 def test_invalid_products_are_rejected_before_legacy_compatibility(tmp_path: Path) -> None:

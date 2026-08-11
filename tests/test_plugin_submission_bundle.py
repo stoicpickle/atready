@@ -54,6 +54,7 @@ def test_submission_bundle_is_minimal_safe_and_deterministic(tmp_path: Path) -> 
         assert not any(name.startswith("apps/") or "/__pycache__/" in name for name in names)
         assert not any("screenshot" in name or name.endswith("logo.png") for name in names)
         manifest = json.loads(archive.read(".codex-plugin/plugin.json"))
+        assert manifest["version"] == first_receipt["plugin_version"] == "0.1.7"
         assert "screenshots" not in manifest["interface"]
         assert manifest["interface"]["logo"] == "./assets/icon.png"
         assert manifest["interface"]["composerIcon"] == "./assets/icon.png"

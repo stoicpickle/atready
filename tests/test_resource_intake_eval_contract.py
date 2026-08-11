@@ -86,7 +86,7 @@ def test_blank_slate_intake_eval_has_exact_conversation_only_scenarios() -> None
     assert "ask only which resource the user wants to add" in normalized
     assert "must use fewer than 35 words" in normalized
     assert "first turn asks only for a name in fewer than 35 words" in normalized
-    assert "Scenario B retains its own separately stated allowance" in normalized
+    assert "Target, transport, and disclosure remain editable preview proposals" in normalized
     assert "Accept the displayed conservative defaults" not in evaluation
     assert "must not show the target path" in normalized
     assert "provide a labeled easy-reply format" in normalized
