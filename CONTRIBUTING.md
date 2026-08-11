@@ -29,14 +29,18 @@ Run the Codex plugin and skill validators after changing the plugin:
 
 ```bash
 export CODEX_SYSTEM_SKILLS_DIR=/absolute/path/to/.codex/skills/.system
-python3 "$CODEX_SYSTEM_SKILLS_DIR/plugin-creator/scripts/validate_plugin.py" \
-  plugins/atready
+python3 scripts/validate_plugin_contract.py plugins/atready \
+  --system-skills-dir "$CODEX_SYSTEM_SKILLS_DIR"
 python3 "$CODEX_SYSTEM_SKILLS_DIR/skill-creator/scripts/quick_validate.py" \
   plugins/atready/skills/project-atready
 ```
 
 Set `CODEX_SYSTEM_SKILLS_DIR` to the system-skill directory in the Codex installation being used
-for validation. CI also checks the plugin and skill's portable structural contracts.
+for validation. The repository wrapper delegates to OpenAI's installed plugin validator and adds
+the current documented `policy.products` rule when an older local validator has not learned that
+field yet. It executes only validator bytes matching the repository's reviewed SHA-256 and does not
+suppress any other error. A validator update therefore requires a reviewed digest change. CI also
+checks the plugin and skill's portable structural contracts.
 
 ## Change rules
 

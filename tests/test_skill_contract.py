@@ -33,6 +33,16 @@ def _markdown_h3_section(text: str, heading: str) -> str:
     return marker + section
 
 
+def _markdown_h2_section(text: str, heading: str) -> str:
+    marker = f"## {heading}"
+    match = re.search(rf"^{re.escape(marker)}$", text, re.MULTILINE)
+    assert match is not None, f"missing H2 section: {heading}"
+    remainder = text[match.end() :]
+    next_heading = re.search(r"^#{1,2} ", remainder, re.MULTILINE)
+    section = remainder if next_heading is None else remainder[: next_heading.start()]
+    return marker + section
+
+
 def _write_cli_fixture_wheel(
     path: Path,
     *,
@@ -185,7 +195,9 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
 
     assert "[resource-onboarding.md](references/resource-onboarding.md)" in body
     body_normalized = " ".join(body.split())
-    assert "one friendly, consolidated intake card" in body_normalized
+    name_first = "If the user has not named the resource, ask only for its name and stop"
+    assert name_first in body_normalized
+    assert "one short intake card" in body_normalized
     assert "Use only facts the user states" in body_normalized
     assert "Handle one resource at a time" in body_normalized
     assert "The add request does not authorize initialization" in body_normalized
@@ -215,13 +227,43 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert reference.count("`schema resource-declaration`") == 1
     assert "exactly once for this onboarding task" in folded
     assert "default to assisted setup" in folded
-    assert "do not spend a turn on a mode choice" in folded
+    assert "default to quick setup without explaining modes" in folded
+    assert "Your roster is ready. What resource do you want to add?" in reference
+    assert "A name is enough to start" in reference
+    assert "must stay under 35 words" in folded
+    assert "do not repeat its target or safety explanation" in folded
     assert "put all four groups in one intake card" in folded
-    assert "keep the first assistant response under 250 words" in folded
+    assert "keep the complete card under 120 words" in folded
     assert "one compact, prefilled card" in folded
-    assert "render exactly the four visible bullets" in folded
-    assert "the goal is one easy reply, not a schema interview" in folded
-    assert "**Easy reply:**" in reference
+    assert "the goal is one natural reply, not a schema interview" in folded
+    assert "**Easy reply:**" not in reference
+    assert "reply naturally" in folded
+    quick_setup = _markdown_h2_section(reference, "3. Assisted Setup presented as Quick Setup")
+    card = quick_setup.split("Then show one compact, prefilled card", 1)[1].split(
+        "Use these four internal groups",
+        1,
+    )[0]
+    question_labels = [
+        match.group(1)
+        for line in card.splitlines()
+        if (
+            match := re.match(
+                r"^\s*(?:>\s*)?[-*]\s+\*\*(Fit|Use|Limits|Data):\*\*",
+                line,
+            )
+        )
+    ]
+    assert question_labels == ["Fit", "Use", "Limits", "Data"]
+    assert "Rate each proposed capability separately" in card
+    assert "Reply naturally" in card
+    assert len(card.split()) <= 120
+    for deferred in (
+        "Accept these remaining first-pass defaults",
+        "target path",
+        "disclosure boundary",
+        "<canonical target>",
+    ):
+        assert deferred not in card
 
     output_contract = (SKILL / "references" / "output-contract.md").read_text(encoding="utf-8")
     output_folded = " ".join(output_contract.split())
@@ -299,8 +341,8 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "do not replace them with raw enum labels" in folded
     assert "Review agent (review-agent)" in reference
     assert "code review (code-review)" in folded
-    assert re.search(r'"not sure" is valid for\s*>?\s*readiness facts', normalized, re.IGNORECASE)
-    assert "whether it requires internet access" in folded
+    assert '"Not sure" is fine' in reference
+    assert "internet yes or no?" in folded
     assert "unknown network boolean is a repair item" in folded
     assert "answering this intake card supplies facts only" in folded
     assert "does not authorize a preview or save" in folded
@@ -397,8 +439,9 @@ def test_coderabbit_quick_setup_is_tailored_editable_and_nonexecuting() -> None:
     assert "### coderabbit quick setup" in folded
     assert "show these catalog values as editable proposals" in folded
     assert "render exactly these four visible question bullets" in folded
-    assert "choose cli, pr reviews, or both" in folded
-    assert "rate code review and repository analysis separately" in folded
+    assert "keep it under 120 words" in folded
+    assert "cli, pr reviews, or both?" in folded
+    assert "rate review and repository analysis separately" in folded
     assert "**cli:**" in folded
     assert "**pr reviews:**" in folded
     assert "**both:**" in folded
@@ -411,7 +454,7 @@ def test_coderabbit_quick_setup_is_tailored_editable_and_nonexecuting() -> None:
         "login, installation, update, settings change, provider contact, declaration preview, or "
         "roster save"
     ) in folded
-    assert "rely on your declared readiness" in folded
+    assert "rely on the user's declared readiness" in folded
     assert "executable, version, configuration, or account" in folded
     assert "keep all profile labels" in folded
     assert "strengths, usage mode, readiness, capacity, safety, and defaults editable" in folded
@@ -445,10 +488,11 @@ def test_opencode_quick_setup_collects_only_planning_relevant_declared_facts() -
         "no onboarding answer authorizes opencode execution, provider "
         "access, model enumeration, configuration changes, declaration preview, or roster save"
     ) in folded
-    assert "rely on your declared readiness" in folded
+    assert "rely on the user's declared readiness" in folded
     assert "installation, configuration, providers, models, or an account" in folded
     assert "render exactly these four visible question bullets" in folded
-    assert "rate only the work your configured opencode setup actually handles well" in folded
+    assert "whole response under 120 words" in folded
+    assert "rate each proposed capability separately" in folded
 
 
 def test_pixel_art_quick_setups_distinguish_tiers_products_and_manual_capacity() -> None:
@@ -562,10 +606,12 @@ def test_popular_coding_agent_quick_setups_share_the_planning_only_boundary() ->
         "github workflow support",
     ):
         assert capability in folded
-    assert "rely on your declared readiness" in folded
+    assert "rely on the user's declared readiness" in folded
     assert "installation, configuration, models, providers" in folded
     assert "exactly four visible bullets" in folded
-    assert "one routing-visible workflow" in folded
+    assert "keep it under 120 words" in folded
+    assert "choose one listed workflow" in folded
+    assert "rate each proposed capability separately" in folded
     assert "only when it materially changes declared capability" in folded
     for boundary in (
         "no profile lookup or onboarding answer authorizes login",

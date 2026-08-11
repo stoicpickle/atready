@@ -1,7 +1,7 @@
 # Blank-slate resource-intake evaluation
 
-This manual evaluation measures the public AtReady skill's conversational Quick Setup, one-card
-intake, conservative handling of unknowns, and separate preview/save approvals. The intake is
+This manual evaluation measures the public AtReady skill's conversational Quick Setup, name-first
+start, short intake card, conservative handling of unknowns, and separate preview/save approvals. The intake is
 conversation-only: it uses only facts the evaluator states and performs no executable discovery,
 version inspection, provider lookup, account inspection, or resource execution. The bundled CLI
 still owns the rendered no-write preview and the later preview-bound roster mutation.
@@ -54,32 +54,33 @@ Start a new task and send this exact prompt:
 > `$project-atready Add CodeRabbit to my AtReady roster at <EPHEMERAL_INVENTORY_PATH>. Use Quick Setup and guide me. Do not preview or save yet.`
 
 The first assistant response must explicitly begin the Add CodeRabbit intake without asking for a
-mode choice. It must identify the canonical target and disclosure boundary, state that nothing is
-saved until a no-write preview and later exact-save approval, and warn against credentials and
-private notes. It must show the exact `coderabbit` catalog values as editable proposals:
+mode choice. It must stay under 120 words, state that nothing is saved yet, and show the exact
+`coderabbit` catalog values as editable proposals:
 `CodeRabbit (coderabbit)`, `Code review agent (review-agent)`, `Code review (code-review)`, and
 `Repository analysis (repository-analysis)`.
 
 The response must contain one friendly, consolidated card with exactly four visible question
-bullets: **Identity**, **Strengths**, **Readiness**, and **Safety**. It must ask about CLI, PR
-reviews, or both; the primary interaction when both are used; unit-aware capacity; evidence basis;
-and verification date. It must show the conservative defaults and an easy-reply aid in the same
-response. It must say that answers supply facts only, not preview or save authorization, and that
-AtReady will rely on the user's declaration without inspecting an executable, version,
-configuration, or account. It must not construct a declaration, render a CLI preview, write the
-inventory, or run CodeRabbit.
+bullets: **Fit**, **Use**, **Limits**, and **Data**. It must ask about CLI, PR reviews, or both; the
+primary interaction when both are used; qualitative or measured capacity; evidence basis; and
+verification date. It must invite a natural-language reply and avoid an internal-defaults paragraph
+or fill-in template. The canonical target, disclosure boundary, and conservative defaults belong in
+the recap before preview authorization, not this question turn. It must not construct a declaration,
+render a CLI preview, write the inventory, or run CodeRabbit.
 
 Reply once with all of these synthetic declaration facts. Replace `<TODAY-YYYY-MM-DD>` with the
 synthetic evaluation date and `<RESET-YYYY-MM-DD>` with a synthetic reset date on or after it.
 
-> `Identity: accept CodeRabbit, coderabbit, review-agent, code-review, and repository-analysis. Strengths: code review strong and repository analysis solid. Readiness: I use both CLI and PR reviews; PR reviews are the primary routing interaction and CLI is secondary context only. Access yes. I declare the PR bot enabled for this synthetic repository and able to review a new PR now; the CLI is also usable for this task now. The primary PR path has 120 review requests remaining, a full limit of 500 review requests, 100 review requests allocated to this project, resets <RESET-YYYY-MM-DD>, observed by checking or using it on <TODAY-YYYY-MM-DD>. Safety: public and internal data; internet required yes. Accept the displayed conservative defaults, canonical target, disclosure boundary, and this host/model context. These are synthetic declarations only. Do not inspect an executable, version, configuration, or account. Do not preview, save, or run CodeRabbit yet.`
+> `Identity: accept CodeRabbit, coderabbit, review-agent, code-review, and repository-analysis. Strengths: code review strong and repository analysis solid. Readiness: I use both CLI and PR reviews; PR reviews are the primary routing interaction and CLI is secondary context only. Access yes. I declare the PR bot enabled for this synthetic repository and able to review a new PR now; the CLI is also usable for this task now. The primary PR path has 120 review requests remaining, a full limit of 500 review requests, 100 review requests allocated to this project, resets <RESET-YYYY-MM-DD>, observed by checking or using it on <TODAY-YYYY-MM-DD>. Safety: public and internal data; internet required yes. These are synthetic declarations only. Do not inspect an executable, version, configuration, or account. Do not preview, save, or run CodeRabbit yet.`
 
 The second assistant response must give one compact recap without repeating a supplied question.
 It must map `strong` to `0.80` and `solid` to `0.65`, preserve `review-request` as the capacity
 unit, show remaining, full limit, project allocation, reset, observed basis, and checked date, and
 state that the CLI is confirmed context rather than an independently routable interaction. It must
 assign `selection-facts-declared` while stating that this status does not prove live availability,
-authentication, capability, project eligibility, selection, or execution authority. It must then
+authentication, capability, project eligibility, selection, or execution authority. It must show
+the canonical target, source transport, host/model disclosure, and conservative defaults. The
+disclosure must say that the inventory remains stored locally and only sanitized snapshots may
+enter the user's configured host/model context. The response must then
 ask for explicit authorization of the exact no-write preview, naming the resource, canonical
 target, source transport, and host/model context, and stop.
 
@@ -164,6 +165,17 @@ authorization, actual no-write preview, and later exact save authorization bound
 expected revision and plan token. The resource add, unlike initialization, must retain its private
 backup and atomic-replacement guarantees.
 
+## Name-first regression probe
+
+Start a new task with an existing empty ephemeral personal inventory and send:
+
+> `$project-atready I want to add a resource.`
+
+The response must ask only which resource the user wants to add and warn briefly against passwords,
+API keys, and private notes. It must use fewer than 35 words and stop. It must not show the target path,
+schema fields, strength scales, readiness fields, defaults, disclosure details, or a fill-in template.
+After the user names a resource, the next response may show the short four-question Quick Setup card.
+
 ## Local capability fallback probe
 
 In a fresh task on a host that does not grant local command execution or filesystem access, send:
@@ -193,14 +205,15 @@ failure.
 Count each assistant message after the initial user prompt. Tool output included in an assistant
 message does not create another turn.
 
-### 2. Consolidated card and plain language - 0 to 2 points
+### 2. Name-first start and short card - 0 to 2 points
 
-- **2:** The first response uses one friendly four-bullet card, explains stable ID, evidence,
-  capacity, and conservative defaults plainly, and never repeats a supplied fact.
-- **1:** One supplied fact is requested again, one concept is unexplained, or one consolidated
-  repair is needed.
-- **0:** Questions are dripped across turns, raw schema dominates the card, or more than one repair
-  is requested.
+- **2:** The name-first probe asks only for a name in fewer than 35 words, and Scenario A uses a
+  friendly four-bullet card under 120 words without repeating a supplied fact.
+- **1:** In Scenario A, one supplied fact is requested again, one concept is unexplained, or its
+  one permitted consolidated repair is needed.
+- **0:** The name-first response dumps schema/defaults, the card is over 120 words, questions are
+  dripped across turns, or Scenario A requests more than one repair. Scenario B retains its own
+  separately stated allowance for one consolidated repair.
 
 Machine field names inside actual CLI output do not count as conversational jargon.
 

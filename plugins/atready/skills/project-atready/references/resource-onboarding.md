@@ -15,22 +15,31 @@ launcher's reported runtime contract or required feature set changes, or the tas
 If the user explicitly says Quick Setup or Assisted Setup, begin without asking them to choose a
 mode. Present the default path to users as **Quick Setup**; `Assisted Setup` remains the internal
 contract and evaluation name. If they ask generally to add or onboard resources, default to Quick
-Setup and mention in one sentence that Detailed Setup remains available; do not spend a turn on a
-mode choice. Use Detailed Setup (the internal Advanced Setup branch) only when the user requests it,
-supplies a complete declaration, or rejects the assisted defaults.
+Setup without explaining modes. Use Detailed Setup (the internal Advanced Setup branch) only when
+the user requests it, supplies a complete declaration, or rejects the assisted defaults.
 
-In the same response as the intake card, identify the target and explain that preview output exposes
-every routing-visible field to the terminal, host, logs, and potentially the configured model
-provider. A general planning or `preview-first` request permits questions and states a desired
-sequence; it is not authorization for an exact declaration preview or write.
+If the user has not supplied a resource name, ask only:
+
+> Your roster is ready. What resource do you want to add?
+>
+> A name is enough to start. Do not include passwords, API keys, or private notes.
+
+Stop after that question. Do not show the intake card, target path, internal defaults, disclosure
+details, or a fill-in template until the resource is known. This name-first turn must stay under 35
+words. If initialization just completed, do not repeat its target or safety explanation.
+
+Once the resource is known, show the canonical target and the short disclosure line in the recap,
+where the user can review them before authorizing a preview. A general planning or `preview-first`
+request permits questions and states a desired sequence; it is not authorization for an exact
+declaration preview or write.
 
 Never infer access, authentication, session state, billing, quota, verification, capabilities, or
 ratings from a product name, installation, subscription claim, or nearby configuration. Accept
 `unknown` where the schema permits it. State that unknown or stale access, session, quota, or
 provenance normally makes the resource unverified for routing.
 
-**Quick Setup** collects one short, mostly prefilled human-language card and proposes every
-remaining conservative default. **Detailed Setup** reviews every routing, scoring, policy,
+**Quick Setup** collects one short, mostly prefilled human-language card and keeps every remaining
+conservative default out of the question turn. **Detailed Setup** reviews every routing, scoring, policy,
 provenance, capacity, and handoff field. Both add exactly one resource, require separate preview and
 save approvals, perform no account or provider discovery, and never authorize routed project work.
 
@@ -81,32 +90,26 @@ measured amount is known. A single resource stores one measured-capacity envelop
 limits differ, ask which limit governs this entry or offer the two-entry queue. Never convert or
 combine unlike units.
 
-Render this provider-specific card after the boundary opening in section 3. Keep it under the same
-250-word limit and render exactly these four visible question bullets:
+Render this provider-specific card in the short shape from section 3. Keep it under 120 words and
+render exactly these four visible question bullets:
 
 > **Proposed:** `CodeRabbit (coderabbit)` · `Code review agent (review-agent)` · `Code review
 > (code-review)` and `Repository analysis (repository-analysis)`
 >
-> **Confirm or correct:**
-> - **Identity:** accept or edit the proposed name, stable ID, category, and both capability labels.
-> - **Strengths:** rate code review and repository analysis separately as basic, solid, strong,
->   exceptional, or an exact 0.0-1.0 score.
-> - **Readiness:** choose CLI, PR reviews, or both; identify the primary path if both; say who can
->   use it now, usage room or a measured limit, and how and when those facts were checked.
-> - **Safety:** say which project data it may receive and whether use requires internet access.
+> - **Fit:** Are these labels right? Rate review and repository analysis separately as basic, solid, strong,
+>   exceptional, or 0.0-1.0.
+> - **Use:** CLI, PR reviews, or both? If both, which is primary? Do you have access, and is it
+>   available now?
+> - **Limits:** Plenty, some, none, not sure, or a measured amount? How do you know, and when checked?
+> - **Data:** Public, internal, private, or sensitive? Internet yes or no?
 >
-> I will keep billing unknown, use baseline comparison scores, ask before use, prepare a manual
-> text handoff, and add no private note. I will rely on your declared readiness rather than checking
-> the executable, version, configuration, or account.
->
-> **Easy reply:** `identity: accept/change; strengths: code review strong, repository analysis
-> solid; readiness: CLI / PR reviews / both, primary path if both, access yes, available yes, usage
-> some or measured, checked today; safety: internal, internet yes; defaults and target: accept`
+> Reply naturally. "Not sure" is fine. I will recap before asking to preview. Nothing is saved yet.
 
 Treat every answer as a declaration to recap, not provider evidence. Keep all profile labels,
 strengths, usage mode, readiness, capacity, safety, and defaults editable. No onboarding answer
 authorizes a CodeRabbit review, pull request, login, installation, update, settings change,
 provider contact, declaration preview, or roster save.
+Rely on the user's declared readiness; do not inspect an executable, version, configuration, or account.
 
 ### OpenCode Quick Setup
 
@@ -126,27 +129,21 @@ that this user's installation, configured provider, model, permissions, or curre
 ready. Ask about the underlying model/provider only when it materially changes the user's declared
 capability, cost, or capacity; never request or retain its API key or other credential.
 
-Render exactly these four visible question bullets in the existing Quick Setup card:
+Render exactly these four visible question bullets in the existing Quick Setup card, keeping the
+whole response under 120 words:
 
 > **Proposed:** `OpenCode (opencode)` · `Coding agent (coding-agent)` · `Code implementation
 > (code-implementation)`, `Code review (code-review)`, `Repository analysis
 > (repository-analysis)`, and `Software planning (software-planning)`
 >
-> **Confirm or correct:**
-> - **Identity:** accept or edit the proposed name, stable ID, category, and capability labels.
-> - **Strengths:** rate only the work your configured OpenCode setup actually handles well.
-> - **Readiness:** choose terminal, separately authorized CLI, or desktop/IDE; say who can use it
->   now, its qualitative room or exact provider-governed limit, and how and when you checked.
-> - **Safety:** say which project data and actions it may receive and whether use requires internet.
+> - **Fit:** Are these labels right? Rate each proposed capability separately as basic, solid,
+>   strong, exceptional, or 0.0-1.0.
+> - **Use:** Terminal, separately authorized CLI, or desktop/IDE? Do you have access, and is it
+>   available now?
+> - **Limits:** Plenty, some, none, not sure, or a measured amount? How do you know, and when checked?
+> - **Data:** Public, internal, private, or sensitive? Internet yes or no?
 >
-> I will keep billing unknown, use baseline comparison scores, ask before use, prepare a manual
-> text handoff, and add no private note. I will rely on your declared readiness rather than checking
-> installation, configuration, providers, models, or an account.
->
-> **Easy reply:** `identity: accept/change; strengths: implementation strong, review solid,
-> analysis strong, planning solid; readiness: terminal / delegated CLI / desktop or IDE, access yes,
-> available yes, usage some or measured, checked today; safety: internal, internet yes; defaults
-> and target: accept`
+> Reply naturally. "Not sure" is fine. I will recap before asking to preview. Nothing is saved yet.
 
 Treat model choice and configuration as context for the user's ratings, not as an additional
 resource automatically. If a separately routable model or provider has materially different
@@ -156,6 +153,8 @@ Present it as a catalog-listed OpenCode Zen option under review, never as OpenCo
 default, and require the user to confirm current access, data policy, and observed fit.
 No onboarding answer authorizes OpenCode execution, provider access, model enumeration,
 configuration changes, declaration preview, or roster save.
+Rely on the user's declared readiness; do not inspect installation, configuration, providers,
+models, or an account.
 
 ### Pixel-art tool Quick Setup profiles
 
@@ -220,32 +219,25 @@ editable capability and workflow proposals:
   workflow. Its dated Grok 4.5 suggestion is for complex reasoning across code and knowledge work,
   but the user's scores, access, policy, and exact surface remain unverified.
 
-For each profile, render one card with exactly four visible bullets:
+For each profile, render one card with exactly four visible bullets and keep it under 120 words:
 
 > **Proposed:** `<profile name and stable ID>` · `Coding agent (coding-agent)` · `<the profile's
 > editable capability proposals>`
 >
-> **Confirm or correct:**
-> - **Identity:** accept or edit the proposed name, stable ID, category, and capability labels.
-> - **Strengths:** rate only the work this configured setup actually handles well.
-> - **Readiness:** choose one routing-visible workflow; say who can use it now, qualitative room or
->   one exact governing limit, and how and when those facts were checked.
-> - **Safety:** say which project or repository data and actions it may receive and whether use
->   requires internet.
+> - **Fit:** Are these labels right? Rate each proposed capability separately as basic, solid,
+>   strong, exceptional, or 0.0-1.0.
+> - **Use:** Choose one listed workflow. Do you have access, and is it available now?
+> - **Limits:** Plenty, some, none, not sure, or one measured limit? How do you know, and when checked?
+> - **Data:** Public, internal, private, or sensitive? Internet yes or no?
 >
-> I will keep billing unknown, use baseline comparison scores, ask before use, prepare a manual
-> text handoff, and add no private note. I will rely on your declared readiness rather than checking
-> installation, configuration, models, providers, authentication, billing, quota, or an account.
->
-> **Easy reply:** `identity: accept/change; strengths: implementation strong, review solid,
-> analysis strong, planning solid; readiness: choose one listed workflow, access yes, available
-> yes, usage some or measured, checked today; safety: internal, internet yes; defaults and target:
-> accept`
+> Reply naturally. "Not sure" is fine. I will recap before asking to preview. Nothing is saved yet.
 
 Ask about a backing model or plan only when it materially changes declared capability, cost,
 capacity, policy, or readiness. Do not automatically create a second model/provider resource. If a
 backing provider is independently routable with materially different facts, offer to queue it for
 its own later preview and save.
+Rely on the user's declared readiness; do not inspect installation, configuration, models,
+providers, authentication, billing, quota, or an account.
 
 No profile lookup or onboarding answer authorizes login, account or usage inspection, repository
 analysis, file changes, shell commands, cloud/background delegation, model selection, provider
@@ -293,44 +285,24 @@ skill may explain a selected model role but must not substitute an unconfirmed m
 
 Use a provider-specific variant above when it applies; otherwise use the generic card in this section.
 Use facts already supplied instead of asking twice. Put all four groups in one intake card. Keep the
-questions friendly; show schema values only as mappings or in the later recap. Keep the first
-assistant response under 250 words. Lead with the proposed useful entry, not the storage machinery.
-Do not recite the full schema, internal status names, or every retention caveat in the question card.
-Render exactly the four visible bullets shown below. Do not split readiness into a checklist of its
-individual fields, repeat the available answer choices outside their group, or add a separate
-defaults bullet. The goal is one easy reply, not a schema interview.
-
-Open with this boundary:
-
-> I will add one resource at a time. Nothing is saved until you approve a no-write preview and then
-> approve the exact save. Do not paste credentials or private notes here. "Not sure" is valid for
-> readiness facts. I will use `<canonical target>`; the visible entry will appear in this task and
-> may be retained by its host, logs, or configured model provider.
+questions friendly; show schema values only as mappings in the later recap. Keep the complete card
+under 120 words. Lead with the proposed useful entry, not storage machinery. Do not recite the full
+schema, internal status names, defaults, target path, or retention caveats in the question card. The
+goal is one natural reply, not a schema interview.
 
 Then show one compact, prefilled card in this shape, adapting known profile proposals and facts:
 
 > **Proposed:** `<name>` · `<readable category>` · `<readable capability>` · `<strength if known>`
 >
-> **Confirm or correct:**
-> - **Identity:** the proposed name, ID, category, and capability labels.
-> - **Strength:** basic, solid, strong, exceptional, or an exact 0.0-1.0 score.
-> - **Readiness:** how you use it; whether you have access and can use it now; usage room; how and
->   when you last checked.
-> - **Safety:** data it may receive and whether it requires internet access.
+> - **Fit:** Are these labels right? Rate each proposed capability separately as basic, solid,
+>   strong, exceptional, or 0.0-1.0.
+> - **Use:** How do you use it? Do you have access, and is it available now?
+> - **Limits:** Plenty, some, none, not sure, or a measured amount? How do you know, and when checked?
+> - **Data:** Public, internal, private, or sensitive? Internet yes or no?
 >
-> I will keep billing unknown, use baseline comparison scores, ask before use, prepare a manual
-> text handoff, and add no private note. I will rely on your declared readiness rather than checking
-> a CLI, app, configuration, or account. Answering supplies facts only; it does not authorize a
-> preview or save.
+> Reply naturally. "Not sure" is fine. I will recap before asking to preview. Nothing is saved yet.
 
-End with the provider-specific fill-in aid above when it applies; otherwise use this compact aid.
-It is a response template, not a fifth question group:
-
-> **Easy reply:** `identity: accept/change; strength: strong; readiness: access yes, separate
-> service, available yes, usage some, checked today; safety: internal, internet yes; defaults and
-> target: accept`
-
-Use these four internal groups to make sure the compact card is complete:
+Use these four internal groups to interpret the natural reply. Do not expand the visible card:
 
 1. **Identity:** propose the supplied display name and a lowercase resource ID only as a proposal;
    require the user to confirm it. Explain once that the resource ID is AtReady's stable,
@@ -374,7 +346,8 @@ Use these deterministic friendly mappings:
 - evidence `checked or used`, `my judgment`, `vendor information`, `not sure` -> `observed`,
   `user-judgment`, `vendor-claim`, `unknown`.
 
-End the same card with one visible batch acceptance for the remaining conservative defaults:
+Keep conservative defaults out of the question card. Show this batch in the recap before asking
+for preview authorization:
 
 > Accept these remaining first-pass defaults? We do not know its billing; put relative cost and the
 > eight ranking comparison scores at 0.5 for now (an undecided baseline, not verified quality).
@@ -382,13 +355,12 @@ End the same card with one visible batch acceptance for the remaining conservati
 > other seven comparison ratings at 0.5. Always ask before use; prepare a text handoff you copy
 > manually; add no usage tips; and add no private note.
 
-Use those human phrases in the card. Do not replace them with raw enum labels such as
+Use those human phrases when interpreting the reply. Do not replace them with raw enum labels such as
 `codex-callable`, `local-cli`, `user-judgment`, or `manual-prompt`; show exact schema values only in
 the recap beside the user's words.
 
-Ask the user to confirm the target and disclosure boundary in the same reply. Accept plain English
-or provide one compact response template with labels, strength, access, use, available now, usage
-room, basis, last checked, data, internet, remaining defaults, and target/disclosure. State:
+Show the exact target and disclosure boundary in the recap, not the question card. Ask the user to
+confirm the recap and authorize one no-write preview. State:
 
 > Answering this intake card supplies facts only; it does not authorize a preview or save.
 
@@ -412,8 +384,8 @@ unknown network Boolean is a repair item. Preserve every other unknown. If block
 that single repair, stop without previewing. Normally Assisted Setup takes one substantive intake
 reply; it must never take more than one consolidated repair reply before the recap.
 
-Completion criterion: all four groups, displayed defaults, target, and disclosure boundary are
-confirmed in one intake reply or one intake plus one consolidated repair, or onboarding stops.
+Completion criterion: all four compact prompts are answered in one reply or one consolidated
+repair; the later recap displays the defaults, target, and disclosure boundary before preview authorization.
 
 ## 4. Advanced Setup
 

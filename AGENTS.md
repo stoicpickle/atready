@@ -9,7 +9,7 @@ Codex skill plus an offline inventory CLI.
 - Run `uv run ruff check .`, `uv run ruff format --check .`, and
   `uv run pytest --cov=atready --cov-report=term-missing` before handoff.
 - Run the plugin and skill validators after editing `plugins/atready/`:
-  `python3 "$CODEX_SYSTEM_SKILLS_DIR/plugin-creator/scripts/validate_plugin.py" plugins/atready`
+  `python3 scripts/validate_plugin_contract.py plugins/atready --system-skills-dir "$CODEX_SYSTEM_SKILLS_DIR"`
   and `python3 "$CODEX_SYSTEM_SKILLS_DIR/skill-creator/scripts/quick_validate.py"
   plugins/atready/skills/project-atready`.
   Set `CODEX_SYSTEM_SKILLS_DIR` to the active Codex installation's system-skill directory first.

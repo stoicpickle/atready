@@ -33,6 +33,7 @@ def test_blank_slate_intake_eval_has_exact_conversation_only_scenarios() -> None
         "## Scenario B: conversation-only path preserves unknowns",
         "## Scenario C: keep rendered preview and apply separate",
         "## Scenario D: missing roster requires separate creation approval",
+        "## Name-first regression probe",
         "## Local capability fallback probe",
     ):
         assert heading in evaluation
@@ -52,18 +53,19 @@ def test_blank_slate_intake_eval_has_exact_conversation_only_scenarios() -> None
         "save a resource yet.",
         "$project-atready Add CodeRabbit to my AtReady roster. This host does not provide local "
         "command execution or filesystem access.",
+        "$project-atready I want to add a resource.",
     ):
         assert f"> `{prompt}" in evaluation
 
     for first_response_contract in (
         "explicitly begin the Add CodeRabbit intake",
         "one friendly, consolidated card with exactly four visible question bullets",
-        "**Identity**, **Strengths**, **Readiness**, and **Safety**",
+        "**Fit**, **Use**, **Limits**, and **Data**",
         "`CodeRabbit (coderabbit)`",
         "`Code review agent (review-agent)`",
         "`Code review (code-review)`",
         "`Repository analysis (repository-analysis)`",
-        "answers supply facts only, not preview or save authorization",
+        "avoid an internal-defaults paragraph or fill-in template",
     ):
         assert first_response_contract in normalized
 
@@ -82,6 +84,12 @@ def test_blank_slate_intake_eval_has_exact_conversation_only_scenarios() -> None
     assert "not an add-resource preview or apply" in normalized
     assert "fail closed instead of overwriting it" in normalized
     assert "private backup and atomic-replacement guarantees" in normalized
+    assert "ask only which resource the user wants to add" in normalized
+    assert "must use fewer than 35 words" in normalized
+    assert "name-first probe asks only for a name in fewer than 35 words" in normalized
+    assert "Scenario B retains its own separately stated allowance" in normalized
+    assert "Accept the displayed conservative defaults" not in evaluation
+    assert "must not show the target path" in normalized
 
 
 def test_blank_slate_intake_eval_binds_recap_preview_and_apply() -> None:
@@ -120,7 +128,7 @@ def test_blank_slate_intake_eval_has_bounded_rubric_and_failure_gates() -> None:
     assert "Pass: at least **10/12** and no critical" in evaluation
     dimensions = (
         "Turns to preview",
-        "Consolidated card and plain language",
+        "Name-first start and short card",
         "Profile, mapping, and capacity",
         "Unknown and readiness handling",
         "Preview, apply, and response-shape separation",

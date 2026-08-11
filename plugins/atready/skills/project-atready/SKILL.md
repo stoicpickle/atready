@@ -58,8 +58,8 @@ tokens, and private notes outside this workflow. Use only facts the user states.
 
 ### 2. Gather and recap
 
-Ask one friendly, consolidated intake card with editable catalog suggestions. Accept corrections and
-`unknown`. Treat answers as facts, not authorization. Recap, ask for a no-write preview, and stop.
+If the user has not named the resource, ask only for its name and stop. Otherwise ask one short
+intake card, recap values and target, then request preview. Answers supply facts only.
 
 ### 3. Preview, approve, and save
 
