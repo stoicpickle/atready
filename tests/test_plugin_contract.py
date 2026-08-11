@@ -366,7 +366,7 @@ def test_directory_packet_tracks_the_official_skills_only_submission_contract() 
         "returned route or executing any project-resource handoff.",
         "Use AtReady Quick Setup to begin adding CodeRabbit to the attached "
         "empty-inventory.yaml. Use conversation-only onboarding: do not inspect an executable, "
-        "version, configuration, or account. Present the complete grouped intake card, then stop "
+        "version, configuration, or account. Present the short intake card, then stop "
         "before any preview or write.",
         "I authorize routing the attached demo inventory. Use AtReady to route "
         "alternate-project.yaml with alternate-inventory.yaml, require the declared alternate "
@@ -386,7 +386,7 @@ def test_directory_packet_tracks_the_official_skills_only_submission_contract() 
     for expected_outcome in (
         "project plan first",
         "concise selection/omission explanation",
-        "canonical target and disclosure boundary",
+        "Target, disclosure, and defaults move to the recap",
         "primary, reserved alternate",
         "no assigned primary",
         "produce planning output only",

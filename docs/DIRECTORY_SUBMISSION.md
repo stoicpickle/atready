@@ -110,15 +110,15 @@ must not include executed project-resource handoffs.
    - Expected result shape: concise selection/omission explanation with the original assignments
      and execution boundary preserved.
 3. **Conversation-only Quick Setup**
-   - Prompt: `Use AtReady Quick Setup to begin adding CodeRabbit to the attached empty-inventory.yaml. Use conversation-only onboarding: do not inspect an executable, version, configuration, or account. Present the complete grouped intake card, then stop before any preview or write.`
+   - Prompt: `Use AtReady Quick Setup to begin adding CodeRabbit to the attached empty-inventory.yaml. Use conversation-only onboarding: do not inspect an executable, version, configuration, or account. Present the short intake card, then stop before any preview or write.`
    - Fixture: the complete `empty-inventory.yaml` payload below. Use no credentials or real account
      metadata.
    - Expected behavior: begin Quick Setup without a mode-choice turn; show the exact `coderabbit`
-     catalog proposals as editable labels, ask one grouped plain-language card including unit-aware
+     catalog proposals as editable labels, ask one plain-language card under 120 words including
      capacity, and stop without constructing a declaration or invoking a preview.
-   - Expected result shape: canonical target and disclosure boundary, proposed identity and labels,
-     exactly four visible question bullets, an easy-reply template, and the reminder that answering
-     supplies facts but does not authorize a preview or save.
+   - Expected result shape: proposed identity and labels, exactly four visible question bullets
+     named `Fit`, `Use`, `Limits`, and `Data`, a natural-reply invitation, and a brief statement that
+     nothing is saved yet. Target, disclosure, and defaults move to the recap before preview approval.
 
    Maintainers must also run the
    [blank-slate resource-intake evaluation](../evals/RESOURCE_INTAKE_EVAL.md) against the exact
@@ -654,6 +654,17 @@ python3 scripts/build_plugin_submission.py \
   --output dist/atready-plugin-0.1.6.zip
 ```
 
-Run both plugin validators and `tests/test_plugin_submission_bundle.py` before retaining the ZIP.
+Run the repository's current-policy plugin validator, OpenAI's skill validator, and
+`tests/test_plugin_submission_bundle.py` before retaining the ZIP:
+
+```bash
+export CODEX_SYSTEM_SKILLS_DIR=/absolute/path/to/.codex/skills/.system
+python3 scripts/validate_plugin_contract.py plugins/atready \
+  --system-skills-dir "$CODEX_SYSTEM_SKILLS_DIR"
+python3 "$CODEX_SYSTEM_SKILLS_DIR/skill-creator/scripts/quick_validate.py" \
+  plugins/atready/skills/project-atready
+uv run pytest -q tests/test_plugin_submission_bundle.py
+```
+
 Record the emitted digest, exact source commit, runtime compatibility evidence, and portal draft
 receipt together. Do not rebuild or edit the ZIP between reviewer testing and upload.
