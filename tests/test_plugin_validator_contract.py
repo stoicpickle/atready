@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import re
+import runpy
 from pathlib import Path
 
 import pytest
 import yaml
 
-from scripts.validate_plugin_contract import validate
-
 ROOT = Path(__file__).parents[1]
+validate = runpy.run_path(str(ROOT / "scripts" / "validate_plugin_contract.py"))["validate"]
 
 
 def _write_candidate(tmp_path: Path, products: object) -> Path:
