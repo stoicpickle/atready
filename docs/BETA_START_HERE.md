@@ -85,12 +85,13 @@ Use $project-atready Quick Setup to add CodeRabbit to my resource roster at TEST
 Replace `TEST_INVENTORY_PATH` with the exact printed synthetic inventory path. Every preview, save,
 and validation command must show that exact path. Do not read or change any existing inventory.
 
-Expect one short, mostly prefilled CodeRabbit card. It should show editable profile proposals for
-code review and repository analysis, then ask whether your synthetic workflow is the CLI, PR
-reviews, or both. Choose one primary path if both, and give synthetic readiness plus qualitative or
-measured capacity in review requests, files, or your own exact unit. AtReady may offer a
-narrowly scoped check that only locates the profiled CLI; you may decline and continue by
-conversation. It must not start a review, log in, inspect an account or repository, install or
+Expect one short CodeRabbit prompt. It should tentatively describe the resource in plain language,
+then ask exactly three questions: how strong it is for that work, whether it is available now, and
+whether you would use it with private code or project files. Answer in an ordinary sentence;
+`Not sure` is valid.
+The compact recap should show only purpose, strength, availability, private-work permission, and
+material unknowns. The later no-write preview carries IDs, mappings, defaults, and target details.
+AtReady must not start a review, log in, inspect an account or repository, install or
 update CodeRabbit, change settings, or claim authentication, quota, or availability. It should then:
 
 1. show a no-write preview only after you approve that preview;

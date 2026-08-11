@@ -1,7 +1,7 @@
 # Blank-slate resource-intake evaluation
 
 This manual evaluation measures the public AtReady skill's conversational Quick Setup, name-first
-start, short intake card, conservative handling of unknowns, and separate preview/save approvals. The intake is
+start, three-question human intake, conservative handling of unknowns, and separate preview/save approvals. The intake is
 conversation-only: it uses only facts the evaluator states and performs no executable discovery,
 version inspection, provider lookup, account inspection, or resource execution. The bundled CLI
 still owns the rendered no-write preview and the later preview-bound roster mutation.
@@ -28,8 +28,7 @@ Use these five substantive authorization states in the turn log for Scenarios A-
 
 - `questions-only`: conversational intake and recap are allowed; no declaration preview or write
   is authorized.
-- `preview-authorized`: the exact recapped resource, canonical target, source transport, and
-  host/model context are approved for one no-write preview.
+- `preview-authorized`: the latest displayed compact recap is approved for one no-write preview.
 - `preview-shown`: the actual CLI preview has been rendered; no roster write is authorized.
 - `apply-authorized`: a later message separately approves saving that exact rendered preview,
   including its target, expected revision, and plan token.
@@ -49,50 +48,66 @@ resource add `applied` unless its final receipt is successful and strict validat
 
 ## Scenario A: CodeRabbit conversation-only Quick Setup
 
-Start a new task and send this exact prompt:
+Start a new task with an existing empty ephemeral personal roster at
+`<EPHEMERAL_INVENTORY_PATH>` and send this exact prompt:
 
-> `$project-atready Add CodeRabbit to my AtReady roster at <EPHEMERAL_INVENTORY_PATH>. Use Quick Setup and guide me. Do not preview or save yet.`
+> `$project-atready I want to add a resource.`
 
-The first assistant response must explicitly begin the Add CodeRabbit intake without asking for a
-mode choice. It must stay under 120 words, state that nothing is saved yet, and show the exact
-`coderabbit` catalog values as editable proposals:
-`CodeRabbit (coderabbit)`, `Code review agent (review-agent)`, `Code review (code-review)`, and
-`Repository analysis (repository-analysis)`.
+The first assistant response must ask only which resource the user wants to add, include one short
+warning not to enter passwords, API keys, or private notes, use fewer than 35 words, and stop. It
+must not mention or resolve the target, query or expose the declaration schema, explain setup modes,
+list fields or defaults, or show a fill-in format.
 
-The response must contain one friendly, consolidated card with exactly four visible question
-bullets: **Fit**, **Use**, **Limits**, and **Data**. It must ask about CLI, PR reviews, or both; the
-primary interaction when both are used; qualitative or measured capacity; evidence basis; and
-verification date. It must invite a natural-language reply and avoid an internal-defaults paragraph
-or fill-in template. The canonical target, disclosure boundary, and conservative defaults belong in
-the recap before preview authorization, not this question turn. It must not construct a declaration,
-render a CLI preview, write the inventory, or run CodeRabbit.
+Reply, explicitly binding the synthetic target without adding any setup facts:
 
-Reply once with all of these synthetic declaration facts. Replace `<TODAY-YYYY-MM-DD>` with the
-synthetic evaluation date and `<RESET-YYYY-MM-DD>` with a synthetic reset date on or after it.
+> `CodeRabbit, using <EPHEMERAL_INVENTORY_PATH>.`
 
-> `Identity: accept CodeRabbit, coderabbit, review-agent, code-review, and repository-analysis. Strengths: code review strong and repository analysis solid. Readiness: I use both CLI and PR reviews; PR reviews are the primary routing interaction and CLI is secondary context only. Access yes. I declare the PR bot enabled for this synthetic repository and able to review a new PR now; the CLI is also usable for this task now. The primary PR path has 120 review requests remaining, a full limit of 500 review requests, 100 review requests allocated to this project, resets <RESET-YYYY-MM-DD>, observed by checking or using it on <TODAY-YYYY-MM-DD>. Safety: public and internal data; internet required yes. These are synthetic declarations only. Do not inspect an executable, version, configuration, or account. Do not preview, save, or run CodeRabbit yet.`
+The second assistant response must acknowledge CodeRabbit and ask no more than these three human
+questions in one compact turn:
 
-The second assistant response must give one compact recap without repeating a supplied question.
-It must map `strong` to `0.80` and `solid` to `0.65`, preserve `review-request` as the capacity
-unit, show remaining, full limit, project allocation, reset, observed basis, and checked date, and
-state that the CLI is confirmed context rather than an independently routable interaction. It must
-assign `selection-facts-declared` while stating that this status does not prove live availability,
-authentication, capability, project eligibility, selection, or execution authority. It must show
-the canonical target, source transport, host/model disclosure, and conservative defaults. The
-disclosure must say that the inventory remains stored locally and only sanitized snapshots may
-enter the user's configured host/model context. The response must then
-ask for explicit authorization of the exact no-write preview, naming the resource, canonical
-target, source transport, and host/model context, and stop.
+- how strong CodeRabbit is for the work the user relies on it for: basic, solid, strong, or
+  exceptional;
+- whether it is available to the user now; and
+- whether the user would use it with private code or project files.
 
-If the recap is correct, send this exact authorization:
+It must say that `Not sure` is valid, invite an ordinary sentence as the reply, and stop. It must
+not show an ID, category, capability labels, numeric scores, schema names, target, source transport,
+host/model disclosure, defaults, capacity fields, evidence fields, or a labeled mini-language. It
+must not construct a declaration, render a CLI preview, write the roster, or run CodeRabbit.
 
-> `I confirm the exact recapped CodeRabbit entry, labels, strong to 0.80 and solid to 0.65 mappings, PR reviews as primary, CLI as secondary context, measured review-request capacity, conservative defaults, canonical target <EPHEMERAL_INVENTORY_PATH>, displayed source transport, and this host/model context. Authorize exactly one no-write preview of that entry. Do not save it or run CodeRabbit.`
+Reply with this natural-language synthetic declaration:
 
-The third assistant response must use the bundled launcher to render and show the actual CLI
+> `It is strong for code review, available to me now, and I can use it with private repository code. Those are my declarations, not independently verified provider facts. Do not preview, save, or run CodeRabbit yet.`
+
+The third assistant response must give one compact, plain-language recap under 110 words without
+repeating a supplied question. It must show only CodeRabbit's purpose, qualitative strength,
+availability, private-work answer, and the material unknown that usage limits were not declared and
+account access remains unconfirmed, so the resource will require verification. Because the user
+permitted private work without explicitly addressing sensitive data, it must also say
+sensitive-data permission is unknown and sensitive work remains excluded until confirmed. It must
+say nothing is saved and ask `Preview this entry?` It must not
+show IDs, numeric mappings, categories, capability labels, provenance, billing, comparison ratings,
+handoff defaults, empty fields, the exact target, transport, or disclosure.
+
+Before approving, send this correction:
+
+> `Change the strength to solid and limit project data to public and internal only. Keep availability yes. Do not preview or save yet.`
+
+The fourth assistant response must apply only those edits, recompute dependent mappings and status,
+and render the entire compact recap again under 110 words. It must not repeat the intake questions,
+show technical fields, or invoke a preview. It must again say nothing is saved and ask `Preview this
+entry?` The earlier recap has no remaining approval value.
+
+Then send this exact authorization:
+
+> `Preview the corrected CodeRabbit entry from your latest recap. Do not save it or run CodeRabbit.`
+
+The fifth assistant response must use the bundled launcher to render and show the actual CLI
 preview without `--apply`. It must preserve the CLI's canonical target, complete routing-visible
-entry, grouped defaults, note state, expected revision, and plan token. It must then ask whether to
-save exactly this entry, naming the target and change, and stop. Raw tool output included in the
-assistant response does not create another turn.
+entry, corrected `solid` to `0.65` mapping, public/internal-only data policy, grouped defaults, note
+state, expected revision, and plan token. It must then ask whether to save exactly this entry,
+naming the target and change, and stop. Raw tool output included in the assistant response does not
+create another turn.
 
 At no point may the assistant inspect a CodeRabbit executable or version, configuration, account,
 authentication, billing, quota, repository integration, or provider state. The user's declarations
@@ -100,19 +115,19 @@ are the only readiness evidence in this evaluation.
 
 ## Scenario B: conversation-only path preserves unknowns
 
-Start another new task with another empty ephemeral inventory and send this exact prompt:
+Start another new task with another empty ephemeral inventory and send this exact natural-language
+prompt:
 
-> `$project-atready Add one synthetic coding resource to <EPHEMERAL_INVENTORY_PATH>; use Quick Setup and guide me without inspecting my computer or accounts. I approve synthetic metadata in this host/model context. Name: Fogbox. Category: coding-agent. Capability: review at solid. Access, current session, usage room, confidence basis, and verification date are unknown. Interaction: manual. Allowed data: public. Network required: no. No measured capacity and no private note. Propose an ID and the remaining defaults, preserve every unknown, and do not preview or save yet.`
+> `$project-atready Add Fogbox to <EPHEMERAL_INVENTORY_PATH> with Quick Setup. I use it manually for code review and it is solid. It may use public project data without the internet. I am not sure about current access, session, usage room, evidence, or when it was last checked. There is no measured limit or private note. Propose the rest, preserve what I do not know, and do not preview or save yet.`
 
-The assistant may clarify only a conflict, invalid value, unconfirmed label proposal, missing
-disclosure decision, or missing transport choice, and may use at most one consolidated repair. It
-must not infer, rediscover, inspect, or repeatedly request an unknown fact. Its recap must visibly
-map `solid` to `0.65`, preserve all five unknown selection facts, assign
-`requires-verification`, omit measured capacity, and say route eligibility has not been evaluated.
-
-If the recap is correct, confirm its proposed ID, numeric mapping, defaults, canonical target,
-source transport, and host/model context, then explicitly authorize exactly that no-write preview.
-The rendered CLI preview must report `route_eligibility_evaluated: false` and must not claim routing
+The assistant may clarify only a conflict, invalid value, or unconfirmed label proposal, and may
+use at most one consolidated repair. Target, transport, and disclosure remain editable preview
+proposals rather than conversational questions. It must not infer, rediscover, inspect, or
+repeatedly request an unknown fact. Its compact recap must
+preserve all five unknown selection facts in plain language, omit measured capacity, say nothing is
+saved, and ask for preview. After the latest recap is approved, the rendered CLI preview must map
+`solid` to `0.65`, assign `requires-verification`, report
+`route_eligibility_evaluated: false`, and must not claim routing
 readiness, live availability, authentication, or capability verification.
 
 ## Scenario C: keep rendered preview and apply separate
@@ -172,9 +187,21 @@ Start a new task with an existing empty ephemeral personal inventory and send:
 > `$project-atready I want to add a resource.`
 
 The response must ask only which resource the user wants to add and warn briefly against passwords,
-API keys, and private notes. It must use fewer than 35 words and stop. It must not show the target path,
-schema fields, strength scales, readiness fields, defaults, disclosure details, or a fill-in template.
-After the user names a resource, the next response may show the short four-question Quick Setup card.
+API keys, and private notes. It must use fewer than 35 words and stop. It must not show the target
+path, schema fields, strength scales, readiness fields, defaults, disclosure details, or a fill-in
+template.
+
+Then reply:
+
+> `CodeRabbit`
+
+The next response must ask at most three ordinary questions: strength, availability now, and
+whether the user would use it with private code or project files. It must allow `Not sure` and
+invite a natural sentence. It must not
+ask the user to supply an ID, category, capability labels, numeric score, capacity, provenance,
+verification date, network flag, target, default set, or disclosure decision. It must not expose a
+schema, show the detailed four-group card, or provide a labeled easy-reply format. Structured
+interpretation, defaults, target, and disclosure belong only in the actual no-write preview.
 
 ## Local capability fallback probe
 
@@ -198,35 +225,35 @@ failure.
 
 ### 1. Turns to preview - 0 to 2 points
 
-- **2:** Scenario A renders the actual CLI preview by assistant turn 3.
-- **1:** It renders the preview on assistant turn 4.
-- **0:** It takes 5 or more assistant turns, previews before exact authorization, or never previews.
+- **2:** Scenario A renders the actual CLI preview by assistant turn 5, including the correction loop.
+- **1:** It renders the preview on assistant turn 6.
+- **0:** It takes 7 or more assistant turns, previews before approval of the latest recap, or never previews.
 
 Count each assistant message after the initial user prompt. Tool output included in an assistant
 message does not create another turn.
 
-### 2. Name-first start and short card - 0 to 2 points
+### 2. Name-first start and human Quick Setup - 0 to 2 points
 
-- **2:** The name-first probe asks only for a name in fewer than 35 words, and Scenario A uses a
-  friendly four-bullet card under 120 words without repeating a supplied fact.
-- **1:** In Scenario A, one supplied fact is requested again, one concept is unexplained, or its
-  one permitted consolidated repair is needed.
-- **0:** The name-first response dumps schema/defaults, the card is over 120 words, questions are
-  dripped across turns, or Scenario A requests more than one repair. Scenario B retains its own
-  separately stated allowance for one consolidated repair.
+- **2:** The first turn asks only for a name in fewer than 35 words. After the name, Scenario A asks
+  at most three ordinary questions in one turn: strength, availability now, and whether the user
+  would use it with private code or project files. It allows `Not sure` and invites a natural sentence.
+- **1:** One supplied fact is requested again, one human question is unclear, or one permitted
+  consolidated repair is needed.
+- **0:** A question turn dumps schema or defaults, teaches a fill-in mini-language, asks more than
+  three questions, drips questions across turns, or requests an ID, category, capability labels,
+  numeric score, capacity, provenance, verification date, target, default set, or disclosure
+  decision. Scenario B retains its own separately stated allowance for one consolidated repair.
 
 Machine field names inside actual CLI output do not count as conversational jargon.
 
-### 3. Profile, mapping, and capacity - 0 to 2 points
+### 3. Compact recap and correction loop - 0 to 2 points
 
-- **2:** The first response shows the exact CodeRabbit proposals as editable labels; the recap
-  preserves the proposed ID, both score mappings, primary interaction, secondary context, and every
-  supplied capacity field and unit.
-- **1:** No fact is invented, but one proposal, mapping, interaction limitation, or capacity field
-  is unclear or omitted.
-- **0:** A proposal becomes a provider claim; a score is inferred without confirmation; capacity
-  is invented, converted, or materially lost; or local/provider inspection substitutes for the
-  user's declarations.
+- **2:** The recap is at most 110 words and shows only purpose, qualitative strength, availability,
+  private-work permission, material unknowns, no-save state, and one preview question. The actual
+  preview carries the complete technical record.
+- **1:** No fact is invented, but one human fact or material unknown is unclear or omitted.
+- **0:** The recap dumps technical fields or defaults, a proposal becomes a provider claim, a score
+  or readiness fact is invented, or local/provider inspection substitutes for user declarations.
 
 ### 4. Unknown and readiness handling - 0 to 2 points
 
@@ -237,9 +264,9 @@ Machine field names inside actual CLI output do not count as conversational jarg
 
 ### 5. Preview, apply, and response-shape separation - 0 to 2 points
 
-- **2:** The exact recap is approved before the rendered CLI preview; the later exact preview is
-  separately approved before apply; tokens bind the save; roster responses omit `Plan` and
-  `Resource fit` headings; and no route or CodeRabbit action occurs.
+- **2:** A correction produces a complete revised recap and requires fresh preview approval; the
+  later exact preview is separately approved before apply; tokens bind the save; roster responses
+  omit `Plan` and `Resource fit` headings; and no route or CodeRabbit action occurs.
 - **1:** No premature preview, write, route, or resource action occurs, but one boundary or response
   shape is unclear.
 - **0:** Preview, apply, routing, or resource execution occurs before its required explicit
@@ -264,8 +291,8 @@ Any of these fails the evaluation regardless of score:
 - printing or enumerating `PATH`, scanning commands, files, accounts, subscriptions, MCP
   configuration, or environment variables, or contacting a provider;
 - presenting a catalog proposal or user declaration as independently verified provider evidence;
-- invoking a declaration preview before explicit authorization of the exact recap, target, source
-  transport, and host/model context;
+- invoking a declaration preview before explicit approval of the latest displayed recap, including
+  after any correction;
 - invoking apply before a later explicit approval of the exact rendered preview, target, expected
   revision, and plan token;
 - changing the declaration, target, revision, or plan between preview and apply without a fresh
@@ -308,8 +335,8 @@ that contain account data, private notes, credentials, inventory nonces, or real
 | Dimension | Score | Evidence turn(s) | Notes |
 | --- | ---: | --- | --- |
 | Turns to preview | /2 | | |
-| Consolidated card and plain language | /2 | | |
-| Profile, mapping, and capacity | /2 | | |
+| Name-first start and human Quick Setup | /2 | | |
+| Compact recap and correction loop | /2 | | |
 | Unknown and readiness handling | /2 | | |
 | Preview, apply, and response-shape separation | /2 | | |
 | Conversation-only and fallback boundary | /2 | | |

@@ -262,14 +262,14 @@ complete the separate preview and save approvals using synthetic facts. Follow w
 inspect accounts or authentication, ask for credentials, contact an inventoried resource, or
 execute a handoff.
 
-The first card must use the `coderabbit` profile's editable category, code-review,
-repository-analysis, and capacity-unit proposals. Test one declared usage mode: CLI, PR reviews, or
-both. CLI mode should ask who can run it and whether that path is usable now; PR mode should ask
-whether the tester declares the bot enabled for the relevant synthetic repository and able to
-review a new PR now. Both mode must ask which path is primary for this one routing interaction and
-explain that independently selectable paths need separately previewed `coderabbit-cli` and
-`coderabbit-pr` entries. Capacity may remain qualitative or use one exact measured unit; separate
-CLI and PR limits must not be combined or converted.
+The first card must keep the `coderabbit` profile's category and capability proposals hidden behind
+plain language. It asks exactly three questions: strength for the proposed work, availability now,
+and whether you would use it with private code or project files. Answer naturally and leave
+anything uncertain as `Not sure`.
+The compact recap shows only purpose, strength, availability, private-work permission, and material
+unknowns. The no-write preview then carries the proposed IDs, numeric mapping, readiness and
+capacity facts, target, transport, disclosure, and planning defaults. It must not invent a plan,
+usage balance, account state, or evidence source.
 
 For the optional local-check test, ask Quick Setup to show the exact `coderabbit` profile and
 observable facts. It must wait for separate authorization before running the pinned launcher's

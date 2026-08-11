@@ -346,6 +346,7 @@ def test_listing_screenshot_renderer_accepts_a_fresh_output_directory(
 
 def test_directory_packet_tracks_the_official_skills_only_submission_contract() -> None:
     packet = DIRECTORY_PACKET.read_text(encoding="utf-8")
+    normalized_packet = " ".join(packet.split())
 
     assert OFFICIAL_SUBMISSION_URL in packet
     assert "Submission type: Skills only" in packet
@@ -366,7 +367,7 @@ def test_directory_packet_tracks_the_official_skills_only_submission_contract() 
         "returned route or executing any project-resource handoff.",
         "Use AtReady Quick Setup to begin adding CodeRabbit to the attached "
         "empty-inventory.yaml. Use conversation-only onboarding: do not inspect an executable, "
-        "version, configuration, or account. Present the short intake card, then stop "
+        "version, configuration, or account. Ask the three short human questions, then stop "
         "before any preview or write.",
         "I authorize routing the attached demo inventory. Use AtReady to route "
         "alternate-project.yaml with alternate-inventory.yaml, require the declared alternate "
@@ -386,14 +387,19 @@ def test_directory_packet_tracks_the_official_skills_only_submission_contract() 
     for expected_outcome in (
         "project plan first",
         "concise selection/omission explanation",
-        "Target, disclosure, and defaults move to the recap",
+        "exactly three short questions",
+        "strength, current availability, and whether the user would use it with private code or "
+        "project files",
+        "The compact recap stays human-readable",
+        "IDs, numeric scores, target, disclosure, defaults, and transport details move to the "
+        "actual no-write preview",
         "primary, reserved alternate",
         "no assigned primary",
         "produce planning output only",
         "refuse broad discovery",
         "refuse credential onboarding",
     ):
-        assert expected_outcome in packet
+        assert expected_outcome in normalized_packet
     assert "countries/regions" in packet
     assert "disposable, nonrelease portal-probe candidate" in packet
     assert "Do not submit" in packet

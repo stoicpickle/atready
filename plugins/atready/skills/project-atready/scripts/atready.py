@@ -15,7 +15,7 @@ import threading
 import time
 from pathlib import Path
 
-PLUGIN_VERSION = "0.1.6"
+PLUGIN_VERSION = "0.1.7"
 REQUIRED_RUNTIME_CONTRACT_VERSION = 1
 REQUIRED_RUNTIME_FEATURE_IDS = (
     "inventory.mutate-preview-apply.v1",

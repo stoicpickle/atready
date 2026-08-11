@@ -110,15 +110,18 @@ must not include executed project-resource handoffs.
    - Expected result shape: concise selection/omission explanation with the original assignments
      and execution boundary preserved.
 3. **Conversation-only Quick Setup**
-   - Prompt: `Use AtReady Quick Setup to begin adding CodeRabbit to the attached empty-inventory.yaml. Use conversation-only onboarding: do not inspect an executable, version, configuration, or account. Present the short intake card, then stop before any preview or write.`
+   - Prompt: `Use AtReady Quick Setup to begin adding CodeRabbit to the attached empty-inventory.yaml. Use conversation-only onboarding: do not inspect an executable, version, configuration, or account. Ask the three short human questions, then stop before any preview or write.`
    - Fixture: the complete `empty-inventory.yaml` payload below. Use no credentials or real account
      metadata.
-   - Expected behavior: begin Quick Setup without a mode-choice turn; show the exact `coderabbit`
-     catalog proposals as editable labels, ask one plain-language card under 120 words including
-     capacity, and stop without constructing a declaration or invoking a preview.
-   - Expected result shape: proposed identity and labels, exactly four visible question bullets
-     named `Fit`, `Use`, `Limits`, and `Data`, a natural-reply invitation, and a brief statement that
-     nothing is saved yet. Target, disclosure, and defaults move to the recap before preview approval.
+   - Expected behavior: begin Quick Setup without a mode-choice turn; describe CodeRabbit's likely
+     purpose in plain language, ask exactly three short questions about strength, current
+     availability, and whether the user would use it with private code or project files, then stop
+     without constructing a
+     declaration or invoking a preview.
+   - Expected result shape: a tentative human-readable interpretation, three ordinary questions,
+     a natural-reply invitation, and a brief statement that nothing is saved yet. The compact recap
+     stays human-readable; IDs, numeric scores, target, disclosure, defaults, and transport details
+     move to the actual no-write preview.
 
    Maintainers must also run the
    [blank-slate resource-intake evaluation](../evals/RESOURCE_INTAKE_EVAL.md) against the exact
@@ -542,7 +545,7 @@ workstreams:
 
 ## Future release-notes draft (not for the probe)
 
-> Initial skills-only submission of AtReady 0.1.6. For a fixed normalized project brief and
+> Initial skills-only submission of AtReady plugin 0.1.7. For a fixed normalized project brief and
 > inventory snapshot, its capability router deterministically assigns ordered workstreams. It uses
 > a user-maintained local inventory and a compatible local
 > runtime that performs no AtReady-authored provider API or connector calls,
@@ -595,7 +598,7 @@ Also open the four links in a signed-out browser and check the rendered text, no
 The current candidate may complete the local preparation items and a reversible portal draft probe
 only. Submission and publication items remain deliberately blocked for this nonrelease artifact.
 
-- [ ] Confirm the exact source commit and `0.1.6` plugin bundle; record the independently installed
+- [ ] Confirm the exact source commit and `0.1.7` plugin bundle; record the independently installed
       runtime version and prove its contract-and-feature handshake. Retain the available artifact
       hashes/attestations for each channel without implying their product versions must match.
 - [ ] Run the plugin/skill validators, exact-asset contract, staged-plugin smoke, clean first-user
@@ -651,7 +654,7 @@ the plugin version plus ZIP SHA-256:
 
 ```bash
 python3 scripts/build_plugin_submission.py \
-  --output dist/atready-plugin-0.1.6.zip
+  --output dist/atready-plugin-0.1.7.zip
 ```
 
 Run the repository's current-policy plugin validator, OpenAI's skill validator, and

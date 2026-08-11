@@ -9,7 +9,8 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).parents[1]
-validate = runpy.run_path(str(ROOT / "scripts" / "validate_plugin_contract.py"))["validate"]
+VALIDATOR_NAMESPACE = runpy.run_path(str(ROOT / "scripts" / "validate_plugin_contract.py"))
+validate = VALIDATOR_NAMESPACE["validate"]
 
 
 def _write_candidate(tmp_path: Path, products: object) -> Path:
@@ -70,6 +71,51 @@ def test_current_products_field_can_bridge_one_legacy_validator_error(tmp_path: 
     )
 
     errors = _validate(plugin, system_skills)
+
+    assert errors == []
+
+
+def test_production_validator_digest_is_bound_to_an_immutable_official_artifact() -> None:
+    assert VALIDATOR_NAMESPACE["OFFICIAL_REFERENCE"] == (
+        "https://raw.githubusercontent.com/openai/codex/"
+        "d32cb2c6aca2626d1b1d05c4537a5b6c2eec20f2/"
+        "codex-rs/skills/src/assets/samples/plugin-creator/scripts/validate_plugin.py"
+    )
+    assert VALIDATOR_NAMESPACE["TRUSTED_UPSTREAM_VALIDATOR_SHA256"] == (
+        "a4712ddc7c02211edf009b4ef22728f2e4c47650b9ff5696b6b36596dc29fa4a"
+    )
+
+
+def test_validate_uses_the_production_digest_by_default(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    plugin = _write_candidate(tmp_path, ["CODEX"])
+    system_skills = _write_upstream(tmp_path, [])
+    upstream = system_skills / "plugin-creator" / "scripts" / "validate_plugin.py"
+    fixture_digest = hashlib.sha256(upstream.read_bytes()).hexdigest()
+    monkeypatch.setitem(validate.__globals__, "TRUSTED_UPSTREAM_VALIDATOR_SHA256", fixture_digest)
+
+    errors = validate(plugin, system_skills)
+
+    assert errors == []
+    upstream.write_text(
+        "def validate_plugin(plugin_root):\n    return ['changed']\n", encoding="utf-8"
+    )
+    assert validate(plugin, system_skills) == [
+        "OpenAI plugin validator does not match the repository's reviewed SHA-256"
+    ]
+
+
+def test_matching_reviewed_digest_is_accepted(tmp_path: Path) -> None:
+    plugin = _write_candidate(tmp_path, ["CODEX"])
+    system_skills = _write_upstream(tmp_path, [])
+    upstream = system_skills / "plugin-creator" / "scripts" / "validate_plugin.py"
+
+    errors = validate(
+        plugin,
+        system_skills,
+        trusted_upstream_sha256=hashlib.sha256(upstream.read_bytes()).hexdigest(),
+    )
 
     assert errors == []
 

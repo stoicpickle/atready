@@ -39,11 +39,9 @@ def test_blank_slate_intake_eval_has_exact_conversation_only_scenarios() -> None
         assert heading in evaluation
 
     for prompt in (
-        "$project-atready Add CodeRabbit to my AtReady roster at "
-        "<EPHEMERAL_INVENTORY_PATH>. Use Quick Setup and guide me. Do not preview or save yet.",
-        "$project-atready Add one synthetic coding resource to <EPHEMERAL_INVENTORY_PATH>; use "
-        "Quick Setup and guide me without inspecting my computer or accounts. I approve "
-        "synthetic metadata in this host/model context.",
+        "$project-atready I want to add a resource.",
+        "$project-atready Add Fogbox to <EPHEMERAL_INVENTORY_PATH> with Quick Setup. I use it "
+        "manually for code review and it is solid.",
         "Do not save yet. Explain what saving this exact rendered preview would change and what "
         "evidence I would receive.",
         "$project-atready Add CodeRabbit to my AtReady roster at "
@@ -57,17 +55,18 @@ def test_blank_slate_intake_eval_has_exact_conversation_only_scenarios() -> None
     ):
         assert f"> `{prompt}" in evaluation
 
-    for first_response_contract in (
-        "explicitly begin the Add CodeRabbit intake",
-        "one friendly, consolidated card with exactly four visible question bullets",
-        "**Fit**, **Use**, **Limits**, and **Data**",
-        "`CodeRabbit (coderabbit)`",
-        "`Code review agent (review-agent)`",
-        "`Code review (code-review)`",
-        "`Repository analysis (repository-analysis)`",
-        "avoid an internal-defaults paragraph or fill-in template",
+    for quick_setup_contract in (
+        "ask only which resource the user wants to add",
+        "how strong CodeRabbit is for the work the user relies on it for",
+        "whether it is available to the user now",
+        "whether the user would use it with private code or project files",
+        "`Not sure` is valid",
+        "invite an ordinary sentence as the reply",
+        "no more than these three human questions",
+        "It must not show IDs, numeric mappings",
+        "The actual preview carries the complete technical record",
     ):
-        assert first_response_contract in normalized
+        assert quick_setup_contract in normalized
 
     assert "conversation-only" in evaluation
     assert "performs no executable discovery" in evaluation
@@ -86,10 +85,12 @@ def test_blank_slate_intake_eval_has_exact_conversation_only_scenarios() -> None
     assert "private backup and atomic-replacement guarantees" in normalized
     assert "ask only which resource the user wants to add" in normalized
     assert "must use fewer than 35 words" in normalized
-    assert "name-first probe asks only for a name in fewer than 35 words" in normalized
-    assert "Scenario B retains its own separately stated allowance" in normalized
+    assert "first turn asks only for a name in fewer than 35 words" in normalized
+    assert "Target, transport, and disclosure remain editable preview proposals" in normalized
     assert "Accept the displayed conservative defaults" not in evaluation
     assert "must not show the target path" in normalized
+    assert "provide a labeled easy-reply format" in normalized
+    assert "show the detailed four-group card" in normalized
 
 
 def test_blank_slate_intake_eval_binds_recap_preview_and_apply() -> None:
@@ -97,16 +98,22 @@ def test_blank_slate_intake_eval_binds_recap_preview_and_apply() -> None:
     normalized = " ".join(evaluation.split())
 
     for coderabbit_contract in (
-        "PR reviews are the primary routing interaction",
-        "CLI is secondary context only",
-        "code review strong and repository analysis solid",
-        "`strong` to `0.80`",
-        "`solid` to `0.65`",
-        "120 review requests remaining",
-        "`review-request`",
-        "`selection-facts-declared`",
-        "Authorize exactly one no-write preview of that entry",
-        "actual CLI preview without `--apply`",
+        "CodeRabbit, using <EPHEMERAL_INVENTORY_PATH>",
+        "It is strong for code review, available to me now",
+        "private repository code",
+        "compact, plain-language recap under 110 words",
+        "usage limits were not declared",
+        "account access remains unconfirmed",
+        "sensitive-data permission is unknown",
+        "sensitive work remains excluded until confirmed",
+        "Change the strength to solid and limit project data to public and internal only",
+        "apply only those edits",
+        "render the entire compact recap again under 110 words",
+        "The earlier recap has no remaining approval value",
+        "Preview the corrected CodeRabbit entry from your latest recap",
+        "actual CLI preview",
+        "corrected `solid` to `0.65` mapping",
+        "public/internal-only data policy",
         "expected revision, and plan token",
         "Save exactly this rendered coderabbit entry",
         "then run strict inventory validation",
@@ -128,8 +135,8 @@ def test_blank_slate_intake_eval_has_bounded_rubric_and_failure_gates() -> None:
     assert "Pass: at least **10/12** and no critical" in evaluation
     dimensions = (
         "Turns to preview",
-        "Name-first start and short card",
-        "Profile, mapping, and capacity",
+        "Name-first start and human Quick Setup",
+        "Compact recap and correction loop",
         "Unknown and readiness handling",
         "Preview, apply, and response-shape separation",
         "Conversation-only and fallback boundary",
@@ -155,7 +162,7 @@ def test_blank_slate_intake_eval_has_bounded_rubric_and_failure_gates() -> None:
     for failure in (
         "inspecting or searching for a CodeRabbit executable, version, configuration, account",
         "printing or enumerating `PATH`",
-        "preview before explicit authorization of the exact recap",
+        "preview before explicit approval of the latest displayed recap",
         "apply before a later explicit approval of the exact rendered preview",
         "inventing access, session, quota, capacity, provenance, verification date, capability, "
         "or score",

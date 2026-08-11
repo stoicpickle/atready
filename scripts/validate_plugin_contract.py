@@ -14,10 +14,15 @@ from typing import Any
 
 import yaml
 
-OFFICIAL_REFERENCE = "https://developers.openai.com/plugins/deploy/submission-errors"
+OFFICIAL_REFERENCE = (
+    "https://raw.githubusercontent.com/openai/codex/"
+    "d32cb2c6aca2626d1b1d05c4537a5b6c2eec20f2/"
+    "codex-rs/skills/src/assets/samples/plugin-creator/scripts/validate_plugin.py"
+)
+CURRENT_POLICY_SCHEMA = "https://developers.openai.com/plugins/deploy/submission-errors"
 ALLOWED_PRODUCTS = {"CHAT", "CODEX"}
 TRUSTED_UPSTREAM_VALIDATOR_SHA256 = (
-    "ebda00d55d7518b127f675f062fb5c6e7a1ffdc0a99df1a55ac594400d7d3228"
+    "a4712ddc7c02211edf009b4ef22728f2e4c47650b9ff5696b6b36596dc29fa4a"
 )
 MAX_AGENT_BYTES = 64_000
 MAX_SKILLS = 100
@@ -198,8 +203,10 @@ def validate(
     plugin_root: Path,
     system_skills_dir: Path,
     *,
-    trusted_upstream_sha256: str = TRUSTED_UPSTREAM_VALIDATOR_SHA256,
+    trusted_upstream_sha256: str | None = None,
 ) -> list[str]:
+    if trusted_upstream_sha256 is None:
+        trusted_upstream_sha256 = TRUSTED_UPSTREAM_VALIDATOR_SHA256
     plugin_root = plugin_root.expanduser().resolve()
     valid_product_skills, errors = _official_products(plugin_root)
     if errors:
@@ -240,7 +247,8 @@ def main() -> None:
             print(f"- {error}")
         raise SystemExit(1)
     print(f"Plugin validation passed: {plugin_root}")
-    print(f"Current policy schema: {OFFICIAL_REFERENCE}")
+    print(f"Reviewed OpenAI validator: {OFFICIAL_REFERENCE}")
+    print(f"Current policy schema: {CURRENT_POLICY_SCHEMA}")
 
 
 if __name__ == "__main__":
