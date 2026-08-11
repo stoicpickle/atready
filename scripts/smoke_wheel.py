@@ -9,6 +9,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+from datetime import date
 from pathlib import Path
 
 import atready
@@ -27,6 +28,7 @@ if str(_SCRIPT_DIRECTORY) not in sys.path:
 from first_user_acceptance import run_acceptance  # noqa: E402
 
 _COMMAND_TIMEOUT_SECONDS = 30
+_CANONICAL_SMOKE_DATE = date(2026, 8, 10)
 _NONCE_PATTERN = re.compile(
     r'^revision_privacy_nonce:\s+["\']?(nonce-v1:[0-9a-f]{64})["\']?$',
     re.MULTILINE,
@@ -679,8 +681,8 @@ def main_smoke() -> None:
 
         presentation_inventory = Path(directory) / "presentation-inventory.yaml"
         presentation_project = Path(directory) / "presentation-project.yaml"
-        presentation_inventory.write_text(demo_inventory(), encoding="utf-8")
-        presentation_project.write_text(starter_project(), encoding="utf-8")
+        presentation_inventory.write_text(demo_inventory(_CANONICAL_SMOKE_DATE), encoding="utf-8")
+        presentation_project.write_text(starter_project(_CANONICAL_SMOKE_DATE), encoding="utf-8")
         presentation_args = [
             "route",
             "--project",
@@ -773,8 +775,8 @@ def main_smoke() -> None:
                 "installed wheel did not expose a complete limit-conflict presentation"
             )
 
-        demo = InventoryCatalog.from_text(demo_inventory()).inventory
-        project = project_from_text(starter_project())
+        demo = InventoryCatalog.from_text(demo_inventory(_CANONICAL_SMOKE_DATE)).inventory
+        project = project_from_text(starter_project(_CANONICAL_SMOKE_DATE))
         try:
             route(demo, project)
         except ConfigurationError as exc:

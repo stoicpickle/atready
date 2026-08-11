@@ -148,8 +148,9 @@ def _invoke_staged_wrapper(
         # same staged launcher's resolver and strict handshake in-process instead; the release
         # wheel smoke separately proves the native console entry point on Windows CI.
         namespace = runpy.run_path(str(skill / _WRAPPER_RELATIVE))
-        namespace["_uv_tool_bin"] = lambda: tool_bin
-        namespace["_run_bounded"] = lambda _command: subprocess.CompletedProcess(
+        launcher_globals = namespace["_resolve_command"].__globals__
+        launcher_globals["_uv_tool_bin"] = lambda: tool_bin
+        launcher_globals["_run_bounded"] = lambda _command: subprocess.CompletedProcess(
             _command,
             0,
             payload + "\n",
