@@ -143,7 +143,7 @@ def test_beta_start_here_has_uncoached_value_and_recovery_prompts() -> None:
     assert "move that exact folder to Trash" in normalized
 
 
-def test_beta_walkthrough_exercises_coderabbit_specific_quick_setup() -> None:
+def test_beta_walkthrough_exercises_three_question_coderabbit_quick_setup() -> None:
     start = START.read_text(encoding="utf-8")
     private_beta = (ROOT / "docs" / "PRIVATE_BETA.md").read_text(encoding="utf-8")
     walkthrough = " ".join(
@@ -158,20 +158,27 @@ def test_beta_walkthrough_exercises_coderabbit_specific_quick_setup() -> None:
     ).casefold()
 
     for phrase in (
-        "cli, pr reviews, or both",
-        "choose one primary path if both",
-        "code review and repository analysis",
-        "review requests, files, or your own exact unit",
+        "exactly three questions",
+        "how strong it is for that work",
+        "whether it is available now",
+        "whether you would use it with private code or project files",
+        "answer in an ordinary sentence",
+        "the compact recap should show only purpose, strength, availability",
+        "the later no-write preview carries ids, mappings, defaults, and target details",
     ):
         assert phrase in walkthrough
     for phrase in (
-        "`coderabbit-cli` and `coderabbit-pr`",
-        "separate cli and pr limits must not be combined or converted",
+        "category and capability proposals hidden behind plain language",
+        "strength for the proposed work, availability now, and whether you would use it with "
+        "private code or project files",
+        "the compact recap shows only purpose, strength, availability",
+        "the no-write preview then carries the proposed ids, numeric mapping",
+        "must not invent a plan, usage balance, account state, or evidence source",
     ):
         assert phrase in owner_flow
     assert (
-        "it must not start a review, log in, inspect an account or repository, install or update "
-        "coderabbit, change settings, or claim authentication, quota, or availability"
+        "atready must not start a review, log in, inspect an account or repository, install or "
+        "update coderabbit, change settings, or claim authentication, quota, or availability"
     ) in walkthrough
     assert (
         "neither branch may start a coderabbit review, open or modify a pull request, log in, "

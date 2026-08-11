@@ -26,9 +26,9 @@ successful-route boundary. Never change the actual route or mutation status to f
 
 ## Resource intake workflow
 
-Use this branch before planning when the user asks to add one resource. Read the complete
-[resource-onboarding.md](references/resource-onboarding.md) and follow its setup contract.
+Use this branch before planning when the user asks to add one resource. Read the complete [resource-onboarding.md](references/resource-onboarding.md) and follow its setup contract.
 
+If unnamed, ask only for the resource name and stop. Do not invoke the launcher, resolve the target, inspect the roster, or explain setup modes.
 ### 1. Check the local boundary
 
 Without approved local execution and filesystem access, say chat cannot save. Offer `atready add`
@@ -58,8 +58,8 @@ tokens, and private notes outside this workflow. Use only facts the user states.
 
 ### 2. Gather and recap
 
-If the user has not named the resource, ask only for its name and stop. Otherwise ask one short
-intake card, recap values and target, then request preview. Answers supply facts only.
+Use Quick Setup: propose a purpose and ask only the unanswered subset of the three human-language questions in one turn. A bare-name request gets all three; never repeat supplied facts.
+Keep IDs, mappings, defaults, target, transport, and disclosure details out of the question turn. A recap edit requires rerendering and fresh preview approval; corrections are facts only.
 
 ### 3. Preview, approve, and save
 

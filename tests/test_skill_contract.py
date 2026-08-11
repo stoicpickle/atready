@@ -43,6 +43,49 @@ def _markdown_h2_section(text: str, heading: str) -> str:
     return marker + section
 
 
+def _quoted_quick_setup_card(section: str) -> str:
+    start = section.find("> **Got it:")
+    assert start >= 0, "missing human Quick Setup card"
+    remainder = section[start:]
+    end = re.search(
+        r"^> Reply naturally.*?anything is saved\.$",
+        remainder,
+        re.MULTILINE | re.DOTALL,
+    )
+    assert end is not None, "missing natural-reply invitation"
+    return remainder[: end.end()]
+
+
+def _assert_three_human_questions(card: str) -> None:
+    bullets = [line for line in card.splitlines() if re.match(r"^\s*(?:>\s*)?[-*]\s+", line)]
+    assert len(bullets) == 3
+    assert card.count("?") == 3
+    folded = " ".join(card.split()).casefold()
+    assert "basic, solid, strong, or exceptional" in folded
+    assert "available to you now" in folded
+    assert "would you use it with private code or project files" in folded
+    assert "reply naturally" in folded
+    assert '"not sure" is fine' in folded
+    for forbidden in (
+        "mainly use",
+        "how do you use",
+        "internet",
+        "usage limit",
+        "stable id",
+        "schema",
+        "0.0-1.0",
+        "capacity",
+        "evidence",
+        "verification date",
+        "target",
+        "transport",
+        "disclosure",
+        "defaults",
+        "easy reply",
+    ):
+        assert forbidden not in folded
+
+
 def _write_cli_fixture_wheel(
     path: Path,
     *,
@@ -118,7 +161,7 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert body.count('"/absolute/path/to/project-atready/scripts/atready.py"') >= 6
     assert "Never invoke a bare `atready` command or bypass the launcher" in normalized_body
     assert "never searches `PATH` for `atready`" in normalized_body
-    assert "offline and without configuration files" in normalized_body
+    assert "uses trusted `uv`, offline and without configuration files" in normalized_body
     assert re.search(r"(?m)^\s*atready(?:\s|$)", body) is None
     assert "config path" in body
     assert "inventory validate /absolute/path/to/inventory.yaml" in body
@@ -177,7 +220,7 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "rough project goal" in metadata["description"]
     assert "explicitly invokes AtReady" in metadata["description"]
     assert len(text.splitlines()) <= 225
-    assert len(text.split()) <= 1_600
+    assert len(text.split()) <= 1_650
     assert (SKILL / "scripts" / "atready.py").is_file()
     assert (SKILL / "references" / "routing-rules.md").is_file()
     assert (SKILL / "references" / "output-contract.md").is_file()
@@ -195,9 +238,16 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
 
     assert "[resource-onboarding.md](references/resource-onboarding.md)" in body
     body_normalized = " ".join(body.split())
-    name_first = "If the user has not named the resource, ask only for its name and stop"
+    name_first = "If unnamed, ask only for the resource name and stop"
     assert name_first in body_normalized
-    assert "one short intake card" in body_normalized
+    assert body.index(name_first) < body.index("### 1. Check the local boundary")
+    assert "Do not invoke the launcher" in body_normalized
+    assert "inspect the roster" in body_normalized
+    assert "ask only the unanswered subset of the three human-language questions" in body_normalized
+    assert "A bare-name request gets all three" in body_normalized
+    assert "never repeat supplied facts" in body_normalized
+    assert "Keep IDs, mappings, defaults, target, transport, and disclosure" in body_normalized
+    assert "details out of the question turn" in body_normalized
     assert "Use only facts the user states" in body_normalized
     assert "Handle one resource at a time" in body_normalized
     assert "The add request does not authorize initialization" in body_normalized
@@ -230,38 +280,36 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "default to quick setup without explaining modes" in folded
     assert "Your roster is ready. What resource do you want to add?" in reference
     assert "A name is enough to start" in reference
+    assert reference.index("If the user has not supplied a resource name") < reference.index(
+        "resolve the explicit or default inventory target"
+    )
+    assert "Do not invoke the launcher, resolve the target, inspect the roster" in normalized
     assert "must stay under 35 words" in folded
     assert "do not repeat its target or safety explanation" in folded
-    assert "put all four groups in one intake card" in folded
-    assert "keep the complete card under 120 words" in folded
+    assert "ask only the unanswered subset of the three visible questions" in folded
+    assert "a bare-name request gets all three" in folded
+    assert "keep the complete card under 100 words" in folded
     assert "one compact, prefilled card" in folded
     assert "the goal is one natural reply, not a schema interview" in folded
     assert "**Easy reply:**" not in reference
     assert "reply naturally" in folded
     quick_setup = _markdown_h2_section(reference, "3. Assisted Setup presented as Quick Setup")
     card = quick_setup.split("Then show one compact, prefilled card", 1)[1].split(
-        "Use these four internal groups",
+        "Interpret the natural reply internally",
         1,
     )[0]
-    question_labels = [
-        match.group(1)
-        for line in card.splitlines()
-        if (
-            match := re.match(
-                r"^\s*(?:>\s*)?[-*]\s+\*\*(Fit|Use|Limits|Data):\*\*",
-                line,
-            )
-        )
-    ]
-    assert question_labels == ["Fit", "Use", "Limits", "Data"]
-    assert "Rate each proposed capability separately" in card
-    assert "Reply naturally" in card
-    assert len(card.split()) <= 120
+    _assert_three_human_questions(card)
+    assert len(card.split()) <= 100
     for deferred in (
         "Accept these remaining first-pass defaults",
         "target path",
         "disclosure boundary",
         "<canonical target>",
+        "stable ID",
+        "0.0-1.0",
+        "measured amount",
+        "verification date",
+        "Easy reply",
     ):
         assert deferred not in card
 
@@ -270,9 +318,9 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "## Response discipline" in body
     assert "concise, short, brief, quick, promo, or on-screen" in body_normalized
     assert "no more than three short sentences or bullets" in body_normalized
-    assert "only the facts needed for the current state and one next action" in body_normalized
-    assert "actual CLI preview or receipt" in body_normalized
-    assert "required separate approval" in body_normalized
+    assert "give only the facts needed for the current state and one next action" in body_normalized
+    assert "CLI preview or receipt" in body_normalized
+    assert "separate approval" in body_normalized
     assert "no more than three short sentences and 60 words" in body_normalized
     assert "Do not enumerate unset routing roles" in body_normalized
     assert "generic price, quota, privacy, rights, licensing" in body_normalized
@@ -313,11 +361,11 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "## Concise response" not in output_contract
     assert "## Default response" not in output_contract
     assert output_contract.count("No routed project resources were contacted or run.") == 2
-    assert "lead with the proposed useful entry" in folded
-    assert "a lowercase resource id only as a proposal" in folded
-    assert "require the user to confirm it" in folded
-    assert "label proposals only, not claims" in folded
-    assert "stable, machine-readable label" in folded
+    assert "lead with a tentative plain-language purpose" in folded
+    assert "prepare a lowercase resource id" in folded
+    assert "editable serialization proposals" in folded
+    assert "never claim they prove account access or product capability" in folded
+    assert "pair every technical id with a readable label in the actual preview" in folded
     assert all(
         phrase in reference
         for phrase in (
@@ -327,30 +375,23 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
             "`exceptional` -> `0.95`",
         )
     )
-    assert all(
-        phrase in folded
-        for phrase in (
-            "**identity:**",
-            "**strengths:**",
-            "**readiness and capacity:**",
-            "**safety:**",
-        )
+    assert "for quick setup, render no more than 110 words" in folded
+    assert "the preview is the technical audit surface" in folded
+    assert (
+        "exact schema values, target, transport, and disclosure appear in the actual cli preview"
+        in folded
     )
-    assert "Accept these remaining first-pass defaults" in reference
-    assert "an undecided baseline, not verified quality" in folded
-    assert "do not replace them with raw enum labels" in folded
-    assert "Review agent (review-agent)" in reference
-    assert "code review (code-review)" in folded
     assert '"Not sure" is fine' in reference
-    assert "internet yes or no?" in folded
-    assert "unknown network boolean is a repair item" in folded
+    assert "do not expose them in quick setup questions" in folded
+    assert "infer network use only from the confirmed workflow" in folded
     assert "answering this intake card supplies facts only" in folded
     assert "does not authorize a preview or save" in folded
-    assert "at most one consolidated repair question" in folded
-    assert "never drip one field per turn" in folded
-    assert "one substantive intake reply" in folded
-    assert "**Scoring-input defaults:**" in reference
-    assert "Do not call these universally" in reference
+    assert "show it in the recap and stop before preview" in folded
+    assert "never add a fourth quick setup question" in folded
+    assert "one name-first turn and no more than three quick setup questions" in folded
+    assert "do not add an `atready details` block" in folded
+    assert "keep ids, numeric mappings, category and capability labels" in folded
+    assert "for the actual cli preview" in folded
     assert "task-local safety baseline" in folded
     assert "require per-resource confirmation" in folded
     assert "never reuse capabilities" in folded
@@ -388,15 +429,18 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
             "`selection-facts-declared`",
         )
     )
-    assert "does not prove live availability" in reference
-    assert "assess staleness separately" in folded
-    assert "explicit preview authorization" in folded
-    assert "Ready for the no-write preview?" in reference
-    assert "It will not save" in reference
+    assert "express status through `still unknown` only when it matters to routing" in folded
+    assert "preview this entry?" in folded
+    assert "nothing has been saved" in folded
+    assert "treat any correction as facts, not approval" in folded
+    assert "render the entire compact recap again" in folded
+    assert "approval must follow the latest displayed version" in folded
+    assert "even when one message contains both an edit and preview language" in folded
+    assert "never patch or save the old preview" in folded
     assert "Save exactly this entry?" in reference
     assert "back up the current roster" in reference
     assert "general intent such as `preview-first`" in folded
-    assert "is not authorization for the exact recap" in folded
+    assert "is not approval of the latest displayed recap" in folded
     assert "Show the actual CLI preview" in reference
     assert "second explicit approval" in folded
     assert "do not preview or apply a second resource" in folded
@@ -438,17 +482,23 @@ def test_coderabbit_quick_setup_is_tailored_editable_and_nonexecuting() -> None:
         assert proposal.casefold() in folded
     assert "### coderabbit quick setup" in folded
     assert "show these catalog values as editable proposals" in folded
-    assert "render exactly these four visible question bullets" in folded
-    assert "keep it under 120 words" in folded
-    assert "cli, pr reviews, or both?" in folded
-    assert "rate review and repository analysis separately" in folded
+    assert "ask only the unanswered subset in the displayed order" in folded
+    assert "the bare-name template has all three visible bullets" in folded
+    assert "keep it under 100 words" in folded
+    assert "only when the user volunteers one" in folded
+    assert "never add provider-specific questions" in folded
     assert "**cli:**" in folded
     assert "**pr reviews:**" in folded
     assert "**both:**" in folded
-    assert "which path should be the one routing-visible `interaction`" in folded
+    assert "primary path named in a volunteered answer" in folded
     assert "`coderabbit-cli` and `coderabbit-pr`" in folded
     assert "one measured-capacity envelope" in folded
     assert "never convert or combine unlike units" in folded
+    card = _quoted_quick_setup_card(section)
+    _assert_three_human_questions(card)
+    assert len(card.split()) <= 100
+    assert "code-review service" in card.casefold()
+    assert "pull-request feedback" in card.casefold()
     assert (
         "no onboarding answer authorizes a coderabbit review, pull request, "
         "login, installation, update, settings change, provider contact, declaration preview, or "
@@ -482,7 +532,7 @@ def test_opencode_quick_setup_collects_only_planning_relevant_declared_facts() -
     assert "interactive terminal session (`local-cli`)" in folded
     assert "non-interactive cli task (`codex-callable`)" in folded
     assert "desktop/ide use (`manual`)" in folded
-    assert "only when it materially changes" in folded
+    assert "voluntarily named underlying model/provider as context only" in folded
     assert "never request or retain its api key" in folded
     assert (
         "no onboarding answer authorizes opencode execution, provider "
@@ -490,9 +540,14 @@ def test_opencode_quick_setup_collects_only_planning_relevant_declared_facts() -
     ) in folded
     assert "rely on the user's declared readiness" in folded
     assert "installation, configuration, providers, models, or an account" in folded
-    assert "render exactly these four visible question bullets" in folded
-    assert "whole response under 120 words" in folded
-    assert "rate each proposed capability separately" in folded
+    assert "ask only the unanswered subset in the displayed order" in folded
+    assert "the bare-name template has all three visible bullets" in folded
+    assert "whole response under 100 words" in folded
+    assert "ask which one routing-visible workflow applies" not in folded
+    card = _quoted_quick_setup_card(section)
+    _assert_three_human_questions(card)
+    assert len(card.split()) <= 100
+    assert "coding agent" in card.casefold()
 
 
 def test_pixel_art_quick_setups_distinguish_tiers_products_and_manual_capacity() -> None:
@@ -568,15 +623,12 @@ def test_model_routing_reference_keeps_provider_copy_out_of_scores_and_hidden_se
     assert "provider metadata to one compact line" in folded
     assert "entire first response still stays under 250 words" in folded
     assert "do not copy them into capability scores" in folded
-    assert "do not invite them to accept baseline `0.5`" in folded
-    assert "relevant capability strengths, speed, and relative marginal cost" in folded
-    assert "`0.25`, `0.50`, `0.75`, and `0.95`" in folded
-    assert "roster does not yet encode a model-aware preference" in folded
+    assert "apply the first question's one qualitative answer" in folded
+    assert "speed, relative marginal cost, and the other comparison ratings" in folded
+    assert "visible `0.5` baseline" in folded
+    assert "offer detailed setup after the first resource" in folded
     assert "the dated planning role changed routing by itself" in folded
-    assert "keep the relative cost and speed you just confirmed" in full_folded
-    assert "other seven comparison ratings at 0.5" in full_folded
-    assert "marginal cost `0.5` unless model-aware relative cost was confirmed" in full_folded
-    assert "except a confirmed model-aware speed value" in full_folded
+    assert "billing `unknown`, marginal cost `0.5`, and all eight ratings `0.5`" in full_folded
     assert "deterministic router still selects resource entries, not hidden models" in folded
     assert "shared_capacity_group" in model_routing
     assert "does not coordinate or reserve a shared pool" in folded
@@ -608,11 +660,15 @@ def test_popular_coding_agent_quick_setups_share_the_planning_only_boundary() ->
         assert capability in folded
     assert "rely on the user's declared readiness" in folded
     assert "installation, configuration, models, providers" in folded
-    assert "exactly four visible bullets" in folded
-    assert "keep it under 120 words" in folded
-    assert "choose one listed workflow" in folded
-    assert "rate each proposed capability separately" in folded
-    assert "only when it materially changes declared capability" in folded
+    assert "only the unanswered subset of the three bullets" in folded
+    assert "a bare-name request shows all three" in folded
+    assert "keep it under 100 words" in folded
+    assert "choose one listed workflow" not in folded
+    assert "ask whether the routing-visible workflow" not in folded
+    card = _quoted_quick_setup_card(section)
+    _assert_three_human_questions(card)
+    assert len(card.split()) <= 100
+    assert "do not ask about a backing model or plan in quick setup" in folded
     for boundary in (
         "no profile lookup or onboarding answer authorizes login",
         "account or usage inspection, repository analysis, file changes, shell commands",
@@ -622,6 +678,90 @@ def test_popular_coding_agent_quick_setups_share_the_planning_only_boundary() ->
         "any credential store, or environment-variable values",
     ):
         assert boundary in folded
+
+
+def test_quick_setup_recap_is_compact_and_corrections_reset_preview_approval() -> None:
+    reference = (SKILL / "references" / "resource-onboarding.md").read_text(encoding="utf-8")
+    section = _markdown_h2_section(reference, "7. Recap, revise, and preview")
+    sample = section.split("For Quick Setup, render no more than 110 words in this shape:", 1)[1]
+    sample = sample.split("Do not add an `AtReady details` block", 1)[0]
+
+    assert len(sample.split()) <= 110
+    for visible_fact in (
+        "**Strength:**",
+        "**Available now:**",
+        "**Private work:**",
+        "**Still unknown:**",
+        "Nothing has been saved",
+        "**Preview this entry?**",
+    ):
+        assert visible_fact in sample
+    for deferred_detail in (
+        "resource ID",
+        "numeric mappings",
+        "billing",
+        "comparison ratings",
+        "exact target",
+        "transport",
+        "disclosure",
+    ):
+        assert deferred_detail not in sample
+
+    folded = " ".join(section.split()).casefold()
+    assert "treat any correction as facts, not approval" in folded
+    assert "apply only the requested edits" in folded
+    assert "render the entire compact recap again" in folded
+    assert "approval must follow the latest displayed version" in folded
+    assert "even when one message contains both an edit and preview language" in folded
+
+
+def test_private_work_does_not_invent_sensitive_data_permission() -> None:
+    onboarding = (SKILL / "references" / "resource-onboarding.md").read_text(encoding="utf-8")
+    folded = " ".join(onboarding.split()).casefold()
+    assert "preserve sensitive-data permission as unknown" in folded
+    assert "sensitive work remains excluded until you confirm it" in folded
+    assert "the preview's allowed-data list remains the enforceable routing policy" in folded
+    assert "explicitly narrows the allowed classes" in folded
+    assert "map an explicit no or not sure to `public` only" in folded
+    assert "configures only the inventoried resource's routing policy" in folded
+    assert "separate per-project disclosure decision" in folded
+
+
+def test_quick_setup_strength_applies_only_to_the_affirmed_capability() -> None:
+    onboarding = (SKILL / "references" / "resource-onboarding.md").read_text(encoding="utf-8")
+    folded = " ".join(onboarding.split()).casefold()
+    assert "only to the capability the user affirmed" in folded
+    assert "only to the affirmed planning capability" not in folded
+
+
+def test_quick_setup_capacity_and_destination_proposals_fail_closed() -> None:
+    onboarding = (SKILL / "references" / "resource-onboarding.md").read_text(encoding="utf-8")
+    folded = " ".join(onboarding.split()).casefold()
+    assert "persist a numeric remaining amount only with a non-unknown evidence basis" in folded
+    assert "omit measured `economics.capacity`" in folded
+    assert "never invent capacity provenance or a date" in folded
+    assert "human-readable selected-roster label" in folded
+    assert "use `your personal atready roster` only for the configured personal roster" in folded
+    assert "use `the selected atready roster` for an explicit custom or evaluation target" in folded
+    assert "map yes, no, or not sure only to the current session or current-use field" in folded
+    assert "keep account access `unknown` unless the user explicitly declares it" in folded
+
+
+def test_coderabbit_both_mode_requires_a_primary_or_confirmed_split() -> None:
+    onboarding = (SKILL / "references" / "resource-onboarding.md").read_text(encoding="utf-8")
+    section = _markdown_h3_section(onboarding, "CodeRabbit Quick Setup")
+    folded = " ".join(section.split()).casefold()
+    assert "both paths without naming a primary one" in folded
+    assert "do not choose either interaction" in folded
+    assert "save neither entry until the user explicitly confirms it" in folded
+
+
+def test_provider_cards_omit_questions_already_answered() -> None:
+    onboarding = (SKILL / "references" / "resource-onboarding.md").read_text(encoding="utf-8")
+    folded = " ".join(onboarding.split()).casefold()
+    assert folded.count("only the unanswered subset") >= 3
+    assert "a bare-name request shows all three" in folded
+    assert "render one card with exactly three visible bullets" not in folded
 
 
 def test_planning_skill_uses_a_protected_temporary_project_and_exact_cleanup() -> None:

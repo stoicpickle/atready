@@ -7,8 +7,21 @@ authorization.
 
 ## 1. Resolve the contract and default to Assisted Setup
 
-Resolve the explicit or default inventory target read-only. Before asking intake questions, invoke
-the pinned bundled launcher with `schema resource-declaration` exactly once for this onboarding
+If the user has not supplied a resource name, ask only:
+
+> Your roster is ready. What resource do you want to add?
+>
+> A name is enough to start. Do not include passwords, API keys, or private notes.
+
+Stop after that question. Do not invoke the launcher, resolve the target, inspect the roster, show
+the intake card, explain setup modes, or expose defaults, disclosure details, or a fill-in template.
+This name-first turn must stay under 35 words. If initialization just completed, do not repeat its
+target or safety explanation.
+
+After the resource name is known, resolve the explicit or default inventory target read-only.
+
+Before asking the three intake questions, invoke the pinned bundled launcher with
+`schema resource-declaration` exactly once for this onboarding
 task. Reuse that result when building the declaration; do not query the schema again unless the
 launcher's reported runtime contract or required feature set changes, or the task is restarted.
 
@@ -18,18 +31,8 @@ contract and evaluation name. If they ask generally to add or onboard resources,
 Setup without explaining modes. Use Detailed Setup (the internal Advanced Setup branch) only when
 the user requests it, supplies a complete declaration, or rejects the assisted defaults.
 
-If the user has not supplied a resource name, ask only:
-
-> Your roster is ready. What resource do you want to add?
->
-> A name is enough to start. Do not include passwords, API keys, or private notes.
-
-Stop after that question. Do not show the intake card, target path, internal defaults, disclosure
-details, or a fill-in template until the resource is known. This name-first turn must stay under 35
-words. If initialization just completed, do not repeat its target or safety explanation.
-
-Once the resource is known, show the canonical target and the short disclosure line in the recap,
-where the user can review them before authorizing a preview. A general planning or `preview-first`
+Once the resource is known, keep the canonical target and short disclosure line for the actual
+no-write preview. A general planning or `preview-first`
 request permits questions and states a desired sequence; it is not authorization for an exact
 declaration preview or write.
 
@@ -38,8 +41,9 @@ ratings from a product name, installation, subscription claim, or nearby configu
 `unknown` where the schema permits it. State that unknown or stale access, session, quota, or
 provenance normally makes the resource unverified for routing.
 
-**Quick Setup** collects one short, mostly prefilled human-language card and keeps every remaining
-conservative default out of the question turn. **Detailed Setup** reviews every routing, scoring, policy,
+**Quick Setup** hides the data model. After the name, it proposes a likely purpose and asks no more
+than three ordinary-language questions in one turn. The user may answer naturally; no mini-language
+or fill-in template is required. **Detailed Setup** exposes every routing, scoring, policy,
 provenance, capacity, and handoff field. Both add exactly one resource, require separate preview and
 save approvals, perform no account or provider discovery, and never authorize routed project work.
 
@@ -54,59 +58,69 @@ catalog. `resource profiles --json` lists the bounded built-in profiles. `resour
 capability, capacity-unit, and model-routing proposals. Catalog values are never inventory facts.
 
 The public plugin workflow is conversation-only and performs no local executable or version
-inspection. Those standalone CLI capabilities remain outside this public-plugin candidate. If no profile matches or several
-match, use generic Quick Setup and require the user to confirm every proposal.
+inspection. Those standalone CLI capabilities remain outside this public-plugin candidate. If no
+profile matches or several match, use generic Quick Setup, propose a plain-language purpose, and put
+technical proposals in the actual preview for correction before save.
 
 ### CodeRabbit Quick Setup
 
-When the selected catalog profile is exactly `coderabbit`, use a tailored four-group card instead
-of reducing CodeRabbit to a generic service. Show these catalog values as editable proposals:
+When the selected catalog profile is exactly `coderabbit`, use a tailored Quick Setup card with at
+most three questions instead of reducing CodeRabbit to a generic service. Show these catalog
+values as editable proposals:
 
 - `CodeRabbit` with stable ID `coderabbit`;
 - `Code review agent (review-agent)`;
-- `Code review (code-review)` and `Repository analysis (repository-analysis)`, with a separate
-  strength requested for each; and
+- `Code review (code-review)` and `Repository analysis (repository-analysis)`; and
 - capacity hints `Review requests (review-request)` and `Files reviewed (review-file)`.
 
-Recognize these user-facing usage modes inside the single **Readiness** group:
+Recognize these user-facing usage modes only when the user volunteers one. Otherwise put the
+profile's conservative workflow proposal in the actual preview for correction; never add provider-specific
+questions:
 
-- **CLI:** ask whether the user or Codex runs CodeRabbit from a terminal, whether that path is
-  usable for this task now, and how and when they checked. Map to `codex-callable` only when the
+- **CLI:** determine whether the user or Codex runs CodeRabbit from a terminal and whether that path
+  is usable for this task now. Map to `codex-callable` only when the
   user says Codex can call it here; otherwise map a terminal workflow to `local-cli`.
-- **PR reviews:** ask whether the user relies on the pull-request app/bot, whether they declare it
+- **PR reviews:** determine whether the user relies on the pull-request app/bot and declares it
   enabled for the relevant repositories and able to review a new PR now, and how and when they
   checked. Map this path to `external-agent`.
-- **Both:** ask which path should be the one routing-visible `interaction` for this entry. State in
-  the recap that the other path is confirmed context but is not independently selectable by the
+- **Both:** use the primary path named in a volunteered answer as the one routing-visible
+  `interaction`. State in
+  the actual preview that the other path is confirmed context but is not independently selectable by the
   router. If both paths need independent readiness, policy, or capacity, offer to queue
   `coderabbit-cli` and `coderabbit-pr` as two separately confirmed resources after this entry;
-  never combine their previews or saves.
+  never combine their previews or saves. If the user volunteers both paths without naming a
+  primary one, do not choose either interaction. Keep the interaction unconfirmed and stop before
+  preview, or offer the two-resource split and save neither entry until the user explicitly
+  confirms it.
 
-Tailor capacity to the chosen path without assuming a plan or limit. For PR reviews, ask for
-remaining review requests, the full limit, any repository/project allocation, reset date, basis,
-and verification date when known. For CLI use, accept the profile's `review-request` or
+Tailor volunteered capacity to the chosen path without assuming a plan or limit. For PR reviews,
+accept remaining review requests, the full limit, any repository/project allocation, reset date,
+basis, and verification date when supplied. For CLI use, accept the profile's `review-request` or
 `review-file` unit, or the user's exact unit. Preserve `not sure` and qualitative room when no
 measured amount is known. A single resource stores one measured-capacity envelope; when CLI and PR
-limits differ, ask which limit governs this entry or offer the two-entry queue. Never convert or
-combine unlike units.
+limits differ, use the primary path's limit or offer the two-entry queue in the recap. Never convert
+or combine unlike units. Persist a numeric remaining amount only with a non-unknown evidence basis
+and `last_verified` date. If either is absent, omit measured `economics.capacity`; the stated amount
+may appear only as an unpersisted preview proposal until the user supplies both facts. Never invent
+capacity provenance or a date.
 
-Render this provider-specific card in the short shape from section 3. Keep it under 120 words and
-render exactly these four visible question bullets:
+Render this provider-specific card in the short shape from section 3. Keep it under 100 words and
+ask only the unanswered subset in the displayed order. The bare-name template has all three
+visible bullets. Keep stable IDs, schema labels, numeric scores, capacity fields, defaults, target,
+transport, and disclosure details for the actual preview:
 
-> **Proposed:** `CodeRabbit (coderabbit)` · `Code review agent (review-agent)` · `Code review
-> (code-review)` and `Repository analysis (repository-analysis)`
+> **Got it: CodeRabbit.** I would tentatively treat it as a code-review service for code review and
+> pull-request feedback.
 >
-> - **Fit:** Are these labels right? Rate review and repository analysis separately as basic, solid, strong,
->   exceptional, or 0.0-1.0.
-> - **Use:** CLI, PR reviews, or both? If both, which is primary? Do you have access, and is it
->   available now?
-> - **Limits:** Plenty, some, none, not sure, or a measured amount? How do you know, and when checked?
-> - **Data:** Public, internal, private, or sensitive? Internet yes or no?
+> - How strong is it for that work: basic, solid, strong, or exceptional?
+> - Is it available to you now?
+> - Would you use it with private code or project files?
 >
-> Reply naturally. "Not sure" is fine. I will recap before asking to preview. Nothing is saved yet.
+> Reply naturally, and correct my tentative purpose if needed. "Not sure" is fine. I will show you
+> what I understood before anything is saved.
 
-Treat every answer as a declaration to recap, not provider evidence. Keep all profile labels,
-strengths, usage mode, readiness, capacity, safety, and defaults editable. No onboarding answer
+Treat every answer as a declaration, not provider evidence. Keep all profile labels, strengths,
+usage mode, readiness, capacity, safety, and defaults editable in the actual preview. No onboarding answer
 authorizes a CodeRabbit review, pull request, login, installation, update, settings change,
 provider contact, declaration preview, or roster save.
 Rely on the user's declared readiness; do not inspect an executable, version, configuration, or account.
@@ -119,38 +133,38 @@ project plan. Show these catalog values as editable proposals:
 - `OpenCode` with stable ID `opencode`;
 - `Coding agent (coding-agent)`;
 - `Code implementation (code-implementation)`, `Code review (code-review)`, `Repository analysis
-  (repository-analysis)`, and `Software planning (software-planning)`, each rated separately; and
+  (repository-analysis)`, and `Software planning (software-planning)`; and
 - capacity hints `Agent tasks (agent-task)`, `Tokens (token)`, and `Provider credits (credit)`.
 
-Ask which one routing-visible workflow applies: an interactive terminal session (`local-cli`), a
+When the user volunteers a workflow, recognize an interactive terminal session (`local-cli`), a
 separately authorized non-interactive CLI task (`codex-callable`), or person-mediated desktop/IDE
-use (`manual`). The official surfaces and commands justify these proposals, but do not establish
+use (`manual`). Otherwise propose `manual` in the actual preview for correction. The official surfaces and
+commands justify these proposals, but do not establish
 that this user's installation, configured provider, model, permissions, or current session is
-ready. Ask about the underlying model/provider only when it materially changes the user's declared
-capability, cost, or capacity; never request or retain its API key or other credential.
+ready. Treat any voluntarily named underlying model/provider as context only; never request or
+retain its API key or other credential.
 
-Render exactly these four visible question bullets in the existing Quick Setup card, keeping the
-whole response under 120 words:
+Ask only the unanswered subset in the displayed order in the existing Quick Setup card, keeping
+the whole response under 100 words. The bare-name template has all three visible bullets. Keep
+stable IDs, schema labels, numeric scores, capacity fields, defaults, target, transport, and
+disclosure details for the actual preview:
 
-> **Proposed:** `OpenCode (opencode)` · `Coding agent (coding-agent)` · `Code implementation
-> (code-implementation)`, `Code review (code-review)`, `Repository analysis
-> (repository-analysis)`, and `Software planning (software-planning)`
+> **Got it: OpenCode.** I would tentatively treat it as a coding agent for implementation, review,
+> repository analysis, and software planning.
 >
-> - **Fit:** Are these labels right? Rate each proposed capability separately as basic, solid,
->   strong, exceptional, or 0.0-1.0.
-> - **Use:** Terminal, separately authorized CLI, or desktop/IDE? Do you have access, and is it
->   available now?
-> - **Limits:** Plenty, some, none, not sure, or a measured amount? How do you know, and when checked?
-> - **Data:** Public, internal, private, or sensitive? Internet yes or no?
+> - How strong is it for that work: basic, solid, strong, or exceptional?
+> - Is it available to you now?
+> - Would you use it with private code or project files?
 >
-> Reply naturally. "Not sure" is fine. I will recap before asking to preview. Nothing is saved yet.
+> Reply naturally, and correct my tentative purpose if needed. "Not sure" is fine. I will show you
+> what I understood before anything is saved.
 
 Treat model choice and configuration as context for the user's ratings, not as an additional
 resource automatically. If a separately routable model or provider has materially different
 strengths, readiness, policy, or capacity, offer to queue it as its own one-resource setup later.
 The catalog reviewed on 2026-08-09 may expose a temporary `DeepSeek V4 Flash Free` suggestion.
 Present it as a catalog-listed OpenCode Zen option under review, never as OpenCode's universal
-default, and require the user to confirm current access, data policy, and observed fit.
+default. Put its access, data-policy, and fit proposals in the actual preview for correction.
 No onboarding answer authorizes OpenCode execution, provider access, model enumeration,
 configuration changes, declaration preview, or roster save.
 Rely on the user's declared readiness; do not inspect installation, configuration, providers,
@@ -158,34 +172,35 @@ models, or an account.
 
 ### Pixel-art tool Quick Setup profiles
 
-When the exact profile is `pixellab` or `retro-diffusion`, use the same four-group Quick Setup card
-and keep the creative resource secondary to the user's project goal. Show catalog capabilities and
-workflow modes as editable proposals. Ask the user to score only the asset work their configured
-surface actually handles well. Do not inspect a project gallery, provider account, authentication,
+When the exact profile is `pixellab` or `retro-diffusion`, use the same Quick Setup card with at
+most three unanswered questions and keep the creative resource secondary to the user's project goal. Show catalog capabilities and
+workflow modes as editable proposals in the actual preview. Apply the first question's one strength only to
+the plain-language asset purpose the user affirms. Do not inspect a project gallery, provider account, authentication,
 purchase history, subscription, credit balance, API configuration, or credentials.
 
-- **PixelLab (`pixellab`):** ask whether the routing-visible surface is the person-mediated web
+- **PixelLab (`pixellab`):** when supplied, recognize the routing-visible surface as the person-mediated web
   creator, browser editor, Aseprite extension, or a separately configured API integration. Propose
   pixel-art generation, sprite generation and animation, pixel-art editing, and map generation.
   Catalog review on 2026-08-09 lists Pixel Apprentice with 2,000 images per month up to 320x320 and
   Pixel Artisan with 5,000 images per month up to 512x512 plus up to 10 concurrent jobs, and Pixel
   Architect with 10,000 images per month plus up to 20 concurrent background jobs. Present the tier,
-  limits, dimensions, and concurrency only as dated vendor proposals; require the user to confirm
-  their actual tier, current availability, and useful fit.
+  limits, dimensions, and concurrency only as dated vendor proposals in the actual preview; never treat a
+  catalog tier as the user's actual tier.
 - **Retro Diffusion (`retro-diffusion`):** first distinguish the credit-based cloud website or a
   separately configured website API from the one-time-purchase local Aseprite extension. Catalog
   review on 2026-08-09 found no website subscription: cloud use consumes purchased credits, while
   the separately owned local extension has no website-credit balance. If the user calls it a
-  subscription, explain the catalog distinction and ask which product they actually have rather
+  subscription, explain the catalog distinction inside the tentative purpose and let the user say
+  which product they actually have rather
   than silently correcting their declaration. Propose pixel-art and sprite generation, animation,
   pixel-art editing, and palette editing for confirmation.
 
-For either cloud surface, ask the user to check the provider themselves and declare one governing
-capacity unit: images or credits for PixelLab, generations or credits for Retro Diffusion. Record
+For either cloud surface, accept one governing capacity unit when the user volunteers it: images or
+credits for PixelLab, generations or credits for Retro Diffusion. Record
 the exact remaining amount, optional full limit/project allocation/reset date, basis, and checked
 date only when supplied. Retro Diffusion's catalog says website credits do not expire and that
-larger images can cost more than one credit; confirm the no-expiry rule before omitting a reset and
-never translate a credit balance into a fixed image count. State that AtReady keeps a
+larger images can cost more than one credit; use no-expiry only when the user volunteers
+confirmation, and never translate a credit balance into a fixed image count. State that AtReady keeps a
 point-in-time snapshot only: it does not refresh or decrement balances. A later balance change is a
 complete `inventory replace` request with a new preview and save approval.
 
@@ -194,48 +209,49 @@ generation, account access, declaration preview, roster save, or any provider ac
 
 ### Other coding-agent Quick Setup profiles
 
-Use the same compact four-group card for these exact profiles, while preserving each profile's
+Use the same compact card with at most three unanswered questions for these exact profiles, while preserving each profile's
 editable capability and workflow proposals:
 
 - **Cursor (`cursor`):** propose code implementation, code review, repository analysis, and
-  software planning. Ask whether the routing-visible workflow is the person-mediated editor,
-  interactive CLI, separately authorized headless CLI, or a separately configured Cloud Agent.
+  software planning. Put the person-mediated editor, interactive CLI, separately authorized
+  headless CLI, and separately configured Cloud Agent workflows in the actual preview for correction.
   Its dated model suggestions may include Composer 2.5 for cost-efficient agentic coding and
   Cursor Grok 4.5 for hard long-running coding and knowledge work. Both are unverified proposals
   and may share one Cursor Models capacity pool.
 - **Claude Code (`claude-code`):** propose code implementation, code review, repository analysis,
-  and software planning. Ask whether the workflow is interactive terminal, separately authorized
-  headless use, person-mediated IDE/desktop/web, or separately configured CI.
+  and software planning. Put interactive terminal, separately authorized headless use,
+  person-mediated IDE/desktop/web, and separately configured CI in the actual preview for correction.
 - **Google Antigravity (`antigravity`):** propose code implementation, repository analysis,
-  software planning, multi-agent orchestration, and research. Ask whether the workflow is terminal,
-  separately authorized headless use, person-mediated desktop/IDE, or separately configured
-  background agents.
+  software planning, multi-agent orchestration, and research. Put terminal, separately authorized
+  headless use, person-mediated desktop/IDE, and separately configured background-agent workflows
+  in the actual preview for correction.
 - **GitHub Copilot (`github-copilot`):** propose code implementation, code review, debugging,
-  repository analysis, software planning, and GitHub workflow support. Ask whether the workflow is
-  interactive terminal, separately authorized programmatic use, coding-agent delegation, or
-  person-mediated editor/app.
-- **Grok (`grok`):** propose research, analysis, software planning, and code review. Ask whether the
-  surface is the person-mediated Grok app/web experience or a separately configured xAI API
-  workflow. Its dated Grok 4.5 suggestion is for complex reasoning across code and knowledge work,
+  repository analysis, software planning, and GitHub workflow support. Put interactive terminal,
+  separately authorized programmatic use, coding-agent delegation, and person-mediated editor/app
+  in the actual preview for correction.
+- **Grok (`grok`):** propose research, analysis, software planning, and code review. Put the
+  person-mediated Grok app/web and separately configured xAI API workflows in the actual preview for
+  correction. Its dated Grok 4.5 suggestion is for complex reasoning across code and knowledge work,
   but the user's scores, access, policy, and exact surface remain unverified.
 
-For each profile, render one card with exactly four visible bullets and keep it under 120 words:
+For each profile, render one card with only the unanswered subset of the three bullets in the
+displayed order and keep it under 100 words. A bare-name request shows all three. Keep stable IDs,
+schema labels, numeric scores, defaults, target, transport, and disclosure details for the actual
+preview:
 
-> **Proposed:** `<profile name and stable ID>` · `Coding agent (coding-agent)` · `<the profile's
-> editable capability proposals>`
+> **Got it: `<profile name>`.** I would tentatively treat it as a coding agent for `<plain-language
+> capability proposals>`.
 >
-> - **Fit:** Are these labels right? Rate each proposed capability separately as basic, solid,
->   strong, exceptional, or 0.0-1.0.
-> - **Use:** Choose one listed workflow. Do you have access, and is it available now?
-> - **Limits:** Plenty, some, none, not sure, or one measured limit? How do you know, and when checked?
-> - **Data:** Public, internal, private, or sensitive? Internet yes or no?
+> - How strong is it for that work: basic, solid, strong, or exceptional?
+> - Is it available to you now?
+> - Would you use it with private code or project files?
 >
-> Reply naturally. "Not sure" is fine. I will recap before asking to preview. Nothing is saved yet.
+> Reply naturally, and correct my tentative purpose if needed. "Not sure" is fine. I will show you
+> what I understood before anything is saved.
 
-Ask about a backing model or plan only when it materially changes declared capability, cost,
-capacity, policy, or readiness. Do not automatically create a second model/provider resource. If a
-backing provider is independently routable with materially different facts, offer to queue it for
-its own later preview and save.
+Do not ask about a backing model or plan in Quick Setup. Do not automatically create a second
+model/provider resource. If the user voluntarily names an independently routable backing provider
+with materially different facts, offer to queue it for its own later preview and save.
 Rely on the user's declared readiness; do not inspect installation, configuration, models,
 providers, authentication, billing, quota, or an account.
 
@@ -248,13 +264,13 @@ credential store, or environment-variable values.
 ### Model-aware resource variants
 
 When a selected profile contains `model_routing_suggestions`, read
-[model-routing.md](model-routing.md). Show the review date, named model option, suggested resource
-ID, planning role, caution, and any shared-capacity group as editable proposals. Ask whether the
-user can actually select that model on the named surface now.
+[model-routing.md](model-routing.md). Mention only the named model and a plain-language tentative
+role before the three-question card. Put the review date, suggested resource ID, caution, and any
+shared-capacity group in the actual preview as editable proposals. The availability question applies to the
+named model on the named surface; do not add a selection or workflow question.
 
-Keep the provider metadata to one compact line before the existing four-bullet card: review date,
-model and proposed resource ID, one short role phrase, one short caution, and an optional shared-pool
-label. Do not paste the full catalog record or repeat generic provider boundaries in every bullet.
+Keep the question-turn provider metadata to one compact line: model name and one short role phrase.
+Do not paste the full catalog record or repeat generic provider boundaries in every question.
 The entire first response still stays under 250 words and presents only the current queue item.
 
 Keep one generic provider resource when the configured model is automatic, unknown, or immaterial.
@@ -265,15 +281,10 @@ scores, readiness, policy, preview, and apply approval. Never infer a score from
 benchmark, `Flash`, `Fast`, `Thinking`, or a model's position in a provider list.
 
 When the user's reason for separate entries is different hard-work versus fast/cost-efficient fit,
-do not invite them to accept baseline `0.5` for every differentiating input. Keep Quick Setup, but
-extend its **Strengths** bullet with only the planning distinctions that justify separate entries:
-the relevant capability strengths, speed, and relative marginal cost. Map `basic`, `solid`,
-`strong`, and `exceptional` speed to `0.40`, `0.65`, `0.80`, and `0.95`. Map user-judged relative
-cost `low`, `medium`, `high`, and `very high` to `0.25`, `0.50`, `0.75`, and `0.95`; this is not a
-price, plan lookup, or vendor fact. Show every mapping in the recap and leave the other comparison
-ratings at their visible baseline unless the user chooses Detailed Setup. If the user cannot rate
-the differences yet, preserve the baseline and say the roster does not yet encode a model-aware
-preference; never claim the dated planning role changed routing by itself.
+apply the first question's one qualitative answer only to the capability the user affirmed. Keep
+speed, relative marginal cost, and the other comparison ratings at the visible `0.5` baseline in
+the actual preview. Offer Detailed Setup after the first resource when the user wants those distinctions to
+affect routing. Never claim the dated planning role changed routing by itself.
 
 If entries share a proposed capacity group, state that AtReady does not enforce shared-pool
 consumption and never present them as independent capacity or redundancy. Cursor-hosted Grok and
@@ -284,55 +295,52 @@ skill may explain a selected model role but must not substitute an unconfirmed m
 ## 3. Assisted Setup presented as Quick Setup
 
 Use a provider-specific variant above when it applies; otherwise use the generic card in this section.
-Use facts already supplied instead of asking twice. Put all four groups in one intake card. Keep the
-questions friendly; show schema values only as mappings in the later recap. Keep the complete card
-under 120 words. Lead with the proposed useful entry, not storage machinery. Do not recite the full
-schema, internal status names, defaults, target path, or retention caveats in the question card. The
-goal is one natural reply, not a schema interview.
+Use facts already supplied instead of asking twice. Ask only the unanswered subset of the three
+visible questions in one turn; a bare-name request gets all three. Keep the complete card under 100 words. Lead with a tentative plain-language purpose, not
+storage machinery. Stable IDs, schema labels, numeric scores, defaults, target path, declaration
+transport, and disclosure details belong only in the actual preview. The goal is one natural reply, not
+a schema interview.
 
 Then show one compact, prefilled card in this shape, adapting known profile proposals and facts:
 
-> **Proposed:** `<name>` · `<readable category>` · `<readable capability>` · `<strength if known>`
+> **Got it: `<name>`.** I would tentatively treat it as `<plain-language category>` for
+> `<plain-language capability proposals>`.
 >
-> - **Fit:** Are these labels right? Rate each proposed capability separately as basic, solid,
->   strong, exceptional, or 0.0-1.0.
-> - **Use:** How do you use it? Do you have access, and is it available now?
-> - **Limits:** Plenty, some, none, not sure, or a measured amount? How do you know, and when checked?
-> - **Data:** Public, internal, private, or sensitive? Internet yes or no?
+> - How strong is it for that work: basic, solid, strong, or exceptional?
+> - Is it available to you now?
+> - Would you use it with private code or project files?
 >
-> Reply naturally. "Not sure" is fine. I will recap before asking to preview. Nothing is saved yet.
+> Reply naturally, and correct my tentative purpose if needed. "Not sure" is fine. I will show you
+> what I understood before anything is saved.
 
-Use these four internal groups to interpret the natural reply. Do not expand the visible card:
+Interpret the natural reply internally without expanding the visible card:
 
-1. **Identity:** propose the supplied display name and a lowercase resource ID only as a proposal;
-   require the user to confirm it. Explain once that the resource ID is AtReady's stable,
-   machine-readable label for this entry. Propose plausible category and capability IDs for
-   confirmation. Say: "These are label proposals only, not claims about your account, access, or
-   what the resource can actually do." A proposal is a question, not an inferred inventory fact.
-   Pair every technical ID with a readable label, such as `Review agent (review-agent)` and `Code
-   review (code-review)`. Require the user to confirm or edit every proposal; never silently derive
-   or persist a category or capability.
-2. **Strengths:** ask, "How strong is it at each proposed capability: basic, solid, strong,
-   exceptional, or an exact 0.0-1.0 score?" Map labels deterministically: `basic` -> `0.40`,
-   `solid` -> `0.65`, `strong` -> `0.80`, and `exceptional` -> `0.95`. Never invent a capability or
-   silently raise a score. Show both label and number in the recap.
-3. **Readiness and capacity:** ask these human-language questions together:
-   - "Do you currently have usable access: yes, limited, no, or not sure?"
-   - "How do you use it: Codex can call it here, a terminal command, a separate app/service/bot, or
-     you use it manually?"
-   - "Can you use it in this task right now: yes, no, or not sure?"
-   - "How much usage room remains: plenty, some, none, not sure, or a measured amount?"
-   - If an amount is known, ask for its unit, the full plan limit when known, any smaller project
-     allocation, any reset date, the basis for the amount, and when it was checked. Preserve the
-     user's units; never compare or convert unlike units. A profile may suggest a unit label but
-     never supplies a remaining amount.
-   - "How do you know these facts: you checked or used it, your judgment, vendor information, or
-     not sure?"
-   - "When did you last check: today, YYYY-MM-DD, or not sure?"
-4. **Safety:** ask, "What project data may it receive: public, internal, private, and/or sensitive?"
-   Explain that public-only is the restrictive starting policy. Ask, "Does using it require
-   internet access: yes or no?" If the user is unsure about network use, include it in the one
-   consolidated repair instead of guessing because the stored field is Boolean.
+1. **Purpose and strength:** the catalog or model may propose a readable category and capabilities,
+   but the user confirms or corrects the useful purpose. Apply one qualitative strength to the
+   stated purpose unless the user naturally distinguishes capabilities. Map `basic` -> `0.40`,
+   `solid` -> `0.65`, `strong` -> `0.80`, and `exceptional` -> `0.95`. Keep the number invisible
+   until the actual preview. Never invent a capability or silently raise a score.
+2. **Availability and use:** map yes, no, or not sure only to the current session or current-use
+   field. Keep account access `unknown` unless the user explicitly declares it. When the user does
+   not volunteer a workflow, propose person-mediated `manual` use in the actual preview for correction.
+   A statement that the resource is available now is a current user declaration: use
+   `user-judgment` and the current date unless they provide stronger evidence or another date. Keep
+   quota `unknown` unless the user volunteers qualitative or measured room. For a measured amount,
+   preserve the supplied unit and any supplied limit, allocation, reset, basis, and checked date;
+   never compare or convert unlike units.
+3. **Data and network:** map the user's data answer to allowed data classes. Treat a simple yes to
+   using it with private code or project files as `public`, `internal`, and `private`. Map an
+   explicit no or not sure to `public` only. Preserve sensitive-data permission as unknown unless
+   the user explicitly confirms it; until then, `sensitive` remains excluded from the allowed
+   list. Infer network use only from the confirmed workflow itself, such as a separate cloud
+   service; otherwise use the conservative no-network default and display it for correction in the
+   actual preview. This answer configures only the inventoried resource's routing policy. It does
+   not authorize loading private project content into this conversation or its configured
+   host/model; that remains a separate per-project disclosure decision.
+4. **Identity:** prepare a lowercase resource ID and plausible category and capability IDs as
+   editable serialization proposals. Never claim they prove account access or product capability.
+   Pair every technical ID with a readable label in the actual preview, where the user can correct
+   them before save authorization. Do not expose them in Quick Setup questions or the compact recap.
 
 Use these deterministic friendly mappings:
 
@@ -346,28 +354,18 @@ Use these deterministic friendly mappings:
 - evidence `checked or used`, `my judgment`, `vendor information`, `not sure` -> `observed`,
   `user-judgment`, `vendor-claim`, `unknown`.
 
-Keep conservative defaults out of the question card. Show this batch in the recap before asking
-for preview authorization:
+Keep conservative defaults out of the question card and compact recap. Materialize them internally
+for the no-write preview, where the user can inspect every exact value before save approval. The
+preview is the technical audit surface; the recap is only a human confirmation of intent.
 
-> Accept these remaining first-pass defaults? We do not know its billing; put relative cost and the
-> eight ranking comparison scores at 0.5 for now (an undecided baseline, not verified quality).
-> For a model-aware entry, keep the relative cost and speed you just confirmed and put only the
-> other seven comparison ratings at 0.5. Always ask before use; prepare a text handoff you copy
-> manually; add no usage tips; and add no private note.
-
-Use those human phrases when interpreting the reply. Do not replace them with raw enum labels such as
-`codex-callable`, `local-cli`, `user-judgment`, or `manual-prompt`; show exact schema values only in
-the recap beside the user's words.
-
-Show the exact target and disclosure boundary in the recap, not the question card. Ask the user to
-confirm the recap and authorize one no-write preview. State:
+Use the user's phrases when interpreting the reply. Exact schema values, target, transport, and
+disclosure appear in the actual CLI preview, not the Quick Setup recap. Before the recap, state:
 
 > Answering this intake card supplies facts only; it does not authorize a preview or save.
 
 The batch maps exactly to:
 
-- billing `unknown`; marginal cost `0.5` unless model-aware relative cost was confirmed; and all
-  eight ratings `0.5` except a confirmed model-aware speed value;
+- billing `unknown`, marginal cost `0.5`, and all eight ratings `0.5`;
 - `approval_required: true`;
 - handoff method `manual-prompt` with no instructions;
 - empty best/avoid advisory lists; and
@@ -377,15 +375,12 @@ Do not describe Assisted Setup as routing-ready. Its conservative scoring defaul
 ranking or cost gates, and every project still supplies its own capability, interaction, data,
 network, and cost constraints.
 
-Normalize the reply once. If required facts are missing or contradictory, ask at most one
-consolidated repair question listing every blocker; never drip one field per turn. Active or limited
-access without a real verification date, an unconfirmed proposal, a missing capability score, or an
-unknown network Boolean is a repair item. Preserve every other unknown. If blockers remain after
-that single repair, stop without previewing. Normally Assisted Setup takes one substantive intake
-reply; it must never take more than one consolidated repair reply before the recap.
+Normalize the reply once. Preserve unknown optional facts instead of interviewing for them. If a
+contradiction prevents a valid declaration, show it in the recap and stop before preview until the
+user corrects it naturally; never add a fourth Quick Setup question.
 
-Completion criterion: all four compact prompts are answered in one reply or one consolidated
-repair; the later recap displays the defaults, target, and disclosure boundary before preview authorization.
+Completion criterion: one name-first turn and no more than three Quick Setup questions produce a
+compact human recap before preview authorization; the actual preview carries the technical record.
 
 ## 4. Advanced Setup
 
@@ -462,22 +457,33 @@ migration boundary in the main skill rather than inserting a nonce.
 Completion criterion: note state is absent, or its protected source and disclosure authorization
 are explicit without the value appearing in the recap.
 
-## 7. Recap, status, and preview authorization
+## 7. Recap, revise, and preview
 
-Present one compact structured recap. Lead with the user's friendly answers and show their exact
-schema mappings beside them. Use this order:
+For Quick Setup, render no more than 110 words in this shape:
 
-- **Confirmed labels:** display name, resource ID, categories, and capabilities.
-- **Strength, readiness, and capacity:** each qualitative label and numeric score, access,
-  interaction, current session, quota, measured amount/unit/limit/project allocation/reset when
-  supplied, provenance basis, and verification date.
-- **Safety:** allowed data classes and network requirement.
-- **Scoring-input defaults:** marginal cost and any defaulted ratings. Do not call these universally
-  neutral: a project's cost ceiling can gate the default marginal cost.
-- **Conservative safety defaults:** public-only data, approval required, and no network requirement
-  when those values were defaulted.
-- **Descriptive and handoff defaults:** billing, handoff, and best/avoid text.
-- **Private note:** only `present` or `absent`.
+> **Here's what I'll add**
+>
+> **`<resource>`** for `<plain-language purpose>`
+>
+> - **Strength:** `<qualitative strength>`
+> - **Available now:** `<Yes / No / Not sure>`
+> - **Private work:** `<Allowed / Not allowed / Not sure>`
+> - **Still unknown:** `<only routing-material unknowns, or omit this line>`
+>
+> It will be previewed against `<human-readable selected-roster label>`. Nothing has been saved.
+>
+> **Preview this entry?**
+
+Do not add an `AtReady details` block. Keep IDs, numeric mappings, category and capability labels,
+provenance, billing, comparison ratings, handoff defaults, empty fields, exact target, transport,
+and disclosure for the actual CLI preview. Do not present an inferred workflow or network default
+as user-confirmed. Detailed Setup may use a complete structured recap because the user requested
+field-level control.
+
+Derive the recap's roster label from the resolved destination without revealing its path: use
+`your personal AtReady roster` only for the configured personal roster, and use `the selected
+AtReady roster` for an explicit custom or evaluation target. Preserve the exact target only for the
+actual CLI preview.
 
 Assign one intake status, in this priority order:
 
@@ -488,26 +494,30 @@ Assign one intake status, in this priority order:
 - `selection-facts-declared` when those facts are declared. Strict validation and routing assess
   staleness separately against the inventory preference and project date.
 
-Always say:
+Express status through `Still unknown` only when it matters to routing. For example: `Usage limits,
+so AtReady will mark this as needing verification.` Keep the exact internal status and its detailed
+limitations for the actual CLI preview.
 
-> This intake status does not prove live availability, authentication, capability, project
-> eligibility, selection, or execution authority.
+When the user permits private work but has not explicitly addressed sensitive data, include
+`Sensitive-data permission; sensitive work remains excluded until you confirm it` under `Still
+unknown` in the compact recap and repeat that statement immediately before the actual CLI preview.
+The preview's allowed-data list remains the enforceable routing policy. If the user explicitly
+narrows the allowed classes, treat omitted higher-sensitivity classes as excluded rather than
+unknown.
 
-Then request explicit preview authorization with this human-facing copy and a compact details block:
+Treat any correction as facts, not approval. Apply only the requested edits, recompute dependent
+mappings and status, render the entire compact recap again, and ask `Preview this entry?` again.
+Do not repeat answered intake questions. Even when one message contains both an edit and preview
+language, stop at the revised recap; approval must follow the latest displayed version. Repeat this
+loop until the user approves or cancels.
 
-> Ready for the no-write preview? It will show the complete `<resource>` entry in this task, use the
-> roster at `<canonical target>`, and remove any temporary input afterward. It will not save
-> anything. Proceed?
->
-> Details: `<source transport>` · this host/model context · one resource only.
+Authorization to answer questions or edit the recap is not preview authorization. General intent
+such as `preview-first`, `show me a preview`, or `stop before apply` is not approval of the latest
+displayed recap. Do not create a declaration source or invoke `inventory add` until the user
+explicitly approves that latest recap.
 
-Stop for an answer. Authorization to answer questions is not preview authorization. General intent
-such as `preview-first`, `show me a preview`, or `stop before apply` is not authorization for the
-exact recap unless the user separately confirms this request. Do not create a declaration source
-or invoke `inventory add` until that exact approval is given.
-
-Completion criterion: the user explicitly authorizes the exact preview, or onboarding stops without
-a CLI preview or write.
+Completion criterion: the user explicitly approves the latest displayed recap for preview, or
+onboarding stops without a CLI preview or write.
 
 ## 8. Preview, approve, and apply
 
@@ -521,6 +531,10 @@ Stop again and ask:
 
 > Save exactly this entry? AtReady will back up the current roster, apply this reviewed
 > version, and validate it. It will not run or contact `<resource>`.
+
+If the user corrects the rendered preview instead of saving it, treat the correction as facts only.
+Return to the compact recap with the edits applied, then require fresh preview approval and render a
+new CLI preview. Never patch or save the old preview.
 
 Apply only after a second explicit approval of that rendered preview. Repeat the same
 semantic declaration with its exact `--expect-revision` and `--expect-plan`; a changed declaration,

@@ -40,7 +40,7 @@ def test_submission_bundle_is_minimal_safe_and_deterministic(tmp_path: Path) -> 
     assert first.read_bytes() == second.read_bytes()
     assert first_receipt["sha256"] == hashlib.sha256(first.read_bytes()).hexdigest()
     assert first_receipt["sha256"] == second_receipt["sha256"]
-    assert first_receipt["plugin_version"] == "0.1.6"
+    assert first_receipt["plugin_version"] == "0.1.7"
     assert first_receipt["submission_type"] == "skills-only"
 
     with zipfile.ZipFile(first) as archive:

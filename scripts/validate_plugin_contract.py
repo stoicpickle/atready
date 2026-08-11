@@ -17,7 +17,7 @@ import yaml
 OFFICIAL_REFERENCE = "https://developers.openai.com/plugins/deploy/submission-errors"
 ALLOWED_PRODUCTS = {"CHAT", "CODEX"}
 TRUSTED_UPSTREAM_VALIDATOR_SHA256 = (
-    "ebda00d55d7518b127f675f062fb5c6e7a1ffdc0a99df1a55ac594400d7d3228"
+    "a4712ddc7c02211edf009b4ef22728f2e4c47650b9ff5696b6b36596dc29fa4a"
 )
 MAX_AGENT_BYTES = 64_000
 MAX_SKILLS = 100

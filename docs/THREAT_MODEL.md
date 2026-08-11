@@ -19,7 +19,8 @@ Codex plugin and Python local runtime are separate artifacts: the plugin delegat
 strict, value-free compatibility handshake proves the required runtime contract and features. It
 never installs or updates the runtime. On a Codex host with approved local execution and filesystem
 access, an explicit resource-add request may authorize bounded inventory/schema/profile reads and
-conversational intake and recap. Rendering the exact CLI preview requires approval of that recap,
+conversational intake and recap. Rendering the exact CLI preview requires approval of the latest
+displayed recap,
 and a later explicit approval is required before one exact preview-bound inventory write. This does
 not add scanning, provider contact, account inspection, credential access, or network authority.
 If the selected roster is missing, creating one empty roster requires its own exact path approval;
@@ -34,8 +35,9 @@ The relevant data flow is:
 2. The user may declare one resource through bounded guided terminal answers, typed arguments, a
    protected versioned file, explicit non-interactive stdin, or bounded non-sensitive answers in a
    Codex conversation. The conversational request authorizes only selected local
-   inventory/schema/profile reads, intake, and recap.
-3. After approving the recap and reviewing the complete no-write resource preview, the user may
+   inventory/schema/profile reads, intake, and recap. A correction produces a revised recap and
+   requires fresh preview approval.
+3. After approving the latest recap and reviewing the complete no-write resource preview, the user may
    separately approve one exact preview-bound save. Without that approval, no inventory write
    occurs.
 4. Before declaration, the user may authorize exact-profile executable location without execution;
@@ -86,7 +88,7 @@ to secure or audit that provider.
 - Recommendation, authorization, credential access, and execution are separate
   states.
 - A conversational resource-add request authorizes bounded local reads, intake, and recap only.
-  Rendering the exact CLI preview requires approval of the recap. One exact preview-bound write
+  Rendering the exact CLI preview requires approval of the latest displayed recap. One exact preview-bound write
   requires a later, separate, explicit save approval enforced by the local runtime rather than
   inferred from model output.
 - Model output is never a security decision or execution authority.

@@ -17,7 +17,7 @@ state; it never grants permission.
 | Install or update AtReady | Explicit user-controlled setup | The Codex plugin and Python local runtime are separate, independently versioned artifacts. A reviewed beta helper or documented manual commands may install both only when the user runs them; the plugin itself never installs, upgrades, or repairs the runtime and declares no apps, MCP servers, connectors, or hooks |
 | Read an inventory or preferences file | User-supplied only | The user selects or provides the file; no home-directory search |
 | Read one resource declaration | Explicit guided terminal answers, typed arguments, protected file path, or explicit non-interactive stdin | Guided Quick Add reads bounded answers only from the attached terminal and never asks for credentials or private notes. Structured modes read one versioned, bounded resource envelope; file contents/stdin stay out of AtReady argv, but terminal answers, typed arguments, the file path, and routing-visible preview can be retained elsewhere |
-| Prepare a resource addition in a Codex conversation | Explicit resource-add request | When the current host grants the installed skill local execution and filesystem access, the request authorizes only bounded reads of the selected local inventory, resource schema, and optional built-in profile plus conversational intake and recap. Rendering the exact CLI preview requires approval of that recap. The skill asks only for routing-visible, non-secret facts supplied or confirmed by the user. It does not scan the computer, inspect accounts, contact a provider, read credentials, check billing or quota, or persist the proposal |
+| Prepare a resource addition in a Codex conversation | Explicit resource-add request | When the current host grants the installed skill local execution and filesystem access, the request authorizes only bounded reads of the selected local inventory, resource schema, and optional built-in profile plus conversational intake and recap. Rendering the exact CLI preview requires approval of the latest displayed recap; any correction produces a revised recap and requires fresh approval. The skill asks only for routing-visible, non-secret facts supplied or confirmed by the user. It does not scan the computer, inspect accounts, contact a provider, read credentials, check billing or quota, or persist the proposal |
 | List or inspect a built-in resource profile | Explicit profile command | Read-only bounded package data containing editable label/unit suggestions, optional provider-specific workflow/question guidance, dated unverified model-routing proposals, and an exact executable probe; profiles are not inventory or provider facts |
 | Locate one profiled local executable | Separate exact-profile discovery approval | Bounded lookup of one profile's canonical executable and small platform-scoped exact alias allowlist, or user-supplied exact-path resolution, does not execute the program; different files under multiple allowed names fail as ambiguous, and the sanitized result writes no inventory and remains an unconfirmed proposal |
 | Inspect that executable's version | Second explicit version-probe approval | Runs the resolved external program with fixed arguments, no shell, and bounded time/output; AtReady writes no inventory and uses no network itself, but the external program's network/write side effects are not evaluated |
@@ -110,9 +110,10 @@ Conversational add follows the same data and mutation boundary. The skill may co
 routing-visible facts needed by the public resource schema, and may use a built-in profile only as
 editable suggestion copy. Those answers and the sanitized preview can enter the configured
 host/model context. The first request authorizes intake and recap only. The skill must obtain
-explicit approval before rendering the exact CLI preview, stop after displaying it, and obtain a
-later approval before applying it. Declining, changing, or failing to approve performs no inventory
-write.
+explicit approval of the latest compact recap before rendering the exact CLI preview, stop after
+displaying it, and obtain a later approval before applying it. A correction invalidates pending
+preview approval and produces a revised recap. Declining, changing, or failing to approve performs
+no inventory write.
 
 An explicit resource or inventory-annotation declaration file is read-only input, not
 AtReady-owned storage. AtReady never copies, modifies, deletes, or retains it. On POSIX,
