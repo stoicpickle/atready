@@ -33,7 +33,7 @@ def test_bare_demo_attempts_no_network_or_private_file_creation(
     assert main(["demo"]) == 0
 
     output = capsys.readouterr().out
-    assert "Resource plan: Synthetic CLI Release" in output
+    assert "Resource fit: Synthetic CLI Release" in output
     assert output.endswith(_NO_EXECUTION_BOUNDARY + "\n")
     assert list(tmp_path.iterdir()) == before
 
@@ -56,7 +56,7 @@ def test_bare_demo_routes_synthetic_fixtures_in_memory(
     canonical_without_boundary = canonical.removesuffix(boundary)
 
     assert output.startswith(canonical_without_boundary)
-    assert "Resource plan: Synthetic CLI Release" in output
+    assert "Resource fit: Synthetic CLI Release" in output
     assert "Use: Synthetic Local Coding Agent" in output
     assert "--format markdown" not in output
     cta = (
@@ -104,7 +104,7 @@ def test_welcome_and_progressive_help_point_to_bare_demo(capsys) -> None:
         main(["--help"])
     assert result.value.code == 0
     help_text = capsys.readouterr().out
-    assert "demo      Run a complete synthetic resource plan" in help_text
+    assert "demo      Run a complete synthetic resource fit example" in help_text
 
     assert main(["help", "planning"]) == 0
     assert "See the complete flow: atready demo" in capsys.readouterr().out

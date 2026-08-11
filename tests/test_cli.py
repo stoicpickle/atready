@@ -468,7 +468,7 @@ def test_help_describes_the_beginner_facing_job(capsys) -> None:
         main(["--help"])
     assert result.value.code == 0
     output = capsys.readouterr().out
-    assert "Plan a project around the tools and resources you already have." in output
+    assert "Show where your resources fit a project plan." in output
     assert "Add one resource with guided, preview-first setup" in output
     assert "welcome" in output
 
@@ -958,9 +958,10 @@ def test_project_route_yaml_snapshot_and_all_schemas(tmp_path: Path, monkeypatch
 
     assert main(["route", "--project", str(project_path)]) == 0
     summary = capsys.readouterr().out
-    assert "Resource plan:" in summary
+    assert "Resource fit:" in summary
+    assert "Resource plan" not in summary
     assert "Use: Personal Local Coding Agent" in summary
-    assert "AtReady made this plan only." in summary
+    assert "AtReady only recommends resources where they fit." in summary
     assert "## Authorization boundary" not in summary
     assert "Adjusted score" not in summary
 

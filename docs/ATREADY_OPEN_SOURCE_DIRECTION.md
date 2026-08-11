@@ -8,19 +8,25 @@ live; PyPI, directory listings, domains, and other external release channels rem
 
 Use **AtReady by Stoicpickle** as the product identity.
 
-AtReady is a small planning companion. A developer brings a rough idea or written plan, and AtReady
-considers the tools, agents, services, subscriptions, models, credits, and capacity that the
-developer has chosen to declare. It recommends where those resources may fit before implementation,
-explains the recommendation, and produces inert handoff material. It does not execute the routed
-work, contact resources, inspect accounts, or store credentials.
+AtReady is a resource-fit companion for Codex. A developer or Codex brings a rough implementation
+plan, and AtReady considers the tools, agents, services, subscriptions, models, credits, and
+capacity that the developer has chosen to declare. It recommends where those resources may fit,
+explains constraints and gaps, and produces inert handoff material. Codex owns the project plan;
+AtReady contributes resource context that Codex would not otherwise have. It does not execute the
+routed project work or contact resources automatically. A separately authorized
+`resource discover --inspect-version` check may invoke one allowlisted local executable with fixed
+version arguments; that external program's side effects remain unknown. AtReady does not inspect
+accounts or store credentials.
 
-Positioning line: **Plan with what you have at the ready.**
+Positioning line: **Help Codex plan with what you already have.**
 
-The next distribution focus is an open-source beta of the deterministic local CLI. The bundled
-Codex skill is an optional conversational adapter, not a second engine or a prerequisite. A
+The next distribution focus is an open-source beta of the Codex skill and its deterministic local
+CLI engine. The skill is the intended conversational experience; the CLI stores and validates the
+roster, produces inspectable resource-fit evidence, and remains a standalone fallback. A
 ChatGPT/Codex directory plugin may become a later installation and discovery surface, but
 public directory submission is not the next dependency. Resume it only after real users show that
-the planning behavior is useful enough to repeat and the supported-surface/runtime path is proven.
+the resource-fit behavior is useful enough to repeat and the supported-surface/runtime path is
+proven.
 
 ## Naming evidence
 
@@ -56,13 +62,13 @@ and hidden backup names are compatibility details, not public product identifier
 - Test useful behavior before investing further in portal and universal-surface work.
 - Let developers inspect the local-first routing and storage behavior.
 - Give experienced Codex users a practical way to install, test, and critique the product.
-- Preserve the optional skill while users test whether the CLI's planning behavior is useful.
+- Keep the Codex skill and CLI engine aligned while users test whether the resource advice is useful.
 
 ## Next mini-direction
 
 1. Keep private development changes reviewed and green before promoting a clean public snapshot.
 2. Invite early users to try the source beta and collect practical feedback
-   on setup, resource intake, plan usefulness, trust, and repeat use.
+   on setup, resource intake, recommendation usefulness, trust, and repeat use.
 3. Prioritize confusing first-use behavior over new providers, connectors, or routing features.
 4. Add a verified PyPI install only when it materially improves the early-user path.
 5. Revisit public plugin submission only if beta users want that installation surface.
@@ -70,16 +76,17 @@ and hidden backup names are compatibility details, not public product identifier
 ## Beta success signal
 
 The beta is successful when testers can install without maintainer intervention, describe their
-resources without exposing credentials, bring a real rough plan, understand the recommendation,
-and choose to use AtReady again. A completed installation alone is not product validation.
+resources without exposing credentials, bring a real rough plan, understand how the recommendation
+could improve Codex's plan, and choose to use AtReady again. A completed installation alone is not
+product validation.
 
 ## Deferred public demo clip
 
 Return to Screen Studio when the next public demo is ready. The target is a roughly 20 second real
 screen recording for X, not a generated interface mockup. Show a synthetic pixel game request,
-Codex invoking AtReady, and the actual compact resource plan using examples such as Codex and Retro
-Diffusion. Keep `SYNTHETIC EXAMPLE` visible, use provider names as plain text without logos or an
-endorsement claim, and end on the no execution boundary.
+Codex invoking AtReady, and the actual compact resource-fit recommendation using examples such as
+Codex and Retro Diffusion. Keep `SYNTHETIC EXAMPLE` visible, use provider names as plain text without
+logos or an endorsement claim, and end on the no execution boundary.
 
 Use the Intel build of Screen Studio on the current iMac, record at 1080p, and free comfortable
 working storage before capture and export. Prepare the exact synthetic roster, prompt, output,

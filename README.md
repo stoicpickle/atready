@@ -1,10 +1,14 @@
 # AtReady
 
-**Plan with what you have at the ready.**
+**Help Codex plan with what you already have.**
 
-AtReady is a small, local-first planning tool. Tell it about the coding agents, creative tools,
-subscriptions, services, or people available to you. Give it a rough project plan. It recommends
-where those resources fit and explains why.
+AtReady helps Codex plan around the resources you already have. Tell it about the coding agents,
+creative tools, subscriptions, services, credits, or people available to you. When you or Codex
+have a rough implementation plan, AtReady suggests where those resources fit and explains the
+constraints that matter.
+
+Codex owns the project plan. AtReady contributes resource context that Codex would not otherwise
+have. It does not replace Codex's planning.
 
 It does not run the work, contact your tools, or spend your credits. You stay in control.
 
@@ -14,20 +18,21 @@ It does not run the work, contact your tools, or spend your credits. You stay in
 > it. Expect changes. Please share what feels confusing or unnecessary.
 
 > **[Try AtReady and tell me how it went](https://github.com/stoicpickle/atready/blob/main/docs/TRY_ATREADY.md)**
-> One short install, demo, resource, and planning journey for first-time users.
+> One short install, demo, resource, and resource fit journey for first-time users.
 
 ## The idea in one minute
 
-Maybe you have Codex, CodeRabbit, Cursor, a design subscription, and a small amount of image credit.
-A project comes along. Instead of forgetting what is available or trying to use everything, AtReady
-helps answer:
+Maybe Codex has outlined implementation, art, testing, and review for a small game. You have Codex,
+CodeRabbit, Cursor, a design subscription, and a small amount of image credit. Instead of forgetting
+what is available or trying to use everything, AtReady adds a resource fit pass that answers:
 
 - Which resources are actually useful for this plan?
 - What should each one handle?
 - Which resources should stay out of the way?
 - What is missing, uncertain, or blocked?
 
-AtReady turns those answers into an advisory route and inert handoff notes. Nothing is dispatched.
+AtReady turns those answers into an advisory resource recommendation and inert handoff notes.
+Codex can use that recommendation while refining the implementation plan. Nothing is dispatched.
 
 ## Install and try AtReady
 
@@ -54,7 +59,7 @@ files, use the network, or contact or run any resource.
 The result looks like this:
 
 ```text
-Resource plan: Synthetic CLI Release
+Resource fit: Synthetic CLI Release
 Goal: Ship a tested local CLI without network access or telemetry.
 1 step · 1 assigned · no open gaps
 
@@ -72,7 +77,7 @@ Other resources
 - Not needed for this plan: Synthetic Asset Studio
 - Blocked by a project rule: Synthetic Interactive Debugger
 
-AtReady made this plan only.
+AtReady only recommends resources where they fit.
 
 Ready to try your own roster?
 1. atready init
@@ -108,15 +113,16 @@ friendly recap, asks before generating the complete no-write preview, then requi
 exact `save <resource-id>` confirmation before writing. Cancelling before that confirmation changes
 nothing.
 
-### 3. Plan a small project
+### 3. Check resource fit for a small project
 
 ```bash
 atready plan
 ```
 
-Describe a goal and one to three steps. AtReady asks only for the details that can change which
-resources fit, shows what it understood, and returns a plan you can accept, change, or ignore. It
-does not write a project file, contact a resource, spend a credit, or run work.
+Give AtReady a goal and one to three steps from your rough plan. It asks only for details that can
+change which resources fit, then returns assignments, constraints, and gaps you or Codex can use to
+refine the plan. It does not create the complete project plan, write a project file, contact a
+resource, spend a credit, or run work.
 
 ## Reusable and scripted workflows
 
@@ -153,7 +159,7 @@ through `--resource-file` or `--resource-stdin`. The
 [resource intake guide](https://github.com/stoicpickle/atready/blob/main/plugins/atready/skills/project-atready/references/resource-onboarding.md)
 explains the same fields in friendlier language.
 
-For a reusable or scripted plan, create a starter project file:
+For a reusable or scripted resource fit check, create a starter project file:
 
 ```bash
 atready project template > my-project.yaml
@@ -182,10 +188,12 @@ The summary defaults to 80 columns; add `--width 40` through `--width 120` when 
 different wrap width.
 
 The same project and inventory produce the same route. AtReady does not claim the route is globally
-optimal; it is a consistent, inspectable recommendation you can accept, edit, or ignore.
+optimal or that it can out-plan Codex; it is a consistent, inspectable resource recommendation you
+can accept, edit, or ignore.
 
 ## What AtReady does not do
 
+- It does not create or replace the overall project plan.
 - It does not execute project work or send handoffs.
 - It does not log in to providers or store credentials.
 - It does not automatically inspect accounts, subscriptions, or billing.
@@ -196,13 +204,15 @@ Your personal inventory is stored locally. Private notes are excluded from norma
 routing snapshots, but sanitized routing data can still enter whichever host or model you choose to
 use. “Local-first” does not mean model processing is automatically local.
 
-## Optional Codex skill
+## Use AtReady with Codex
 
-The CLI is the product. This repository also includes an optional Codex skill that can add one
-declared resource through a conversational no-write preview and separate save approval, or turn a
-rough project idea into the same CLI-grounded resource plan. The skill does not replace the CLI's
-validation, mutation, or routing engine. It uses the bundled launcher only when Codex has approved
-local execution and file access; otherwise it directs the same task to `atready add` in a terminal.
+The Codex skill is the intended conversational experience. The CLI is its local engine and a
+standalone fallback: it stores the declared roster, validates changes, and produces the same
+inspectable resource-fit evidence. The skill can add one declared resource through a no-write
+preview and separate save approval, or match the saved roster to a rough plan before implementation.
+It does not replace Codex's project planning. It uses the bundled launcher only when Codex has
+approved local execution and file access; otherwise it directs the same task to `atready add` in a
+terminal.
 
 Codex discovers personal skills under `~/.agents/skills`. After installing AtReady, keep any
 existing destination unchanged by default. On macOS or Linux, this guarded setup copies the
@@ -255,13 +265,13 @@ atready --help                  List commands
 atready demo                    Run the complete fake example
 atready init                    Create an empty personal inventory
 atready add                     Add one resource through guided setup
-atready plan                    Make a guided resource plan
-atready resource profiles      Browse planning-oriented resource suggestions
+atready plan                    Check resource fit for a small rough plan
+atready resource profiles      Browse starter suggestions for resource fit
 atready inventory list         List saved resources
 atready inventory validate     Check an inventory
 atready project template       Print a starter project brief
-atready route                  Produce a concise advisory resource plan
-atready help planning           Show the beginner planning workflow
+atready route                  Match an existing project brief to your roster
+atready help planning           Show the beginner resource-fit workflow
 atready help --all              Show every advanced command
 ```
 

@@ -97,7 +97,7 @@ def test_guided_plan_reprompts_after_terminal_controls_without_echoing_them(
 
     captured = capsys.readouterr()
     assert "Remove control or zero-width characters, or type cancel." in captured.out
-    assert "Resource plan: Guided AtReady plan" in captured.out
+    assert "Resource fit: Guided AtReady plan" in captured.out
     assert "\x1b" not in captured.out + captured.err
     assert "unsafe\\x1b" not in captured.out + captured.err
     assert inventory.read_bytes() == original
@@ -152,6 +152,10 @@ def test_guided_plan_routes_in_memory_and_matches_canonical_route(
     assert main(["plan", "--inventory", str(inventory), "--allow-demo"]) == 0
     guided_output = capsys.readouterr().out
     assert captured_project is not None
+    assert guided_output.startswith("CHECK RESOURCE FIT\nInventory:")
+    assert "Check resource fit for these steps? [Y/n]:" in guided_output
+    assert "PLAN A PROJECT" not in guided_output
+    assert "Make this resource plan?" not in guided_output
     assert "No project file will be written." in guided_output
     assert "No routed project resources were contacted or run." in guided_output
     workstream = captured_project.workstreams[0]
@@ -189,7 +193,7 @@ def test_guided_plan_routes_in_memory_and_matches_canonical_route(
         == 0
     )
     route_output = capsys.readouterr().out
-    assert guided_output[guided_output.index("Resource plan:") :] == route_output
+    assert guided_output[guided_output.index("Resource fit:") :] == route_output
 
 
 def test_guided_plan_surfaces_a_gap_from_custom_eligibility(
@@ -235,10 +239,10 @@ def test_help_is_progressive_and_complete_help_remains_available(capsys) -> None
     assert result.value.code == 0
     beginner = capsys.readouterr().out
     assert "Get started:" in beginner
-    assert "plan      Make a resource plan" in beginner
+    assert "plan      Check resource fit" in beginner
     assert "Advanced command names:" in beginner
     assert "doctor  runtime  config  resource  skill  schema" in beginner
-    assert "demo      Run a complete synthetic resource plan" in beginner
+    assert "demo      Run a complete synthetic resource fit example" in beginner
 
     headings = {"Get started:", "Manage:", "More:", "Advanced command names:"}
     displayed_commands: set[str] = set()

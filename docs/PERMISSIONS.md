@@ -2,9 +2,9 @@
 
 ## Principle
 
-AtReady v0.1 is a planner, not an operator. It needs enough
+AtReady v0.1 is a resource-fit advisor, not a project planner or operator. It needs enough
 access to read information the user deliberately supplies and produce a visible
-plan. It does not need authority over the resources it describes.
+recommendation. It does not need authority over the resources it describes.
 
 Recommendation, authorization, credential access, and execution are distinct.
 An inventory field such as `active`, `authenticated`, or `callable` describes

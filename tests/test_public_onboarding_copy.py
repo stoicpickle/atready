@@ -43,7 +43,7 @@ def test_readme_preserves_the_three_step_journey_and_contributor_setup() -> None
 
     assert "### 1. Create your resource list" in beginner
     assert "### 2. Add one resource" in beginner
-    assert "### 3. Plan a small project" in beginner
+    assert "### 3. Check resource fit for a small project" in beginner
     assert beginner.index("atready init") < beginner.index("atready add")
     assert beginner.index("atready add") < beginner.index("atready plan")
     assert "git clone https://github.com/stoicpickle/atready.git" in contributing
@@ -60,7 +60,7 @@ def test_first_time_guide_uses_the_same_short_public_journey() -> None:
     assert "close and reopen the terminal, then try again" in normalized
     assert "## 2. Run the safe demo" in guide
     assert "atready demo\n```" in guide
-    assert "## 3. Try your own resource and plan" in guide
+    assert "## 3. Try your own resource fit check" in guide
     assert THREE_STEP_JOURNEY in guide
     assert guide.index(PUBLIC_INSTALL) < guide.index(SHELL_FALLBACK)
     assert guide.index(SHELL_FALLBACK) < guide.index("atready --version")
@@ -69,6 +69,20 @@ def test_first_time_guide_uses_the_same_short_public_journey() -> None:
     assert "git clone" not in guide
     assert "uv tool install ." not in guide
     assert "atready demo inventory" not in guide
+
+
+def test_public_copy_positions_atready_as_codex_resource_context() -> None:
+    readme = README.read_text(encoding="utf-8")
+    guide = TRY_GUIDE.read_text(encoding="utf-8")
+
+    assert "Help Codex plan with what you already have." in readme
+    assert "Codex owns the project plan." in readme
+    assert "AtReady contributes resource context" in readme
+    assert "The Codex skill is the intended conversational experience." in readme
+    assert "The CLI is its local engine and a\nstandalone fallback" in readme
+    assert "AtReady is a small, local-first planning tool" not in readme
+    assert "The CLI is the product" not in readme
+    assert "It does not create the complete project plan." in guide
 
 
 def test_demo_sample_keeps_the_exact_safety_close_after_next_steps() -> None:

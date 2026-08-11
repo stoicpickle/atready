@@ -125,22 +125,22 @@ class _AtReadyArgumentParser(argparse.ArgumentParser):
             return super().format_help()
         return """usage: atready [--version] <command> ...
 
-Plan a project around the tools and resources you already have.
+Show where your resources fit a project plan.
 
 Get started:
   init      Create your local resource roster
   add       Add one resource with guided, preview-first setup
-  plan      Make a resource plan through a guided conversation
-  demo      Run a complete synthetic resource plan
+  plan      Check resource fit through a guided conversation
+  demo      Run a complete synthetic resource fit example
 
 Manage:
   inventory Inspect or maintain your roster
   project   Create or validate a project brief
-  route     Route an existing project brief
+  route     Match an existing project brief to your roster
 
 More:
   welcome              Show the AtReady welcome screen
-  help planning        Learn the beginner planning workflow
+  help planning        Learn the beginner resource fit workflow
   help resources       Learn the resource workflow
   help automation      Learn the scriptable workflow
   help --all           See every top-level command
@@ -333,7 +333,7 @@ def _configure_annotation_mutation_parser(parser: argparse.ArgumentParser) -> No
 def build_parser() -> argparse.ArgumentParser:
     parser = _AtReadyArgumentParser(
         prog="atready",
-        description="Plan a project around the tools and resources you already have.",
+        description="Show where your resources fit a project plan.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.set_defaults(handler=_handle_welcome, color="auto")
@@ -367,11 +367,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     guided_plan_parser = commands.add_parser(
         "plan",
-        help="Make a resource plan through a guided conversation",
+        help="Check resource fit through a guided conversation",
         description=(
-            "Turn a goal and one to three steps into a temporary, read-only resource plan. "
-            "AtReady uses only capabilities you choose from your declared roster. It does not "
-            "write a project file, contact a resource, or run any work."
+            "Match a goal and one to three existing plan steps to your declared roster. AtReady "
+            "does not create the complete project plan, write a project file, contact a resource, "
+            "or run any work."
         ),
     )
     guided_plan_parser.add_argument(
@@ -447,7 +447,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     demo_parser = commands.add_parser(
         "demo",
-        help="Run a complete synthetic resource plan",
+        help="Run a complete synthetic resource fit example",
         description=(
             "Run the bundled synthetic inventory and project entirely in memory. "
             "No files are written and no resources are contacted or run."
@@ -927,15 +927,15 @@ def _inventory_path(candidate: Path | None) -> Path:
 _HELP_TOPICS = {
     "planning": """PLANNING
 
-For a first plan:
+For a first resource fit check:
   0. See the complete flow: atready demo
   1. Create your roster:  atready init
   2. Add a resource:      atready add
-  3. Make a plan:         atready plan
+  3. Check resource fit:  atready plan
 
-The guided planner asks for a goal, one to three steps, each expected result and
-check, and the declared capability strength each step needs. It creates no
-project file and runs no resource.
+The guided check asks for a goal, one to three existing plan steps, each expected
+result and check, and the declared capability strength each step needs. It does
+not create the complete project plan, write a project file, or run a resource.
 
 For a reusable or scripted project brief:
   atready project template > project.yaml
@@ -2551,7 +2551,7 @@ def _handle_guided_plan(args: argparse.Namespace) -> int:
         raise failure
 
     try:
-        print("PLAN A PROJECT")
+        print("CHECK RESOURCE FIT")
         print(f"Inventory: {_terminal_safe(target)}")
         print(
             "AtReady will use only your declared roster. It will not write a project file, "
@@ -2560,7 +2560,7 @@ def _handle_guided_plan(args: argparse.Namespace) -> int:
         print("Do not enter credentials or secrets. Type cancel at any prompt.\n")
         project = _guided_project_from_inventory(catalog.inventory)
         _print_guided_plan_recap(project)
-        if not _guided_plan_yes_no("Make this resource plan?", default=True):
+        if not _guided_plan_yes_no("Check resource fit for these steps?", default=True):
             raise _GuidedPlanCancelledError
         plan = route(catalog.inventory, project, allow_demo=args.allow_demo)
         print()
@@ -3080,7 +3080,7 @@ def _handle_route(args: argparse.Namespace) -> int:
         project = project_from_path(project_path)
     except ConfigurationError as exc:
         if "configuration file does not exist" in str(exc):
-            exc.add_note("Use the guided planner instead: atready plan")
+            exc.add_note("Use the guided resource fit check instead: atready plan")
             exc.add_note("Or create a project brief: atready project template > project.yaml")
         raise
     try:

@@ -216,7 +216,7 @@ def render_summary(
     lines: list[str] = []
     _append_wrapped(
         lines,
-        f"Resource plan: {_untrusted_presentation_text(plan.project_name)}",
+        f"Resource fit: {_untrusted_presentation_text(plan.project_name)}",
         width=width,
     )
     if goal:
@@ -401,7 +401,7 @@ def render_summary(
         )
     _append_wrapped(
         lines,
-        "AtReady made this plan only.",
+        "AtReady only recommends resources where they fit.",
         width=width,
     )
     lines.append(_FINAL_SAFETY_BOUNDARY)

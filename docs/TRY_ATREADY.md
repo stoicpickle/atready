@@ -1,7 +1,8 @@
 # Try AtReady
 
 This is a short first test of AtReady's complete loop: install it, try the safe demo, add one
-resource you really use, and see where that resource fits in a small plan. Allow about 10 minutes.
+resource you really use, and see how it could support a small plan from you or Codex. Allow about
+10 minutes.
 
 AtReady will not scan your computer, contact the resource, run project work, or spend credits.
 Your resource roster stays in a local inventory file. Do not put credentials, private account
@@ -40,7 +41,7 @@ The command prints a complete example plan without creating files, using the net
 changing your personal resource list. Read the result once: what resource did it choose, why, and
 what did it leave out?
 
-## 3. Try your own resource and plan
+## 3. Try your own resource fit check
 
 Run these three commands in order:
 
@@ -54,15 +55,16 @@ atready plan
 2. `atready add` guides you through adding one tool, agent, service, subscription, app, or person
    you actually have available. Starter suggestions are editable and are not verified facts about
    your account. `Not sure` is a valid answer when the flow offers it.
-3. `atready plan` asks for a real but non-sensitive goal and one to three steps, then suggests where
-   your saved resources fit.
+3. `atready plan` asks for a real but non-sensitive goal and one to three steps from a rough plan,
+   then suggests where your saved resources fit. It does not create the complete project plan.
 
 During `atready add`, AtReady shows a no-write preview first. Nothing is saved until you separately
 type the exact save confirmation it gives you. The inventory remains on your computer; do not
 upload it or paste its contents into the feedback form.
 
 A useful result should make the assignment, reasoning, deliverable, check, and any gap easy to
-understand. It is advice, not an executed workflow: edit it, ignore it, or use it in your plan.
+understand. It is resource advice, not an executed workflow or a replacement for Codex's planning:
+edit it, ignore it, or use it to refine the plan.
 
 If you prefer an editable project file, run `atready help planning` after this test. It shows the
 advanced `project template` and `route --project` workflow.
@@ -73,10 +75,10 @@ advanced `project template` and `route --project` workflow.
 and answer these five questions:
 
 1. How far did you get?
-2. What were you trying to plan, and what did AtReady produce?
+2. What plan did you bring, and what resource fit did AtReady suggest?
 3. Where did you slow down or feel unsure?
-4. How easy was the resource plan to understand?
-5. Did the plan change what you would do, and what one improvement would help most?
+4. How easy was the resource recommendation to understand?
+5. Did it change how you would use your resources, and what one improvement would help most?
 
 Please describe rather than paste sensitive material. Do not attach your inventory, terminal
 history, credentials, private notes, local file paths, account details, or a proprietary plan.
