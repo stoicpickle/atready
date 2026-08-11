@@ -188,9 +188,17 @@ def test_scorecard_enforces_caps_gap_parity_and_resource_mentions(tmp_path: Path
         case["id"]: {check["name"] for check in case["checks"] if not check["passed"]}
         for case in report["cases"]
     }
+    support_checks = {
+        check["name"]
+        for case in report["cases"]
+        if case["id"] == "support-route"
+        for check in case["checks"]
+    }
 
     assert "line-cap" in failures["straightforward-route"]
     assert "word-cap" in failures["unconfirmed-gap"]
+    assert "gap-parity" not in failures["unconfirmed-gap"]
+    assert "gap-parity" not in support_checks
     assert "forbidden-pattern-1" in failures["support-route"]
     assert "resource-mention-Synthetic Reviewer Seat" in failures["support-route"]
 
