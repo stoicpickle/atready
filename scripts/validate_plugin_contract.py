@@ -203,8 +203,10 @@ def validate(
     plugin_root: Path,
     system_skills_dir: Path,
     *,
-    trusted_upstream_sha256: str = TRUSTED_UPSTREAM_VALIDATOR_SHA256,
+    trusted_upstream_sha256: str | None = None,
 ) -> list[str]:
+    if trusted_upstream_sha256 is None:
+        trusted_upstream_sha256 = TRUSTED_UPSTREAM_VALIDATOR_SHA256
     plugin_root = plugin_root.expanduser().resolve()
     valid_product_skills, errors = _official_products(plugin_root)
     if errors:

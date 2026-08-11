@@ -86,6 +86,40 @@ def test_production_validator_digest_is_bound_to_an_immutable_official_artifact(
     )
 
 
+def test_validate_uses_the_production_digest_by_default(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    plugin = _write_candidate(tmp_path, ["CODEX"])
+    system_skills = _write_upstream(tmp_path, [])
+    upstream = system_skills / "plugin-creator" / "scripts" / "validate_plugin.py"
+    fixture_digest = hashlib.sha256(upstream.read_bytes()).hexdigest()
+    monkeypatch.setitem(validate.__globals__, "TRUSTED_UPSTREAM_VALIDATOR_SHA256", fixture_digest)
+
+    errors = validate(plugin, system_skills)
+
+    assert errors == []
+    upstream.write_text(
+        "def validate_plugin(plugin_root):\n    return ['changed']\n", encoding="utf-8"
+    )
+    assert validate(plugin, system_skills) == [
+        "OpenAI plugin validator does not match the repository's reviewed SHA-256"
+    ]
+
+
+def test_matching_reviewed_digest_is_accepted(tmp_path: Path) -> None:
+    plugin = _write_candidate(tmp_path, ["CODEX"])
+    system_skills = _write_upstream(tmp_path, [])
+    upstream = system_skills / "plugin-creator" / "scripts" / "validate_plugin.py"
+
+    errors = validate(
+        plugin,
+        system_skills,
+        trusted_upstream_sha256=hashlib.sha256(upstream.read_bytes()).hexdigest(),
+    )
+
+    assert errors == []
+
+
 def test_invalid_products_are_rejected_before_legacy_compatibility(tmp_path: Path) -> None:
     plugin = _write_candidate(tmp_path, ["CODEX", "UNKNOWN"])
     system_skills = _write_upstream(tmp_path, [])
