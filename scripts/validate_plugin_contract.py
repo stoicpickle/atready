@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
 import stat
 from pathlib import Path
@@ -69,7 +70,7 @@ def _load_upstream_validator(path: Path, trusted_sha256: str) -> ModuleType:
     file_stat = path.stat()
     if file_stat.st_size > MAX_UPSTREAM_BYTES:
         raise ValueError(f"OpenAI plugin validator exceeds {MAX_UPSTREAM_BYTES} bytes")
-    if file_stat.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+    if os.name == "posix" and file_stat.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
         raise ValueError("OpenAI plugin validator must not be group- or world-writable")
     source_bytes = path.read_bytes()
     expected_hash = hashlib.sha256(source_bytes).hexdigest()
