@@ -41,8 +41,15 @@ You need Python 3.11 or newer and
 public GitHub repository:
 
 ```bash
-uv tool install git+https://github.com/stoicpickle/atready.git
+uv tool install --force --no-config --no-python-downloads \
+  --default-index https://pypi.org/simple \
+  'git+https://github.com/stoicpickle/atready.git@main'
 ```
+
+This is the moving public-source beta channel, not an immutable release. AtReady never runs this
+install or update command for you.
+If you set `UV_INDEX`, `UV_INDEX_URL`, or `UV_EXTRA_INDEX_URL`, uv may still use those inherited
+indexes; clear them first if you require PyPI-only dependency resolution.
 
 If your terminal says `atready` was not found, run `uv tool update-shell`, close and reopen the
 terminal, then try again.

@@ -18,13 +18,13 @@ uv run --no-sync twine check --strict dist/*
 uv run --no-sync python scripts/verify_readme_rendering.py
 uv run --no-sync python scripts/verify_release_artifacts.py --dist dist
 uv run --isolated --no-project \
-  --with ./dist/project_atready-0.1.8-py3-none-any.whl \
+  --with ./dist/project_atready-0.1.9-py3-none-any.whl \
   python scripts/smoke_wheel.py
 uv run --isolated --no-project \
-  --with ./dist/project_atready-0.1.8-py3-none-any.whl \
+  --with ./dist/project_atready-0.1.9-py3-none-any.whl \
   python scripts/smoke_plugin.py
 uv run --no-sync python scripts/hardening_gate.py \
-  --wheel ./dist/project_atready-0.1.8-py3-none-any.whl
+  --wheel ./dist/project_atready-0.1.9-py3-none-any.whl
 ```
 
 The clean first-use lane performs real, non-editable source and wheel installs into separate

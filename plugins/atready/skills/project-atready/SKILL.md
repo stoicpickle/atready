@@ -5,56 +5,53 @@ description: Add one user-declared resource to an AtReady roster through a conve
 
 # AtReady
 
-Use AtReady for two jobs: add resources or place saved resources in a plan. Route adds to intake.
-The CLI owns mutations, eligibility, assignments, gaps, and handoff packets.
+Use AtReady for two jobs: intake and plan placement. The CLI owns mutations and routing.
 
-Resolve this `SKILL.md` directory once, without searching elsewhere, and replace
-`/absolute/path/to/project-atready` below with it. Resolve one already-installed Python 3.11 or
-newer interpreter to an absolute path and replace `/absolute/path/to/python3` below with it. Use
-only that interpreter to run the bundled launcher. Never invoke a bare `atready` command or bypass
+Resolve this `SKILL.md` directory. Resolve one already-installed Python 3.11 or newer interpreter.
+Replace both absolute placeholders below and run the bundled launcher. Never invoke a bare `atready` command or bypass
 the launcher. It uses trusted `uv`, offline and without configuration files, resolves its exact
 tool bin, verifies the runtime contract, and never searches `PATH` for `atready`.
 
 ## Response discipline
 
-Respect concise, short, brief, quick, promo, or on-screen requests and explicit limits. Concision changes
-presentation, never evidence. For a direct question without routing or state change, answer in no
-more than three short sentences or bullets. During a workflow, give only the facts needed for the current state and one next action or approval. Do not repeat boundaries or restate the prompt. Never omit an exact target, actual CLI preview or
-receipt, mutation state, material uncertainty, separate approval, or successful-route boundary.
-Never change the actual route or mutation status to satisfy a limit.
+Respect concise, short, brief, quick, promo, or on-screen limits and explicit limits. For a direct question
+without routing or state change, use no more than three short sentences or bullets. During a workflow,
+give only current facts and one next action. Do not repeat boundaries or the prompt. Keep exact
+targets, CLI preview or receipt, mutation state, uncertainty, separate approval, and route boundaries.
+Never change route or mutation status to satisfy a limit.
 
 ## Resource intake workflow
 
 Use this branch before planning when the user asks to add one resource. Handle one resource at a
 time and keep additional names in a queue.
 
-### 1. Ask and recap without tools
+### 1. Conversation fast path
 
 If the resource is unnamed, ask only `What resource do you want to add?` and stop. Do not read a
-reference, inspect memory or the repository, invoke the launcher, resolve a target, or inspect the
-roster.
+reference, inspect memory or the repository, invoke the launcher, resolve a target, or inspect the roster. Use no tools or filesystem access and narrate nothing.
 
-Once the name is known, read only
-[quick-resource-intake.md](references/quick-resource-intake.md). Do not read another reference or
-run any command during the question or recap turns. Ask only the unanswered subset of its three
-human questions; a bare-name reply gets all three. Then render its compact recap and ask
-`Preview this entry?` Corrections are facts, not approval: apply them, rerender the full recap, and
-require approval of the latest version. Never narrate internal loading or checks.
+Once the name is known, read only [quick-resource-intake.md](references/quick-resource-intake.md).
+Do not read another reference or run any command during the question or recap turns. Ask only its
+unanswered three questions; a bare-name reply gets all three. Then render its compact recap and ask
+`Preview this entry?` Corrections are facts, not approval: apply them, rerender the recap, and
+require its approval. Recaps use no tools and expose no internal work.
 
 ### 2. Preview, approve, and save
 
-Only after explicit approval of the latest recap, read the complete
-[resource-onboarding.md](references/resource-onboarding.md) and follow its protected target,
-schema, profile, preview, apply, cleanup, receipt, and validation contract. This is the first point
-where local execution or filesystem access may be used. Without those capabilities, say chat
-cannot save and offer `atready add` only as a user-run terminal fallback.
+Only after approval of an unchanged bundled-purpose Quick Setup recap with three definite answers,
+read [quick-resource-preview.md](references/quick-resource-preview.md). Read
+[resource-onboarding.md](references/resource-onboarding.md) only for Detailed Setup, a custom or
+ambiguous resource, a corrected purpose, extra planning facts, any `Not sure` answer, or a complete
+declaration. Reuse supplied facts and ask only what remains necessary. This is the first point where local execution or filesystem access may be used. Otherwise request authorization or provide the exact resolved bundled-launcher command as an inert user-run terminal fallback; never offer bare `atready add`.
 
 Show the actual CLI preview unchanged, then stop for a separate `Save exactly this entry?`
 approval. Any correction or changed declaration, target, revision, or plan requires a new compact
 recap and preview. Never claim success from an uncertain apply receipt or retry an apply.
 
-Keep provider discovery, computer scans, account or billing inspection, credentials, tokens, and
-private notes outside this workflow. Use only user-stated facts. Do not use the planning output
+On a no-write preview mismatch, preserve approved task-local facts and invite exact `retry preview` once. Rerun preview without intake or recap. On another mismatch, say the roster keeps changing and nothing was saved; do not offer another retry. It never retries apply, reuses old tokens, saves, or waives save approval.
+
+Exclude provider discovery, scans, account or billing inspection, credentials, tokens, and private
+notes. Use only user-stated facts. Do not use the planning output
 contract and do not append the routing boundary sentence because no route occurred.
 
 ## Planning workflow

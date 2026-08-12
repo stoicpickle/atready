@@ -398,6 +398,165 @@ def _score_resource(
     }
 
 
+def _score_preview_retry(
+    turns: list[dict[str, Any]], case: dict[str, Any], prompt: str
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    checks: list[dict[str, Any]] = []
+    expected_speakers = ["user", "assistant"] * 5
+    _check(
+        checks,
+        "turn-sequence",
+        [turn["speaker"] for turn in turns] == expected_speakers,
+        "five user and five assistant turns alternate",
+    )
+    if len(turns) != 10:
+        return checks, {"assistant_turns": sum(t["speaker"] == "assistant" for t in turns)}
+
+    _check(checks, "unchanged-prompt", turns[0]["text"].strip() == prompt.strip(), "prompt matches")
+    question = turns[1]["text"]
+    question_normalized = _normalized(question)
+    _check(
+        checks,
+        "named-fast-path",
+        question.count("?") == 3
+        and "what resource do you want to add" not in question_normalized
+        and ("strong" in question_normalized or "strength" in question_normalized)
+        and "available" in question_normalized
+        and "private" in question_normalized,
+        "named request asks only the three unanswered intake questions",
+    )
+    _check(
+        checks,
+        "question-word-cap",
+        _word_count(question)
+        <= _positive_int(case.get("maximum_question_words"), label="maximum_question_words"),
+        f"{_word_count(question)} question words",
+    )
+    _check(
+        checks,
+        "intake-answers-unchanged",
+        turns[2]["text"].strip() == "Strong, available now, and yes for private repository code."
+        and not turns[2]["actions"],
+        "user supplies the unchanged scripted intake answers",
+    )
+    recap = turns[3]["text"]
+    recap_normalized = _normalized(recap)
+    _check(
+        checks,
+        "compact-recap",
+        _word_count(recap)
+        <= _positive_int(case.get("maximum_recap_words"), label="maximum_recap_words")
+        and recap.rstrip().endswith("Preview this entry?")
+        and "coderabbit" in recap_normalized
+        and re.search(r"strength\s*:\s*strong\b", recap_normalized) is not None
+        and re.search(r"available now\s*:\s*yes\b", recap_normalized) is not None,
+        "recap preserves the named resource and supplied facts",
+    )
+    _check(
+        checks,
+        "question-and-recap-tool-free",
+        not turns[1]["actions"] and not turns[3]["actions"],
+        "question and recap turns contain no tool action",
+    )
+    _check(
+        checks,
+        "preview-approved",
+        turns[4]["text"].strip() == "Yes, preview this entry." and not turns[4]["actions"],
+        "user explicitly approves the current recap before preview",
+    )
+    internal_narration = re.compile(
+        r"\b(?:loading|loaded|checking|checked|searching)\b"
+        r"|\b(?:memory|repository|filesystem|roster|catalog|profile)\s+"
+        r"(?:search|lookup|inspection|check|scan)\b"
+        r"|\b(?:reference|skill|contract)\s+(?:file|load\w*)\b"
+        r"|\btool\s+call\b",
+        re.IGNORECASE,
+    )
+    _check(
+        checks,
+        "no-internal-narration",
+        internal_narration.search(question + "\n" + recap) is None,
+        "question and recap omit internal loading, memory, repository, reference, "
+        "and tool narration",
+    )
+
+    first_preview = turns[5]
+    first_preview_normalized = _normalized(first_preview["text"])
+    _check(
+        checks,
+        "mismatch-is-no-write",
+        len(first_preview["actions"]) == 1
+        and first_preview["actions"][0].get("kind") == "atready-preview"
+        and "roster changed" in first_preview_normalized
+        and "nothing was saved" in first_preview_normalized
+        and "retry preview" in first_preview_normalized
+        and "save exactly this entry?" not in first_preview_normalized,
+        "first no-write preview mismatch offers bounded same-task recovery",
+    )
+    _check(
+        checks,
+        "exact-retry-instruction",
+        turns[6]["text"].strip().casefold() == "retry preview",
+        "user invokes the exact recovery instruction",
+    )
+    refreshed = turns[7]
+    refreshed_normalized = _normalized(refreshed["text"])
+    repeated_intake = re.compile(
+        r"(?i)(?:how|what)\b[^?]{0,30}\b(?:strength|strong)\b[^?]*\?"
+        r"|(?:is|are)\b[^?]{0,30}\bavailable\b[^?]*\?"
+        r"|(?:would|can|may)\b[^?]{0,40}\bprivate\b[^?]*\?"
+    )
+    _check(
+        checks,
+        "retry-without-repeating-intake",
+        len(refreshed["actions"]) == 1
+        and refreshed["actions"][0].get("kind") == "atready-preview"
+        and repeated_intake.search(refreshed["text"]) is None
+        and not refreshed["text"].rstrip().endswith("Preview this entry?"),
+        "retry runs one refreshed preview without questions or recap approval",
+    )
+    _check(
+        checks,
+        "latest-facts-in-refreshed-preview",
+        "coderabbit" in refreshed_normalized
+        and re.search(r"strength\s*:\s*strong\b", refreshed_normalized) is not None
+        and re.search(r"available now\s*:\s*yes\b", refreshed_normalized) is not None
+        and "private" in refreshed_normalized
+        and refreshed["text"].rstrip().endswith("Save exactly this entry?"),
+        "refreshed preview retains the approved facts and separate save approval",
+    )
+    all_actions = [action for turn in turns for action in turn["actions"]]
+    _check(
+        checks,
+        "no-apply",
+        all(action.get("kind") != "atready-apply" for action in all_actions),
+        "mismatch and retry never apply",
+    )
+    _check(
+        checks,
+        "save-declined",
+        turns[8]["text"].strip() == "No. Do not save it." and not turns[8]["actions"],
+        "user explicitly declines the separate save approval",
+    )
+    _check(
+        checks,
+        "graceful-cancel",
+        (
+            "not saved" in _normalized(turns[9]["text"])
+            or "nothing was saved" in _normalized(turns[9]["text"])
+        )
+        and not turns[9]["actions"],
+        "final answer confirms no save",
+    )
+    _action_checks(turns, checks)
+    return checks, {
+        "assistant_turns": 5,
+        "question_words": _word_count(question),
+        "recap_words": _word_count(recap),
+        "preview_actions": sum(action.get("kind") == "atready-preview" for action in all_actions),
+    }
+
+
 def _score_planning(
     turns: list[dict[str, Any]], case: dict[str, Any], prompt: str, expected: str
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -582,6 +741,8 @@ def score_transcript(
         prompt = _read_regular(prompt_path, label=f"{case_id} prompt")
         if case_id == "resource-add-conversation":
             checks, metrics = _score_resource(turns, case_contract, prompt)
+        elif case_id == "resource-add-preview-retry":
+            checks, metrics = _score_preview_retry(turns, case_contract, prompt)
         else:
             expected_path = _inside(
                 manifest_path.parent,

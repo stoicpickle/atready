@@ -11,6 +11,12 @@
       "maximum_recap_words": 110
     },
     {
+      "id": "resource-add-preview-retry",
+      "prompt_file": "../prompts/resource-add-preview-retry.txt",
+      "maximum_question_words": 100,
+      "maximum_recap_words": 110
+    },
+    {
       "id": "planning-follow-up",
       "prompt_file": "../prompts/planning-follow-up.txt",
       "expected_summary_file": "expected/planning-follow-up.txt",

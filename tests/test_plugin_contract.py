@@ -511,7 +511,7 @@ def test_launcher_uses_a_fixed_doctor_vector_and_accepts_product_version_drift()
 
     assert "shell=True" not in source
     assert "pip install" not in source
-    assert "uv tool install" not in source
+    assert "subprocess.run(_runtime_update_command" not in source
     assert "_repository_root" not in namespace
     assert namespace["_UV_TOOL_BIN_ARGUMENTS"] == (
         "--offline",
@@ -525,6 +525,7 @@ def test_launcher_uses_a_fixed_doctor_vector_and_accepts_product_version_drift()
     assert "routing.agent-summary.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
     assert "routing.capacity-demand.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
     assert "routing.compare.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
+    assert "resource.quick-preview.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
 
     compatible = subprocess.CompletedProcess(
         args=["/resolved/atready", *_doctor_arguments(namespace)],
@@ -602,6 +603,179 @@ def test_launcher_refuses_nonzero_or_warning_bearing_doctor_checks(
     ):
         with pytest.raises(SystemExit, match="invalid local runtime"):
             verify_runtime_contract(["/resolved/atready"])
+
+
+def test_launcher_diagnoses_legacy_runtime_before_delegation() -> None:
+    namespace = runpy.run_path(str(WRAPPER))
+    doctor = subprocess.CompletedProcess(
+        args=["/resolved/atready", *_doctor_arguments(namespace)],
+        returncode=2,
+        stdout="",
+        stderr="error: unrecognized arguments: --plugin-contract\n",
+    )
+    version = subprocess.CompletedProcess(
+        args=["/resolved/atready", "--version"],
+        returncode=0,
+        stdout="atready 0.1.7\n",
+        stderr="",
+    )
+    bounded = mock.Mock(side_effect=[doctor, version])
+    verify_runtime_contract = namespace["_verify_runtime_contract"]
+
+    with mock.patch.dict(verify_runtime_contract.__globals__, {"_run_bounded": bounded}):
+        with pytest.raises(SystemExit) as stopped:
+            verify_runtime_contract(["/resolved/atready"])
+
+    message = str(stopped.value)
+    assert "Observed local runtime version: 0.1.7" in message
+    assert "did not delegate your request" in message
+    assert "do not ask the runtime to read or write your roster" in message
+    assert namespace["_runtime_update_command"]() in message
+    assert "moving public-source beta channel" in message
+    assert "UV_INDEX, UV_INDEX_URL, or UV_EXTRA_INDEX_URL" in message
+    assert "retry the AtReady preview or other request in this same task" in message
+    assert bounded.call_args_list == [
+        mock.call(["/resolved/atready", *_doctor_arguments(namespace)]),
+        mock.call(
+            ["/resolved/atready", "--version"],
+            timeout_seconds=namespace["_VERSION_PROBE_TIMEOUT_SECONDS"],
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "doctor",
+    [
+        subprocess.CompletedProcess(
+            args=["/resolved/atready", "doctor"],
+            returncode=2,
+            stdout="",
+            stderr="synthetic doctor failure",
+        ),
+        subprocess.CompletedProcess(
+            args=["/resolved/atready", "doctor"],
+            returncode=0,
+            stdout="not-json\n",
+            stderr="",
+        ),
+        None,
+    ],
+    ids=("nonzero", "malformed", "incomplete"),
+)
+def test_launcher_remediation_only_probes_doctor_and_version(
+    doctor: subprocess.CompletedProcess[str] | None,
+) -> None:
+    namespace = runpy.run_path(str(WRAPPER))
+    if doctor is None:
+        doctor = subprocess.CompletedProcess(
+            args=["/resolved/atready", *_doctor_arguments(namespace)],
+            returncode=0,
+            stdout=json.dumps(
+                _doctor_payload(
+                    namespace,
+                    runtime_features=list(namespace["REQUIRED_RUNTIME_FEATURE_IDS"])[1:],
+                )
+            )
+            + "\n",
+            stderr="",
+        )
+    version = subprocess.CompletedProcess(
+        args=["/resolved/atready", "--version"],
+        returncode=0,
+        stdout="atready 0.1.7\n",
+        stderr="",
+    )
+    bounded = mock.Mock(side_effect=[doctor, version])
+    verify_runtime_contract = namespace["_verify_runtime_contract"]
+
+    with mock.patch.dict(verify_runtime_contract.__globals__, {"_run_bounded": bounded}):
+        with pytest.raises(SystemExit) as stopped:
+            verify_runtime_contract(["/resolved/atready"])
+
+    assert namespace["_runtime_update_command"]() in str(stopped.value)
+    assert bounded.call_args_list == [
+        mock.call(["/resolved/atready", *_doctor_arguments(namespace)]),
+        mock.call(
+            ["/resolved/atready", "--version"],
+            timeout_seconds=namespace["_VERSION_PROBE_TIMEOUT_SECONDS"],
+        ),
+    ]
+
+
+def test_launcher_remediation_never_invokes_a_subprocess_directly() -> None:
+    namespace = runpy.run_path(str(WRAPPER))
+    remediation = namespace["_runtime_remediation"]
+    version = subprocess.CompletedProcess(
+        args=["/resolved/atready", "--version"],
+        returncode=0,
+        stdout="atready 0.1.7\n",
+        stderr="",
+    )
+    bounded = mock.Mock(return_value=version)
+    forbidden = mock.Mock(side_effect=AssertionError("remediation must not execute subprocesses"))
+
+    with (
+        mock.patch.dict(remediation.__globals__, {"_run_bounded": bounded}),
+        mock.patch.multiple(
+            namespace["subprocess"],
+            Popen=forbidden,
+            call=forbidden,
+            check_call=forbidden,
+            check_output=forbidden,
+            run=forbidden,
+        ),
+    ):
+        message = remediation(
+            ["/resolved/atready"],
+            "AtReady could not verify the installed local runtime, so it stopped.",
+        )
+
+    assert namespace["_runtime_update_command"]() in message
+    bounded.assert_called_once_with(
+        ["/resolved/atready", "--version"],
+        timeout_seconds=namespace["_VERSION_PROBE_TIMEOUT_SECONDS"],
+    )
+    forbidden.assert_not_called()
+
+
+def test_launcher_caps_the_secondary_version_probe_after_doctor_failure() -> None:
+    namespace = runpy.run_path(str(WRAPPER))
+    doctor_timeout = subprocess.TimeoutExpired(
+        ["/resolved/atready", "doctor"],
+        timeout=namespace["_HANDSHAKE_TIMEOUT_SECONDS"],
+    )
+    version_timeout = subprocess.TimeoutExpired(
+        ["/resolved/atready", "--version"],
+        timeout=namespace["_VERSION_PROBE_TIMEOUT_SECONDS"],
+    )
+    bounded = mock.Mock(side_effect=[doctor_timeout, version_timeout])
+    verify_runtime_contract = namespace["_verify_runtime_contract"]
+
+    with mock.patch.dict(verify_runtime_contract.__globals__, {"_run_bounded": bounded}):
+        with pytest.raises(SystemExit) as stopped:
+            verify_runtime_contract(["/resolved/atready"])
+
+    assert "Observed local runtime version: unknown" in str(stopped.value)
+    assert namespace["_VERSION_PROBE_TIMEOUT_SECONDS"] <= 2
+    assert bounded.call_args_list[-1] == mock.call(
+        ["/resolved/atready", "--version"],
+        timeout_seconds=namespace["_VERSION_PROBE_TIMEOUT_SECONDS"],
+    )
+
+
+def test_launcher_version_observation_honors_its_short_timeout() -> None:
+    namespace = runpy.run_path(str(WRAPPER))
+    observe_runtime_version = namespace["_observe_runtime_version"]
+    sleeper = [sys.executable, "-c", "import time; time.sleep(30)"]
+
+    started = time.monotonic()
+    with mock.patch.dict(
+        observe_runtime_version.__globals__,
+        {"_VERSION_PROBE_TIMEOUT_SECONDS": 0.1},
+    ):
+        assert observe_runtime_version(sleeper) == "unknown"
+
+    assert time.monotonic() - started < 1.0
 
 
 @pytest.mark.parametrize(

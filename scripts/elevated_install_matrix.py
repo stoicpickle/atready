@@ -84,11 +84,17 @@ def _write_executable(path: Path, body: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
 
 
-def _runtime_payload(*, plugin_version: str, missing_feature: bool = False) -> dict[str, Any]:
+def _runtime_payload(
+    *,
+    plugin_version: str,
+    runtime_version: str = "9.9.9",
+    missing_feature: bool = False,
+) -> dict[str, Any]:
     features = [
         "inventory.mutate-preview-apply.v1",
         "inventory.read.v1",
         "resource.profiles.v1",
+        "resource.quick-preview.v1",
         "routing.agent-summary.v1",
         "routing.capacity-demand.v1",
         "routing.compare.v1",
@@ -108,7 +114,7 @@ def _runtime_payload(*, plugin_version: str, missing_feature: bool = False) -> d
         "product": "project-atready",
         "runtime_contract_version": 1,
         "runtime_features": features,
-        "runtime_version": "9.9.9",
+        "runtime_version": runtime_version,
         "status": "ready",
         "writes_performed": False,
     }
@@ -117,7 +123,9 @@ def _runtime_payload(*, plugin_version: str, missing_feature: bool = False) -> d
 def _invoke_staged_wrapper(
     root: Path,
     *,
-    plugin_version: str = "0.1.9",
+    plugin_version: str = "0.1.10",
+    runtime_version: str = "9.9.9",
+    legacy_doctor: bool = False,
     missing_feature: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     skill = root / "staged-plugin" / "skills" / "project-atready"
@@ -129,14 +137,25 @@ def _invoke_staged_wrapper(
 
     runtime = tool_bin / ("atready.exe" if os.name == "nt" else "atready")
     payload = json.dumps(
-        _runtime_payload(plugin_version=plugin_version, missing_feature=missing_feature),
+        _runtime_payload(
+            plugin_version=plugin_version,
+            runtime_version=runtime_version,
+            missing_feature=missing_feature,
+        ),
         sort_keys=True,
     )
     _write_executable(
         runtime,
         "import sys\n"
         f"payload = {payload!r}\n"
-        "if len(sys.argv) > 1 and sys.argv[1] == 'doctor':\n"
+        f"runtime_version = {runtime_version!r}\n"
+        f"legacy_doctor = {legacy_doctor!r}\n"
+        "if len(sys.argv) > 1 and sys.argv[1] == '--version':\n"
+        "    print('atready ' + runtime_version)\n"
+        "elif len(sys.argv) > 1 and sys.argv[1] == 'doctor' and legacy_doctor:\n"
+        "    print('error: unrecognized arguments: --plugin-contract', file=sys.stderr)\n"
+        "    raise SystemExit(2)\n"
+        "elif len(sys.argv) > 1 and sys.argv[1] == 'doctor':\n"
         "    print(payload)\n"
         "else:\n"
         "    print('SYNTHETIC-DELEGATED-RUNTIME')\n",
@@ -155,18 +174,29 @@ def _invoke_staged_wrapper(
         namespace = runpy.run_path(str(skill / _WRAPPER_RELATIVE))
         launcher_globals = namespace["_resolve_command"].__globals__
         launcher_globals["_uv_tool_bin"] = lambda: tool_bin
-        launcher_globals["_run_bounded"] = lambda _command: subprocess.CompletedProcess(
-            _command,
-            0,
-            payload + "\n",
-            "",
-        )
+
+        def fake_bounded(
+            command: list[str], *, timeout_seconds: float | None = None
+        ) -> subprocess.CompletedProcess[str]:
+            del timeout_seconds
+            if command[-1] == "--version":
+                return subprocess.CompletedProcess(command, 0, f"atready {runtime_version}\n", "")
+            if legacy_doctor:
+                return subprocess.CompletedProcess(
+                    command,
+                    2,
+                    "",
+                    "error: unrecognized arguments: --plugin-contract\n",
+                )
+            return subprocess.CompletedProcess(command, 0, payload + "\n", "")
+
+        launcher_globals["_run_bounded"] = fake_bounded
         try:
             _executable, command = namespace["_resolve_command"](platform="win32")
             namespace["_verify_runtime_contract"](command)
         except SystemExit as exc:
             return subprocess.CompletedProcess([], 1, "", f"{exc}\n")
-        return subprocess.CompletedProcess([], 0, "SYNTHETIC-DELEGATED-RUNTIME\n", "")
+        return subprocess.CompletedProcess([], 0, f"atready {runtime_version}\n", "")
     return subprocess.run(  # noqa: S603
         [sys.executable, str(skill / _WRAPPER_RELATIVE), "--version"],
         cwd=root,
@@ -182,12 +212,20 @@ def run_matrix(root: Path) -> dict[str, Any]:
     root.mkdir(parents=True, exist_ok=False)
 
     compatible = _invoke_staged_wrapper(root / "compatible")
-    if compatible.returncode != 0 or compatible.stdout != "SYNTHETIC-DELEGATED-RUNTIME\n":
+    if compatible.returncode != 0 or compatible.stdout != "atready 9.9.9\n":
         raise AssertionError(f"fresh compatible stage failed: {compatible.stderr}")
 
-    stale = _invoke_staged_wrapper(root / "stale", plugin_version="0.1.8")
-    if stale.returncode == 0 or "refusing to continue" not in stale.stderr:
+    stale = _invoke_staged_wrapper(
+        root / "stale",
+        runtime_version="0.1.7",
+        legacy_doctor=True,
+    )
+    if stale.returncode == 0 or "Observed local runtime version: 0.1.7" not in stale.stderr:
         raise AssertionError("stale runtime was not rejected before delegation")
+    if "retry the AtReady preview or other request in this same task" not in stale.stderr:
+        raise AssertionError("stale runtime did not provide same-task recovery")
+    if "git+https://github.com/stoicpickle/atready.git@main" not in stale.stderr:
+        raise AssertionError("stale runtime did not provide the public-source recovery command")
     if "SYNTHETIC-DELEGATED-RUNTIME" in stale.stdout + stale.stderr:
         raise AssertionError("stale runtime delegated the requested command")
 

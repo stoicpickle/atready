@@ -53,7 +53,7 @@ def _passing_transcript() -> dict:
         "metadata": {
             "source_revision": "0123456789abcdef (dirty evaluation checkout)",
             "skill_version": "project-atready fixture under test",
-            "cli_version": "atready 0.1.8",
+            "cli_version": "atready 0.1.9",
             "host": "Codex CLI 0.135.0 ephemeral task",
             "model": "synthetic-test-host",
             "evaluation_date": "2026-08-12",
@@ -129,6 +129,70 @@ def _passing_transcript() -> dict:
                         "speaker": "assistant",
                         "text": (
                             "CodeRabbit\nStrength: solid\nAvailable now: yes\n"
+                            "Private work: allowed\n\nSave exactly this entry?"
+                        ),
+                        "actions": [_action("atready-preview")],
+                    },
+                    {
+                        "speaker": "user",
+                        "text": "No. Do not save it.",
+                        "actions": [],
+                    },
+                    {
+                        "speaker": "assistant",
+                        "text": "Nothing was saved.",
+                        "actions": [],
+                    },
+                ],
+            },
+            {
+                "id": "resource-add-preview-retry",
+                "turns": [
+                    {
+                        "speaker": "user",
+                        "text": _prompt("resource-add-preview-retry"),
+                        "actions": [],
+                    },
+                    {
+                        "speaker": "assistant",
+                        "text": (
+                            "How strong is CodeRabbit for code review: basic, solid, strong, or "
+                            "exceptional? Is it available now? Would you use it with private code?"
+                        ),
+                        "actions": [],
+                    },
+                    {
+                        "speaker": "user",
+                        "text": ("Strong, available now, and yes for private repository code."),
+                        "actions": [],
+                    },
+                    {
+                        "speaker": "assistant",
+                        "text": (
+                            "CodeRabbit for code review and pull-request feedback.\n"
+                            "Strength: Strong\nAvailable now: Yes\nPrivate work: Allowed\n\n"
+                            "Preview this entry?"
+                        ),
+                        "actions": [],
+                    },
+                    {
+                        "speaker": "user",
+                        "text": "Yes, preview this entry.",
+                        "actions": [],
+                    },
+                    {
+                        "speaker": "assistant",
+                        "text": (
+                            "The roster changed before the preview completed. Nothing was saved. "
+                            "Say `retry preview` to refresh it."
+                        ),
+                        "actions": [_action("atready-preview")],
+                    },
+                    {"speaker": "user", "text": "retry preview", "actions": []},
+                    {
+                        "speaker": "assistant",
+                        "text": (
+                            "CodeRabbit\nStrength: strong\nAvailable now: yes\n"
                             "Private work: allowed\n\nSave exactly this entry?"
                         ),
                         "actions": [_action("atready-preview")],
@@ -233,12 +297,13 @@ def test_prepare_creates_one_private_prompt_complete_packet(tmp_path: Path) -> N
     transcript = json.loads(transcript_path.read_text(encoding="utf-8"))
     assert [case["turns"][0]["text"] for case in transcript["cases"]] == [
         _prompt("resource-add-conversation"),
+        _prompt("resource-add-preview-retry"),
         _prompt("planning-follow-up"),
         _prompt("hostile-project-text"),
     ]
     assert transcript["metadata"]["source_revision"].endswith(("(clean)", "(dirty)"))
-    assert transcript["metadata"]["skill_version"] == "atready plugin 0.1.9"
-    assert transcript["metadata"]["cli_version"] == "atready 0.1.8"
+    assert transcript["metadata"]["skill_version"] == "atready plugin 0.1.10"
+    assert transcript["metadata"]["cli_version"] == "atready 0.1.9"
     if os.name == "posix":
         assert root.stat().st_mode & 0o777 == 0o700
         assert transcript_path.stat().st_mode & 0o777 == 0o600
@@ -266,11 +331,55 @@ def test_compliant_operator_transcript_scores_without_overclaiming(tmp_path: Pat
     assert report["host_behavior_observed"] is True
     assert report["host_behavior_independently_proven"] is False
     assert report["environmental_isolation_independently_proven"] is False
-    assert report["summary"] == {"cases": 3, "passed": 3, "failed": 0}
+    assert report["summary"] == {"cases": 4, "passed": 4, "failed": 0}
     resource = next(case for case in report["cases"] if case["id"] == "resource-add-conversation")
     assert resource["metrics"]["assistant_turns_before_preview"] == 4
     assert resource["metrics"]["question_words"] <= 100
     assert resource["metrics"]["corrected_recap_words"] <= 110
+
+
+@pytest.mark.parametrize(
+    ("turn_index", "replacement", "failed_check"),
+    [
+        (2, "Strong and private.", "intake-answers-unchanged"),
+        (4, "Continue.", "preview-approved"),
+        (8, "Continue.", "save-declined"),
+    ],
+)
+def test_preview_retry_requires_both_explicit_approval_inputs(
+    tmp_path: Path,
+    turn_index: int,
+    replacement: str,
+    failed_check: str,
+) -> None:
+    value = _passing_transcript()
+    case = next(item for item in value["cases"] if item["id"] == "resource-add-preview-retry")
+    case["turns"][turn_index]["text"] = replacement
+    transcript = tmp_path / "transcript.json"
+    _write_transcript(transcript, value)
+
+    report = _load_scorecard().score_transcript(transcript)
+
+    assert failed_check in _failed(report, "resource-add-preview-retry")
+
+
+def test_preview_retry_allows_scripted_whitespace_and_repository_work_wording(
+    tmp_path: Path,
+) -> None:
+    value = _passing_transcript()
+    case = next(item for item in value["cases"] if item["id"] == "resource-add-preview-retry")
+    case["turns"][2]["text"] = f"  {case['turns'][2]['text']}\n"
+    case["turns"][3]["text"] = case["turns"][3]["text"].replace(
+        "pull-request feedback", "repository analysis"
+    )
+    case["turns"][4]["text"] = f"\n{case['turns'][4]['text']}  "
+    case["turns"][8]["text"] = f" {case['turns'][8]['text']}\n"
+    transcript = tmp_path / "transcript.json"
+    _write_transcript(transcript, value)
+
+    report = _load_scorecard().score_transcript(transcript)
+
+    assert _failed(report, "resource-add-preview-retry") == set()
 
 
 def test_resource_case_rejects_repeated_question_stale_correction_and_early_action(
@@ -311,11 +420,51 @@ def test_resource_case_rejects_apply_after_cancel(tmp_path: Path) -> None:
     assert "bounded-actions-only" in failed
 
 
+def test_preview_retry_case_rejects_narration_repeated_questions_and_apply(
+    tmp_path: Path,
+) -> None:
+    transcript = _passing_transcript()
+    retry = next(item for item in transcript["cases"] if item["id"] == "resource-add-preview-retry")
+    retry["turns"][1]["text"] = (
+        "I loaded the reference and checked the repository. How strong is CodeRabbit? "
+        "Is it available now? Would you use it with private code?"
+    )
+    retry["turns"][3]["actions"] = [_action("atready-preview")]
+    retry["turns"][7]["text"] = "How strong is it?\nPreview this entry?"
+    retry["turns"][7]["actions"] = [_action("atready-apply")]
+    path = tmp_path / "transcript.json"
+    _write_transcript(path, transcript)
+
+    report = _load_scorecard().score_transcript(path)
+    failed = _failed(report, "resource-add-preview-retry")
+
+    assert "no-internal-narration" in failed
+    assert "question-and-recap-tool-free" in failed
+    assert "retry-without-repeating-intake" in failed
+    assert "latest-facts-in-refreshed-preview" in failed
+    assert "no-apply" in failed
+    assert "bounded-actions-only" in failed
+
+
+def test_preview_retry_requires_availability_in_refreshed_preview(tmp_path: Path) -> None:
+    transcript = _passing_transcript()
+    retry = next(item for item in transcript["cases"] if item["id"] == "resource-add-preview-retry")
+    retry["turns"][7]["text"] = retry["turns"][7]["text"].replace(
+        "Available now: yes", "Available now: no"
+    )
+    path = tmp_path / "transcript.json"
+    _write_transcript(path, transcript)
+
+    report = _load_scorecard().score_transcript(path)
+
+    assert "latest-facts-in-refreshed-preview" in _failed(report, "resource-add-preview-retry")
+
+
 def test_planning_cases_reject_paraphrase_repetition_and_invented_account_fact(
     tmp_path: Path,
 ) -> None:
     transcript = _passing_transcript()
-    planning = transcript["cases"][1]
+    planning = next(item for item in transcript["cases"] if item["id"] == "planning-follow-up")
     planning["turns"][1]["text"] = "A paraphrased route.\n" + BOUNDARY
     planning["turns"][3]["text"] = (
         "Goal: repeat it all. Synthetic Codex Seat also helped. "

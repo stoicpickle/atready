@@ -90,17 +90,17 @@ jobs:
       - name: Smoke installed wheel
         run: >-
           uv run --isolated --no-project
-          --with ./dist/project_atready-0.1.8-py3-none-any.whl
+          --with ./dist/project_atready-0.1.9-py3-none-any.whl
           python scripts/smoke_wheel.py
 
       - name: Prove clean source and wheel first use
         if: matrix.python == '3.11'
         run: >-
           uv run --no-sync python scripts/hardening_gate.py
-          --wheel ./dist/project_atready-0.1.8-py3-none-any.whl
+          --wheel ./dist/project_atready-0.1.9-py3-none-any.whl
 
       - name: Smoke staged plugin
         run: >-
           uv run --isolated --no-project
-          --with ./dist/project_atready-0.1.8-py3-none-any.whl
+          --with ./dist/project_atready-0.1.9-py3-none-any.whl
           python scripts/smoke_plugin.py

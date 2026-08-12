@@ -11,8 +11,8 @@ same workflow conversationally; it does not replace the CLI or broaden its permi
 | Python package and CLI | `project-atready` / `atready` | The deterministic command, schemas, routing logic, and a bundled copy of the optional skill | Telemetry, connectors, provider execution, or automatic handoff execution |
 | Optional Codex skill package | `atready` | `.codex-plugin/plugin.json` and the canonical `project-atready` skill | The Python package, hooks, apps, MCP servers, connectors, telemetry, or an implicit installer |
 
-The CLI runtime currently uses product version `0.1.8`, while the optional Codex plugin uses
-product version `0.1.9`, but product-version equality is no longer the compatibility boundary. The plugin
+The CLI runtime currently uses product version `0.1.9`, while the optional Codex plugin uses
+product version `0.1.10`, but product-version equality is no longer the compatibility boundary. The plugin
 declares runtime contract version `1` and its required stable
 feature IDs. Its launcher resolves the already-required `uv` executable through the caller's
 `PATH`, asks it offline and with configuration files disabled for the absolute tool-bin directory,
@@ -128,23 +128,27 @@ and is not a claim that either channel is live today:
    terminal.
 2. Install AtReady from the universal Plugins Directory in a supported ChatGPT or Codex
    surface.
-3. Start a fresh task, ask AtReady to check runtime compatibility, and follow its specific
-   remediation command only if the check fails.
+3. Ask AtReady to check runtime compatibility, and follow its specific remediation command only if
+   the check fails. After a user-run update, retry the preview or other request in that same task;
+   the launcher re-checks before any roster operation.
 
 The same trusted `uv`, directly invocable Python 3, and startup-environment prerequisites apply.
-The public runtime command is intentionally version-bounded until the compatibility contract has a
-stable release range:
+The current public-source beta command is deliberately aligned with the README and launcher:
 
 ```bash
-uv tool install --no-config --default-index https://pypi.org/simple \
-  'project-atready==0.1.8'
+uv tool install --force --no-config --no-python-downloads \
+  --default-index https://pypi.org/simple \
+  'git+https://github.com/stoicpickle/atready.git@main'
 ```
 
-The explicit index applies to the runtime and its dependencies, and `--no-config` prevents user uv
-configuration from selecting another index. PyPI artifacts are publicly downloadable and
-inspectable even when their source repository remains private. The plugin must never silently
-install or upgrade the runtime; it diagnoses compatibility, presents an exact command, and verifies
-the result after the user runs it.
+This is a moving public-source channel, not an exact immutable release. `--no-config` ignores uv
+configuration, the explicit default index prevents ordinary dependency resolution from inheriting
+a different primary index, and `--no-python-downloads` prevents an implicit Python download. The
+command can still honor explicitly inherited `UV_INDEX`, `UV_INDEX_URL`, or
+`UV_EXTRA_INDEX_URL`; clear those variables first when PyPI-only dependency resolution is required.
+The future exact PyPI or tag lane remains separate and must name an actually published,
+reviewed artifact. The plugin must never silently install or upgrade the runtime; it diagnoses
+compatibility, presents the public-source command, and verifies the result after the user runs it.
 
 ## Later package and plugin gates
 
