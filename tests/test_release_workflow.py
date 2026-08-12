@@ -137,8 +137,8 @@ def test_release_candidate_workflow_is_manual_private_and_least_privilege() -> N
         "GITHUB_TRIGGERING_ACTOR",
         "actions/workflows/ci.yml/runs",
         "-f branch=main",
-        "uv sync --locked --all-groups --no-group release --no-install-project",
-        "uv sync --locked --all-groups --no-install-project",
+        "uv sync --locked --all-groups --no-group release --no-group elevated --no-install-project",
+        "uv sync --locked --all-groups --no-group elevated --no-install-project",
         "uv run --no-sync ruff check .",
         "uv run --no-sync ruff format --check .",
         "twine check --strict",
@@ -156,13 +156,13 @@ def test_release_candidate_workflow_is_manual_private_and_least_privilege() -> N
         assert required in commands
     assert commands.count("scripts/verify_release_artifacts.py") == 2
     assert _step(job, "Install locked test dependencies")["run"] == (
-        "uv sync --locked --all-groups --no-group release --no-install-project"
+        "uv sync --locked --all-groups --no-group release --no-group elevated --no-install-project"
     )
     build = _step(job, "Build twice through hash-constrained backend")
     assert "--build-constraints build-constraints.txt" in build["run"]
     assert "--require-hashes" in build["run"]
     assert _step(job, "Install locked release checks")["run"] == (
-        "uv sync --locked --all-groups --no-install-project"
+        "uv sync --locked --all-groups --no-group elevated --no-install-project"
     )
     assert "twine check --strict" in _step(job, "Check PyPI metadata and rendering")["run"]
     assert _step(job, "Verify rendered README links")["run"] == (
@@ -279,7 +279,7 @@ def test_runtime_release_workflow_is_private_source_reviewed_and_pypi_only() -> 
         'PUBLISH_PYPI" == "true" && "$PUBLIC_METADATA_URLS_VERIFIED" != "true"',
         "actions/workflows/ci.yml/runs",
         "-f branch=main",
-        "uv sync --locked --all-groups --no-group release --no-install-project",
+        "uv sync --locked --all-groups --no-group release --no-group elevated --no-install-project",
         "uv run --no-sync ruff check .",
         "uv run --no-sync ruff format --check .",
         "twine check --strict",
@@ -889,7 +889,7 @@ def test_build_backend_and_sdist_are_explicitly_bounded() -> None:
     assert set(ci_workflow["jobs"]) == {"validate"}
     ci_job = ci_workflow["jobs"]["validate"]
     assert _step(ci_job, "Install locked dependencies")["run"] == (
-        "uv sync --locked --all-groups --no-group release --no-install-project"
+        "uv sync --locked --all-groups --no-group release --no-group elevated --no-install-project"
     )
     assert "uv run --no-sync pytest" in "\n".join(step.get("run", "") for step in ci_job["steps"])
     ci_build = _step(ci_job, "Build distributions")
@@ -900,7 +900,7 @@ def test_build_backend_and_sdist_are_explicitly_bounded() -> None:
         "UV_NO_CONFIG": "1",
     }
     assert _step(ci_job, "Install locked release checks")["run"] == (
-        "uv sync --locked --all-groups --no-install-project"
+        "uv sync --locked --all-groups --no-group elevated --no-install-project"
     )
     assert _step(ci_job, "Check PyPI metadata and rendering")["run"] == (
         "uv run --no-sync twine check --strict dist/*"
@@ -915,7 +915,7 @@ def test_build_backend_and_sdist_are_explicitly_bounded() -> None:
     assert clean_first_use["if"] == "matrix.python == '3.11'"
     assert clean_first_use["run"] == (
         "uv run --no-sync python scripts/hardening_gate.py "
-        "--wheel ./dist/project_atready-0.1.7-py3-none-any.whl"
+        "--wheel ./dist/project_atready-0.1.8-py3-none-any.whl"
     )
     assert set(ci_job["strategy"]["matrix"]["os"]) == {
         "ubuntu-latest",

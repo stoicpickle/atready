@@ -90,6 +90,8 @@ def _runtime_payload(*, plugin_version: str, missing_feature: bool = False) -> d
         "inventory.read.v1",
         "resource.profiles.v1",
         "routing.agent-summary.v1",
+        "routing.capacity-demand.v1",
+        "routing.compare.v1",
         "routing.plan-only.v1",
         "routing.presentation-bundle.v1",
         "schema.declarations.v1",
@@ -115,7 +117,7 @@ def _runtime_payload(*, plugin_version: str, missing_feature: bool = False) -> d
 def _invoke_staged_wrapper(
     root: Path,
     *,
-    plugin_version: str = "0.1.8",
+    plugin_version: str = "0.1.9",
     missing_feature: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     skill = root / "staged-plugin" / "skills" / "project-atready"
@@ -183,7 +185,7 @@ def run_matrix(root: Path) -> dict[str, Any]:
     if compatible.returncode != 0 or compatible.stdout != "SYNTHETIC-DELEGATED-RUNTIME\n":
         raise AssertionError(f"fresh compatible stage failed: {compatible.stderr}")
 
-    stale = _invoke_staged_wrapper(root / "stale", plugin_version="0.1.7")
+    stale = _invoke_staged_wrapper(root / "stale", plugin_version="0.1.8")
     if stale.returncode == 0 or "refusing to continue" not in stale.stderr:
         raise AssertionError("stale runtime was not rejected before delegation")
     if "SYNTHETIC-DELEGATED-RUNTIME" in stale.stdout + stale.stderr:

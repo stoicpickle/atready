@@ -90,7 +90,9 @@ jobs:
           version: "0.11.7"
 
       - name: Install locked test dependencies
-        run: uv sync --locked --all-groups --no-group release --no-install-project
+        run: >-
+          uv sync --locked --all-groups --no-group release --no-group elevated
+          --no-install-project
 
       - name: Require exact requested version
         env:
@@ -171,7 +173,7 @@ jobs:
           cp "$candidate_root/dist-first/$sdist" "$candidate_root/dist/$sdist"
 
       - name: Install locked release checks
-        run: uv sync --locked --all-groups --no-install-project
+        run: uv sync --locked --all-groups --no-group elevated --no-install-project
 
       - name: Check PyPI metadata and rendering
         run: >-

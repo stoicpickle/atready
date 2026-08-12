@@ -11,7 +11,7 @@ Run it against the CLI executable you intend to evaluate (POSIX shell):
 python3 scripts/first_user_acceptance.py --executable /absolute/path/to/atready
 ```
 
-For a source checkout after `uv sync --all-groups` (POSIX shell):
+For a source checkout after `uv sync --group dev` (POSIX shell):
 
 ```bash
 uv run python scripts/first_user_acceptance.py \

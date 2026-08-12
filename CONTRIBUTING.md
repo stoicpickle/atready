@@ -6,25 +6,25 @@ are easiest to review.
 ## Set up
 
 ```bash
-uv sync --locked --all-groups --no-group release --no-install-project
+uv sync --locked --all-groups --no-group release --no-group elevated --no-install-project
 uv run --no-sync ruff check .
 uv run --no-sync ruff format --check .
 PYTHONPATH=src uv run --no-sync pytest --cov=atready --cov-report=term-missing
 UV_INDEX="" UV_NO_CONFIG=1 uv build --clear --no-create-gitignore --no-sources \
   --build-constraints build-constraints.txt --require-hashes \
   --default-index https://pypi.org/simple
-UV_INDEX="" UV_NO_CONFIG=1 uv sync --locked --all-groups --no-install-project
+UV_INDEX="" UV_NO_CONFIG=1 uv sync --locked --all-groups --no-group elevated --no-install-project
 uv run --no-sync twine check --strict dist/*
 uv run --no-sync python scripts/verify_readme_rendering.py
 uv run --no-sync python scripts/verify_release_artifacts.py --dist dist
 uv run --isolated --no-project \
-  --with ./dist/project_atready-0.1.7-py3-none-any.whl \
+  --with ./dist/project_atready-0.1.8-py3-none-any.whl \
   python scripts/smoke_wheel.py
 uv run --isolated --no-project \
-  --with ./dist/project_atready-0.1.7-py3-none-any.whl \
+  --with ./dist/project_atready-0.1.8-py3-none-any.whl \
   python scripts/smoke_plugin.py
 uv run --no-sync python scripts/hardening_gate.py \
-  --wheel ./dist/project_atready-0.1.7-py3-none-any.whl
+  --wheel ./dist/project_atready-0.1.8-py3-none-any.whl
 ```
 
 The clean first-use lane performs real, non-editable source and wheel installs into separate

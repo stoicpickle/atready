@@ -164,10 +164,25 @@ converts or compares unlike units. When present, `resets_on` names the next rese
 earlier than `last_verified`. A catalog profile may suggest a unit but never an amount.
 
 The router continues to gate and adjust on the declared qualitative `quota` state. Measured
-capacity is supporting evidence and display context unless a later contract adds a project
-constraint naming the same unit. Zero remaining capacity requires `quota: exhausted`; positive
-remaining capacity cannot coexist with exhausted quota. A qualitative status never invents an
-amount; inconsistent declarations fail validation.
+capacity is supporting evidence and display context unless a workstream declares one exact demand
+in the same unit:
+
+```yaml
+capacity_demand:
+  unit: reviews
+  amount: 12
+```
+
+The router compares only identical unit labels. It records an explicit candidate note when the
+declared snapshot is enough and gates the candidate when it is insufficient, missing, uses another
+unit, was checked after the project date, or reset after it was checked. `project_limit`, when
+present, is the lower advisory bound. The comparison is independent for each workstream; AtReady
+does not reserve or subtract capacity across workstreams, refresh a balance, infer the result of a
+reset, or convert units. Omitting `capacity_demand` preserves qualitative quota routing.
+
+Zero remaining capacity requires `quota: exhausted`; positive remaining capacity cannot coexist
+with exhausted quota. A qualitative status never invents an amount; inconsistent declarations
+fail validation.
 
 ## Inventory annotation declaration
 

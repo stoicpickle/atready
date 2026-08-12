@@ -34,7 +34,9 @@ jobs:
           prune-cache: true
 
       - name: Install locked dependencies
-        run: uv sync --locked --all-groups --no-group release --no-install-project
+        run: >-
+          uv sync --locked --all-groups --no-group release --no-group elevated
+          --no-install-project
 
       - name: Validate plugin and skill contracts
         env:
@@ -74,7 +76,7 @@ jobs:
           UV_DEFAULT_INDEX: https://pypi.org/simple
           UV_INDEX: ""
           UV_NO_CONFIG: "1"
-        run: uv sync --locked --all-groups --no-install-project
+        run: uv sync --locked --all-groups --no-group elevated --no-install-project
 
       - name: Check PyPI metadata and rendering
         run: uv run --no-sync twine check --strict dist/*
@@ -88,17 +90,17 @@ jobs:
       - name: Smoke installed wheel
         run: >-
           uv run --isolated --no-project
-          --with ./dist/project_atready-0.1.7-py3-none-any.whl
+          --with ./dist/project_atready-0.1.8-py3-none-any.whl
           python scripts/smoke_wheel.py
 
       - name: Prove clean source and wheel first use
         if: matrix.python == '3.11'
         run: >-
           uv run --no-sync python scripts/hardening_gate.py
-          --wheel ./dist/project_atready-0.1.7-py3-none-any.whl
+          --wheel ./dist/project_atready-0.1.8-py3-none-any.whl
 
       - name: Smoke staged plugin
         run: >-
           uv run --isolated --no-project
-          --with ./dist/project_atready-0.1.7-py3-none-any.whl
+          --with ./dist/project_atready-0.1.8-py3-none-any.whl
           python scripts/smoke_plugin.py

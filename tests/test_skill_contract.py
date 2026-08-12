@@ -152,7 +152,9 @@ def _write_cli_fixture_wheel(
 def test_skill_frontmatter_and_resources_are_portable() -> None:
     text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     intake_reference = (SKILL / "references" / "resource-onboarding.md").read_text(encoding="utf-8")
-    complete_contract = text + "\n" + intake_reference
+    output_reference = (SKILL / "references" / "output-contract.md").read_text(encoding="utf-8")
+    complete_contract = text + "\n" + intake_reference + "\n" + output_reference
+    normalized_contract = " ".join(complete_contract.split())
     _, frontmatter, body = text.split("---", 2)
     normalized_body = " ".join(body.split())
     metadata = yaml.safe_load(frontmatter)
@@ -188,6 +190,12 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "authorizes only the bounded, read-only inventory checks" in normalized_body
     assert "planning authorization never authorizes credential access" in normalized_body
     assert "already-installed Python 3.11 or newer interpreter" in normalized_body
+    assert (
+        "resolve one already-installed python 3.11 or newer interpreter"
+        in normalized_body.casefold()
+    )
+    assert complete_contract.count('"/absolute/path/to/python3"') >= 10
+    assert re.search(r"(?m)^\s*python3(?:\s|$)", complete_contract) is None
     assert "## Resource intake workflow" in body
     assert "before planning when the user asks to add one resource" in normalized_body
     assert "approved local execution and filesystem access" in complete_contract
@@ -220,6 +228,19 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "rebuild a fresh protected project, reroute" in normalized_body
     assert "not forced assignments" in normalized_body
     assert "never simulate a pin by changing scores" in normalized_body
+    assert "preserve exact demand and unit as `capacity_demand`" in normalized_body.casefold()
+    assert "never convert, aggregate, subtract, or infer spending" in normalized_body.casefold()
+    assert "exact bundled-launcher `compare` variant" in normalized_body
+    assert (
+        "choose one alternative project or explicit overrides, never both"
+        in normalized_body.casefold()
+    )
+    assert "it authorizes no changes" in normalized_body.casefold()
+    assert 'scripts/atready.py" compare' in complete_contract
+    assert "--against /absolute/path/to/alternative.yaml" in complete_contract
+    assert "Never invoke a bare `atready compare` command" in complete_contract
+    assert "use `--format json` in this host branch" in normalized_contract
+    assert "after removing trailing whitespace, ends with exactly" in normalized_contract
     assert "Do not activate for ordinary project planning" in metadata["description"]
     assert "Add one user-declared resource" in metadata["description"]
     assert "add, onboard, register, or save a resource" in metadata["description"]
@@ -371,7 +392,7 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "Keep scores, plan IDs, fingerprints, raw status labels" in output_folded
     assert "## Concise response" not in output_contract
     assert "## Default response" not in output_contract
-    assert output_contract.count("No routed project resources were contacted or run.") == 3
+    assert output_contract.count("No routed project resources were contacted or run.") == 4
     assert "lead with a tentative plain-language purpose" in folded
     assert "prepare a lowercase resource id" in folded
     assert "editable serialization proposals" in folded

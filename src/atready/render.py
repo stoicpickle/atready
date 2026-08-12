@@ -94,6 +94,36 @@ _UNVERIFIED_ISSUE_LABELS = {
     "unknown-quota": "remaining usage is unknown",
     "unknown-session": "current availability is unknown",
 }
+_CAPACITY_GATE_CODES = {
+    "capacity-insufficient",
+    "capacity-reset-unknown",
+    "capacity-unit-mismatch",
+    "capacity-unknown",
+}
+
+
+def _capacity_gap_evidence(assignment: RouteAssignment) -> list[str]:
+    """Return bounded plain evidence for capacity-gated candidates."""
+
+    evidence: list[str] = []
+    capacity_gated = [
+        candidate
+        for candidate in assignment.candidates
+        if set(candidate.gate_codes) & _CAPACITY_GATE_CODES
+    ]
+    for candidate in capacity_gated[:3]:
+        detail = next(
+            (
+                note.split("] ", 1)[1]
+                for note in candidate.notes
+                if note.startswith("[capacity-") and "] " in note
+            ),
+            "exact capacity could not be confirmed",
+        )
+        evidence.append(f"{candidate.resource_name}: {detail}")
+    if len(capacity_gated) > 3:
+        evidence.append(f"{len(capacity_gated) - 3} more candidates have capacity gaps")
+    return evidence
 
 
 def _selected_unverified_warning(warning: str) -> tuple[str, str, str, list[str]] | None:
@@ -143,6 +173,32 @@ def _primary_handoff(assignment: RouteAssignment):
 
 
 def _next_action(plan: RoutePlan, *, has_gaps: bool) -> str:
+    assignment_gates = {
+        gate
+        for assignment in plan.assignments
+        if assignment.primary is None
+        for candidate in assignment.candidates
+        for gate in candidate.gate_codes
+    }
+    capacity_gates = assignment_gates & _CAPACITY_GATE_CODES
+    if has_gaps and capacity_gates:
+        if assignment_gates - _CAPACITY_GATE_CODES:
+            return (
+                "Resolve the exact same-unit capacity and other selection gaps, then route again."
+            )
+        if capacity_gates == {"capacity-insufficient"}:
+            return (
+                "Use a resource with enough same-unit declared capacity or reduce the workstream "
+                "demand, then route again."
+            )
+        if capacity_gates == {"capacity-unit-mismatch"}:
+            return (
+                "Use one exact unit for both workstream demand and resource capacity, then route "
+                "again."
+            )
+        if capacity_gates <= {"capacity-unknown", "capacity-reset-unknown"}:
+            return "Check and update exact same-unit capacity, then route again."
+        return "Resolve the exact same-unit capacity gaps or adjust demand, then route again."
     unverified = [item for item in plan.dispositions if item.status is DispositionStatus.UNVERIFIED]
     if has_gaps and unverified:
         confirmation_labels = {
@@ -269,6 +325,14 @@ def render_summary(
                 initial_indent="   Use: ",
                 subsequent_indent="        ",
             )
+            for evidence in _capacity_gap_evidence(assignment):
+                _append_wrapped(
+                    lines,
+                    _untrusted_presentation_text(evidence),
+                    width=width,
+                    initial_indent="   Capacity: ",
+                    subsequent_indent="             ",
+                )
             continue
 
         _append_wrapped(
@@ -582,6 +646,14 @@ def _render_complete_agent_summary(
             f"{_untrusted_presentation_text(assignment.gap_reason)}",
             width=width,
         )
+        for evidence in _capacity_gap_evidence(assignment):
+            _append_wrapped(
+                lines,
+                _untrusted_presentation_text(evidence),
+                width=width,
+                initial_indent="Capacity: ",
+                subsequent_indent="          ",
+            )
     for assignment in plan.assignments:
         for gap in assignment.unresolved_gaps:
             _append_wrapped(

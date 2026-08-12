@@ -180,6 +180,11 @@ selects a primary resource for each ordered workstream. It may also suggest one 
 reserve one standalone alternate when the project calls for it. The default output is a concise
 human summary of each assignment, result, check, and material gap.
 
+If a workstream includes an exact `capacity_demand`, AtReady compares its amount only with a
+resource capacity declared in the same unit. This is an advisory check against one saved snapshot,
+not a balance refresh or budget: AtReady does not convert units, reserve or subtract capacity,
+inspect providers, or spend anything.
+
 Use the detailed Markdown view when you want scores, exclusions, every resource disposition, and
 the complete inert handoff notes:
 
@@ -190,6 +195,20 @@ atready route --project my-project.yaml --format markdown
 Use `--format json` for the unchanged complete machine-readable evidence record.
 The summary defaults to 80 columns; add `--width 40` through `--width 120` when you want a
 different wrap width.
+
+To ask a bounded what-if question without changing either file or running anything, compare the
+current route with one alternative constraint:
+
+```bash
+atready compare --project my-project.yaml --data-class private
+atready compare --project my-project.yaml --no-network-allowed
+atready compare --project my-project.yaml --forbid-resource my-coding-agent
+```
+
+The result shows only workstreams whose assignments or gaps changed. Use `--against other.yaml`
+instead when you want to compare two complete project briefs, or `--format json` for compact machine
+evidence. A comparison does not choose constraints for you; it gives Codex and you a smaller set of
+consequences to review.
 
 The same project and inventory produce the same route. AtReady does not claim the route is globally
 optimal or that it can out-plan Codex; it is a consistent, inspectable resource recommendation you
@@ -313,7 +332,7 @@ If you want to work on the project itself, clone the source and install its deve
 ```bash
 git clone https://github.com/stoicpickle/atready.git
 cd atready
-uv sync --all-groups
+uv sync --group dev
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest
