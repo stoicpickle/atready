@@ -63,6 +63,8 @@ def test_blank_slate_intake_eval_has_exact_conversation_only_scenarios() -> None
         "`Not sure` is valid",
         "invite an ordinary sentence as the reply",
         "no more than these three human questions",
+        "read only the bundled `quick-resource-intake.md`",
+        "must not read another reference or run a command",
         "It must not show IDs, numeric mappings",
         "The actual preview carries the complete technical record",
     ):
@@ -84,8 +86,9 @@ def test_blank_slate_intake_eval_has_exact_conversation_only_scenarios() -> None
     assert "fail closed instead of overwriting it" in normalized
     assert "private backup and atomic-replacement guarantees" in normalized
     assert "ask only which resource the user wants to add" in normalized
-    assert "must use fewer than 35 words" in normalized
-    assert "first turn asks only for a name in fewer than 35 words" in normalized
+    assert "use fewer than 15 words" in normalized
+    assert "first turn asks only for a name" in normalized
+    assert "must not read a reference, inspect memory or repository files" in normalized
     assert "Target, transport, and disclosure remain editable preview proposals" in normalized
     assert "Accept the displayed conservative defaults" not in evaluation
     assert "must not show the target path" in normalized

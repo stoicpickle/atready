@@ -47,6 +47,9 @@ uv tool install git+https://github.com/stoicpickle/atready.git
 If your terminal says `atready` was not found, run `uv tool update-shell`, close and reopen the
 terminal, then try again.
 
+The CLI works on its own. To add AtReady to Codex conversations, continue to
+[Use AtReady with Codex](#use-atready-with-codex) after the demo.
+
 Run the demo:
 
 ```bash
@@ -119,10 +122,11 @@ nothing.
 atready plan
 ```
 
-Give AtReady a goal and one to three steps from your rough plan. It asks only for details that can
-change which resources fit, then returns assignments, constraints, and gaps you or Codex can use to
-refine the plan. It does not create the complete project plan, write a project file, contact a
-resource, spend a credit, or run work.
+Quick Fit asks for one piece of work, the declared capabilities it needs, and approval to check the
+roster using visible defaults: public data, internet allowed, any workflow or cost, and verified
+facts only. Use `atready plan --mode detailed` for private data, other eligibility limits, one to
+three steps, expected results, verification checks, or strength thresholds. Neither mode creates
+the complete project plan, writes a project file, contacts a resource, spends a credit, or runs work.
 
 ## Reusable and scripted workflows
 
@@ -156,8 +160,8 @@ was fully proven.
 
 If the typed command feels too long, AtReady also accepts one protected YAML or JSON declaration
 through `--resource-file` or `--resource-stdin`. The
-[resource intake guide](https://github.com/stoicpickle/atready/blob/main/plugins/atready/skills/project-atready/references/resource-onboarding.md)
-explains the same fields in friendlier language.
+[protected preview guide](https://github.com/stoicpickle/atready/blob/main/plugins/atready/skills/project-atready/references/resource-onboarding.md)
+documents how those fields reach the exact preview and save boundary.
 
 For a reusable or scripted resource fit check, create a starter project file:
 
@@ -210,9 +214,12 @@ The Codex skill is the intended conversational experience. The CLI is its local 
 standalone fallback: it stores the declared roster, validates changes, and produces the same
 inspectable resource-fit evidence. The skill can add one declared resource through a no-write
 preview and separate save approval, or match the saved roster to a rough plan before implementation.
-It does not replace Codex's project planning. It uses the bundled launcher only when Codex has
-approved local execution and file access; otherwise it directs the same task to `atready add` in a
-terminal.
+For a quick add, it asks for the name, three plain-language facts, and a short recap before doing any
+local roster, schema, or profile checks. Those checks begin only after you approve the recap for a
+preview. It does not replace Codex's project planning. It uses the bundled launcher only when Codex
+has approved local execution and file access; otherwise it directs the same task to `atready add`
+in a terminal. The [quick intake contract](https://github.com/stoicpickle/atready/blob/main/plugins/atready/skills/project-atready/references/quick-resource-intake.md)
+shows the exact conversational boundary.
 
 Codex discovers personal skills under `~/.agents/skills`. After installing AtReady, keep any
 existing destination unchanged by default. On macOS or Linux, this guarded setup copies the
@@ -228,6 +235,9 @@ else
 fi
 atready skill status
 ```
+
+`atready skill status` checks standalone personal or workspace copies. Plugin-managed Codex
+installations are separate and are not inspected by that command.
 
 On Windows PowerShell, use the same keep-existing rule, including for an existing Windows link or
 reparse point:
@@ -253,8 +263,9 @@ restarts, try:
 $project-atready I have a rough project idea. Use my saved AtReady resources to show where they fit.
 ```
 
-The skill asks at most one consolidated routing question. The CLI produces the readable response
-and complete JSON evidence together, so Codex does not have to rewrite the route. The skill stops
+The skill asks at most one consolidated routing question. For a normal check, the CLI produces the
+readable response directly, so Codex does not have to rewrite the route or load the complete JSON
+evidence. Detailed evidence remains available only when requested. The skill stops
 before implementation. The public beta does not depend on OpenAI Plugin Directory publication.
 
 ## Useful commands
@@ -269,6 +280,9 @@ atready plan                    Check resource fit for a small rough plan
 atready resource profiles      Browse starter suggestions for resource fit
 atready inventory list         List saved resources
 atready inventory validate     Check an inventory
+atready inventory replace      Preview a concise full-resource replacement
+atready inventory remove       Preview a concise resource removal
+atready inventory backup       Inspect or restore backups; add --details for full evidence
 atready project template       Print a starter project brief
 atready route                  Match an existing project brief to your roster
 atready help planning           Show the beginner resource-fit workflow

@@ -11,8 +11,8 @@ same workflow conversationally; it does not replace the CLI or broaden its permi
 | Python package and CLI | `project-atready` / `atready` | The deterministic command, schemas, routing logic, and a bundled copy of the optional skill | Telemetry, connectors, provider execution, or automatic handoff execution |
 | Optional Codex skill package | `atready` | `.codex-plugin/plugin.json` and the canonical `project-atready` skill | The Python package, hooks, apps, MCP servers, connectors, telemetry, or an implicit installer |
 
-The CLI runtime currently uses product version `0.1.6`, while the optional Codex plugin uses
-product version `0.1.7`, but product-version equality is no longer the compatibility boundary. The plugin
+The CLI runtime currently uses product version `0.1.7`, while the optional Codex plugin uses
+product version `0.1.8`, but product-version equality is no longer the compatibility boundary. The plugin
 declares runtime contract version `1` and its required stable
 feature IDs. Its launcher resolves the already-required `uv` executable through the caller's
 `PATH`, asks it offline and with configuration files disabled for the absolute tool-bin directory,
@@ -137,7 +137,7 @@ stable release range:
 
 ```bash
 uv tool install --no-config --default-index https://pypi.org/simple \
-  'project-atready==0.1.6'
+  'project-atready==0.1.7'
 ```
 
 The explicit index applies to the runtime and its dependencies, and `--no-config` prevents user uv

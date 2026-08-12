@@ -62,7 +62,12 @@ from atready.models import (
 )
 from atready.paths import create_private_file, resolve_paths
 from atready.project import project_from_path, project_from_text
-from atready.render import render_agent_presentation, render_markdown, render_summary
+from atready.render import (
+    render_agent_presentation,
+    render_agent_summary,
+    render_markdown,
+    render_summary,
+)
 from atready.resource_input import (
     ParsedResourceDeclaration,
     load_inventory_annotation_declaration_file,
@@ -378,6 +383,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--inventory", type=Path, help="Inventory path; defaults to user config"
     )
     guided_plan_parser.add_argument(
+        "--mode",
+        choices=("quick", "detailed"),
+        default="quick",
+        help=(
+            "quick checks one work item with standard eligibility; detailed collects full controls"
+        ),
+    )
+    guided_plan_parser.add_argument(
         "--format",
         choices=("summary", "markdown"),
         default="summary",
@@ -626,6 +639,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     _configure_resource_declaration_parser(replace_parser)
+    replace_parser.add_argument(
+        "--details",
+        action="store_true",
+        help="Show complete sanitized before/after snapshots and technical evidence",
+    )
     replace_parser.set_defaults(handler=_handle_inventory_replace)
 
     remove_parser = inventory_commands.add_parser(
@@ -637,6 +655,11 @@ def build_parser() -> argparse.ArgumentParser:
     remove_parser.add_argument("--expect-revision")
     remove_parser.add_argument("--expect-plan")
     remove_parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
+    remove_parser.add_argument(
+        "--details",
+        action="store_true",
+        help="Show the complete sanitized resource and technical evidence",
+    )
     remove_parser.set_defaults(handler=_handle_inventory_remove)
 
     annotate_parser = inventory_commands.add_parser(
@@ -699,6 +722,11 @@ def build_parser() -> argparse.ArgumentParser:
     backup_inspect_parser.add_argument(
         "--json", action="store_true", help="Emit machine-readable output"
     )
+    backup_inspect_parser.add_argument(
+        "--details",
+        action="store_true",
+        help="Show complete sanitized snapshots and technical evidence",
+    )
     backup_inspect_parser.set_defaults(handler=_handle_inventory_backup_inspect)
 
     backup_rollback_parser = backup_commands.add_parser(
@@ -719,6 +747,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     backup_rollback_parser.add_argument(
         "--json", action="store_true", help="Emit machine-readable output"
+    )
+    backup_rollback_parser.add_argument(
+        "--details",
+        action="store_true",
+        help="Show complete sanitized snapshots and technical evidence",
     )
     backup_rollback_parser.set_defaults(handler=_handle_inventory_backup_rollback)
 
@@ -790,11 +823,11 @@ def build_parser() -> argparse.ArgumentParser:
     route_parser.add_argument("--inventory", type=Path, help="Defaults to user config")
     route_parser.add_argument(
         "--format",
-        choices=("summary", "markdown", "json", "presentation"),
+        choices=("summary", "agent-summary", "markdown", "json", "presentation"),
         default="summary",
         help=(
-            "summary is concise; markdown includes full evidence; presentation returns a JSON "
-            "envelope containing the exact agent response and complete route"
+            "summary is concise for terminals; agent-summary is the compact exact Codex response; "
+            "markdown includes full evidence; presentation returns a bounded JSON envelope"
         ),
     )
     route_parser.add_argument(
@@ -933,9 +966,10 @@ For a first resource fit check:
   2. Add a resource:      atready add
   3. Check resource fit:  atready plan
 
-The guided check asks for a goal, one to three existing plan steps, each expected
-result and check, and the declared capability strength each step needs. It does
-not create the complete project plan, write a project file, or run a resource.
+Quick Fit asks what you are working on and which declared capabilities it needs.
+Use 'atready plan --mode detailed' for one to three steps, expected results,
+checks, capability strength, and custom eligibility. Neither mode creates the
+complete project plan, writes a project file, or runs a resource.
 
 For a reusable or scripted project brief:
   atready project template > project.yaml
@@ -1005,6 +1039,80 @@ def _terminal_safe(value: object) -> str:
     return "".join(
         character if character.isprintable() else character.encode("unicode_escape").decode("ascii")
         for character in str(value)
+    )
+
+
+def _require_details_compatible(args: argparse.Namespace) -> None:
+    if getattr(args, "details", False) and getattr(args, "json", False):
+        raise ConfigurationError("--details cannot be combined with --json")
+    if getattr(args, "details", False) and getattr(args, "apply", False):
+        raise ConfigurationError("--details is preview-only and cannot be combined with --apply")
+
+
+def _bounded_terminal_items(values: list[str] | tuple[str, ...], *, limit: int = 3) -> str:
+    safe = [_terminal_safe(value) for value in values]
+    if not safe:
+        return "none"
+    visible = ", ".join(safe[:limit])
+    remaining = len(safe) - limit
+    return f"{visible} (+{remaining} more)" if remaining > 0 else visible
+
+
+def _bounded_terminal_text(value: object, *, limit: int = 80) -> str:
+    safe = _terminal_safe(value)
+    return safe if len(safe) <= limit else safe[: limit - 3] + "..."
+
+
+def _resource_change_summary(before: dict[str, Any], after: dict[str, Any]) -> str:
+    changed = [key for key in sorted(before) if before.get(key) != after.get(key)]
+    parts: list[str] = []
+    if "name" in changed:
+        parts.append(
+            f'name "{_terminal_safe(before.get("name", ""))}" -> '
+            f'"{_terminal_safe(after.get("name", ""))}"'
+        )
+        changed.remove("name")
+    labels = {
+        "access": "access",
+        "avoid_for": "avoid guidance",
+        "best_for": "best-use guidance",
+        "capabilities": "capabilities",
+        "categories": "categories",
+        "economics": "cost or quota",
+        "handoff": "handoff",
+        "policy": "policy",
+        "provenance": "verification",
+        "ratings": "comparison ratings",
+    }
+    parts.extend(labels.get(key, key.replace("_", " ")) for key in changed)
+    return "; ".join(parts) if parts else "no visible routing fields"
+
+
+def _snapshot_resource_count(snapshot: dict[str, Any] | None) -> int | None:
+    if snapshot is None:
+        return None
+    resources = snapshot.get("resources")
+    return len(resources) if isinstance(resources, list) else None
+
+
+def _comparison_change_summary(comparison: dict[str, Any]) -> str:
+    resource_changes = comparison["resource_changes"]
+    return "; ".join(
+        (
+            f"add: {_bounded_terminal_items(resource_changes['added'])}",
+            f"change: {_bounded_terminal_items(resource_changes['changed'])}",
+            f"remove: {_bounded_terminal_items(resource_changes['removed'])}",
+        )
+    )
+
+
+def _private_note_count_summary(comparison: dict[str, Any]) -> str:
+    counts = comparison["resource_private_note_effect_counts"]
+    return (
+        ", ".join(
+            f"{count} {effect.removeprefix('will-')}" for effect, count in counts.items() if count
+        )
+        or "none"
     )
 
 
@@ -1299,6 +1407,18 @@ def _guided_plan_yes_no(prompt: str, *, default: bool | None = None) -> bool:
         print("Please answer yes or no, or type cancel.")
 
 
+def _guided_plan_approval(prompt: str) -> str:
+    while True:
+        answer = _guided_plan_read(f"{prompt} [Y/n/edit]").casefold()
+        if not answer or answer in {"y", "yes"}:
+            return "yes"
+        if answer in {"n", "no"}:
+            return "no"
+        if answer in {"e", "edit", "change", "revise"}:
+            return "edit"
+        print("Please answer yes, no, or edit, or type cancel.")
+
+
 def _guided_plan_choice(
     prompt: str,
     choices: dict[str, Any],
@@ -1583,6 +1703,30 @@ def _guided_resource_from_profile(profile: Any | None) -> ParsedResourceDeclarat
 
 def _handle_init(args: argparse.Namespace) -> int:
     path = _inventory_path(args.path)
+    if path.exists() or path.is_symlink():
+        try:
+            catalog = InventoryCatalog.from_path(path, today=date.today())
+        except ConfigurationError as exc:
+            raise ConfigurationError(f"refusing to overwrite existing file: {path}") from exc
+        if catalog.inventory.inventory_kind is not InventoryKind.PERSONAL:
+            raise ConfigurationError(f"refusing to overwrite existing file: {path}")
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "created": None,
+                        "inventory_kind": "personal",
+                        "kept": str(path),
+                        "resources": len(catalog.inventory.resources),
+                    },
+                    sort_keys=True,
+                )
+            )
+        else:
+            print(f"Personal roster already exists at {_terminal_safe(path)}")
+            print("Kept unchanged.")
+            print("Next: add a resource with 'atready add'.")
+        return 0
     create_private_file(path, starter_inventory())
     if args.json:
         print(
@@ -1615,7 +1759,12 @@ def _handle_doctor(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
     else:
-        if payload["compatible"]:
+        plugin_requirements_supplied = args.plugin_contract is not None or bool(
+            args.require_feature
+        )
+        if not plugin_requirements_supplied:
+            print("AtReady local runtime self-check passed; no plugin requirements were supplied.")
+        elif payload["compatible"]:
             print("AtReady local runtime is ready for this plugin contract.")
         else:
             print("AtReady local runtime is not compatible with this plugin contract.")
@@ -2369,6 +2518,12 @@ def _print_guided_plan_capabilities(inventory: Inventory, capabilities: Sequence
         print(f"  {index}. {capability} ({names})")
 
 
+def _print_guided_quick_capabilities(capabilities: Sequence[str]) -> None:
+    print("Capabilities in your roster:")
+    for index, capability in enumerate(capabilities, start=1):
+        print(f"  {index}. {capability}")
+
+
 def _guided_project_from_inventory(inventory: Inventory) -> ProjectBrief:
     capabilities = _guided_project_capabilities(inventory)
     if not capabilities:
@@ -2484,6 +2639,55 @@ def _guided_project_from_inventory(inventory: Inventory) -> ProjectBrief:
     )
 
 
+def _guided_quick_project_from_inventory(inventory: Inventory) -> ProjectBrief:
+    capabilities = _guided_project_capabilities(inventory)
+    if not capabilities:
+        raise ConfigurationError("the inventory has no declared capabilities")
+
+    work = ""
+    while not work:
+        work = _guided_plan_read("What should your resources help with?")
+        if not work:
+            print("Describe one piece of work, or type cancel.")
+
+    _print_guided_quick_capabilities(capabilities)
+    selected = _guided_plan_numbered_selection(
+        "Capability numbers this work needs",
+        capabilities,
+    )
+    return ProjectBrief.model_validate(
+        {
+            "schema_version": 1,
+            "id": "guided-quick-fit",
+            "name": "Quick Fit",
+            "goal": work,
+            "as_of": date.today(),
+            "constraints": {},
+            "workstreams": [
+                {
+                    "id": "work",
+                    "name": work[:120],
+                    "objective": work,
+                    "required_capabilities": [
+                        {"id": capability, "importance": 1.0, "minimum": 0.40}
+                        for capability in selected
+                    ],
+                    "inputs": ["The user-provided work description"],
+                    "allowed_scope": [work],
+                    "exclusions": ["Anything outside this work"],
+                    "deliverable": work,
+                    "acceptance_criteria": ["The user confirms the work meets the stated goal"],
+                    "verification": ["User review against the stated goal"],
+                    "stop_conditions": [
+                        "Stop before using any resource without separate authorization"
+                    ],
+                    "next_owner": "User",
+                }
+            ],
+        }
+    )
+
+
 def _print_guided_plan_recap(project: ProjectBrief) -> None:
     constraints = project.constraints
     print("\nREVIEW WHAT ATREADY UNDERSTOOD")
@@ -2525,6 +2729,17 @@ def _print_guided_plan_recap(project: ProjectBrief) -> None:
     print("No project file will be written. No resource will be contacted or run.")
 
 
+def _print_guided_quick_recap(project: ProjectBrief) -> None:
+    workstream = project.workstreams[0]
+    capabilities = _bounded_terminal_items([item.id for item in workstream.required_capabilities])
+    print("\nQUICK FIT REVIEW")
+    print(f"Work: {_bounded_terminal_text(workstream.objective)}")
+    print(f"Needs: {capabilities} (basic or better)")
+    print("Eligibility: public data; internet allowed; any workflow or cost; verified facts only")
+    print("For private data or other limits, choose edit and rerun with --mode detailed.")
+    print("Nothing will be written, contacted, purchased, or run.")
+
+
 def _handle_guided_plan(args: argparse.Namespace) -> int:
     if args.width is not None and args.format != "summary":
         raise ConfigurationError("--width is only available with --format summary")
@@ -2535,16 +2750,9 @@ def _handle_guided_plan(args: argparse.Namespace) -> int:
         )
 
     target = _inventory_path(args.inventory)
-    try:
-        catalog = InventoryCatalog.from_path(target, today=date.today())
-    except ConfigurationError as exc:
-        if "configuration file does not exist" in str(exc):
-            exc.add_note("Create your roster first with: atready init")
-        raise
+    catalog = InventoryCatalog.from_path(target, today=date.today())
     if not catalog.inventory.resources:
-        failure = ConfigurationError("personal inventory has no resources")
-        failure.add_note("Add one resource first with: atready add")
-        raise failure
+        raise ConfigurationError("personal inventory has no resources")
     if catalog.inventory.inventory_kind is InventoryKind.DEMO and not args.allow_demo:
         failure = ConfigurationError("demo inventories require explicit routing permission")
         failure.add_note("Retry this synthetic example with: atready plan --allow-demo")
@@ -2558,10 +2766,21 @@ def _handle_guided_plan(args: argparse.Namespace) -> int:
             "contact a resource, spend a credit, or run any work."
         )
         print("Do not enter credentials or secrets. Type cancel at any prompt.\n")
-        project = _guided_project_from_inventory(catalog.inventory)
-        _print_guided_plan_recap(project)
-        if not _guided_plan_yes_no("Check resource fit for these steps?", default=True):
-            raise _GuidedPlanCancelledError
+        while True:
+            if args.mode == "quick":
+                project = _guided_quick_project_from_inventory(catalog.inventory)
+                _print_guided_quick_recap(project)
+                approval_prompt = "Check this resource fit?"
+            else:
+                project = _guided_project_from_inventory(catalog.inventory)
+                _print_guided_plan_recap(project)
+                approval_prompt = "Check resource fit for these steps?"
+            approval = _guided_plan_approval(approval_prompt)
+            if approval == "yes":
+                break
+            if approval == "no":
+                raise _GuidedPlanCancelledError
+            print("Let's revise the project details. The previous recap was not routed.\n")
         plan = route(catalog.inventory, project, allow_demo=args.allow_demo)
         print()
         return _emit_route_plan(
@@ -2612,6 +2831,7 @@ def _handle_inventory_add(args: argparse.Namespace) -> int:
 
 
 def _handle_inventory_replace(args: argparse.Namespace) -> int:
+    _require_details_compatible(args)
     _require_preview_apply_contract(args, subject="resource replacement")
     parsed = _resource_input(args)
     plan = plan_replace_resource(
@@ -2624,23 +2844,42 @@ def _handle_inventory_replace(args: argparse.Namespace) -> int:
         if args.json:
             print(json.dumps(result, indent=2, sort_keys=True))
         else:
-            print("Inventory resource replacement preview (no files changed)")
+            print("Replace resource preview. Nothing changed.")
             print(f"Target: {_terminal_safe(result['target'])}")
-            print(f"Resource: {result['resource_id']}")
-            print("Current resource (private notes omitted):")
-            print(json.dumps(result["resource_before"], indent=2, sort_keys=True))
-            print("Replacement resource (private notes omitted):")
-            print(json.dumps(result["resource_after"], indent=2, sort_keys=True))
+            print(
+                f"Resource: {_terminal_safe(result['resource_after']['name'])} "
+                f"({_terminal_safe(result['resource_id'])})"
+            )
+            print(
+                "Changes: "
+                + _resource_change_summary(result["resource_before"], result["resource_after"])
+            )
             print(f"Private notes effect: {result['private_notes_effect']}")
-            if result["defaulted_fields"]:
-                print("Defaulted fields: " + ", ".join(result["defaulted_fields"]))
-            _print_intake_review(result["intake_review"])
+            review = result["intake_review"]
+            default_count = sum(len(values) for values in review["default_groups"].values())
+            print(
+                f"Check: {len(review['unverified_selection_facts'])} routing facts unverified; "
+                f"{default_count} values use defaults."
+            )
+            print("This is a full replacement. Omitted fields use declared defaults.")
+            if args.details:
+                print("Current resource (private notes omitted):")
+                print(json.dumps(result["resource_before"], indent=2, sort_keys=True))
+                print("Replacement resource (private notes omitted):")
+                print(json.dumps(result["resource_after"], indent=2, sort_keys=True))
+                if result["defaulted_fields"]:
+                    print("Defaulted fields: " + ", ".join(result["defaulted_fields"]))
+                _print_intake_review(review)
+            else:
+                print("Use --details for complete sanitized before/after evidence.")
             print(f"Expected revision: {result['expect_revision']}")
             print(f"Expected plan: {result['expect_plan']}")
-            print("Applying will canonicalize YAML and create a private exact-byte backup.")
             print(
-                "Rerun with --apply --expect-revision <revision> --expect-plan <plan> "
-                "after reviewing this full replacement."
+                "On apply: create a private exact-byte backup, then replace the roster atomically."
+            )
+            print(
+                "Next: rerun with --apply --expect-revision <revision> "
+                "--expect-plan <plan> using the values above."
             )
         return 0
 
@@ -2689,6 +2928,7 @@ def _handle_inventory_replace(args: argparse.Namespace) -> int:
 
 
 def _handle_inventory_remove(args: argparse.Namespace) -> int:
+    _require_details_compatible(args)
     _require_preview_apply_contract(args, subject="resource removal")
     plan = plan_remove_resource(_inventory_path(args.path), args.resource)
     if not args.apply:
@@ -2696,22 +2936,37 @@ def _handle_inventory_remove(args: argparse.Namespace) -> int:
         if args.json:
             print(json.dumps(result, indent=2, sort_keys=True))
         else:
-            print("Inventory resource removal preview (no files changed)")
+            print("Remove resource preview. Nothing changed.")
             print(f"Target: {_terminal_safe(result['target'])}")
-            print(f"Resource: {result['resource_id']}")
-            print("Resource to remove (private notes omitted):")
-            print(json.dumps(result["resource"], indent=2, sort_keys=True))
-            print(f"Private notes present: {str(result['private_notes_present']).lower()}")
             print(
-                f"Resource count: {result['resource_count_before']} -> "
-                f"{result['resource_count_after']}"
+                f"Resource: {_terminal_safe(result['resource']['name'])} "
+                f"({_terminal_safe(result['resource_id'])})"
             )
+            print(
+                f"Roster: {result['resource_count_before']} -> "
+                f"{result['resource_count_after']} resources"
+            )
+            capabilities = sorted(result["resource"]["capabilities"])
+            note_state = (
+                "present; removed with the resource"
+                if result["private_notes_present"]
+                else "absent"
+            )
+            print(
+                f"Capabilities: {_bounded_terminal_items(capabilities)}. "
+                f"Private notes: {note_state}; values are never shown."
+            )
+            if args.details:
+                print("Resource to remove (private notes omitted):")
+                print(json.dumps(result["resource"], indent=2, sort_keys=True))
+            else:
+                print("Use --details for the complete sanitized resource.")
             print(f"Expected revision: {result['expect_revision']}")
             print(f"Expected plan: {result['expect_plan']}")
-            print("Applying will create a private exact-byte safety backup before removal.")
+            print("On apply: create a private exact-byte safety backup, then remove this resource.")
             print(
-                "Rerun with --apply --expect-revision <revision> --expect-plan <plan> "
-                "after reviewing this removal."
+                "Next: rerun with --apply --expect-revision <revision> "
+                "--expect-plan <plan> using the values above."
             )
         return 0
 
@@ -2804,32 +3059,56 @@ def _handle_inventory_backup_manifest(args: argparse.Namespace) -> int:
 
 
 def _handle_inventory_backup_inspect(args: argparse.Namespace) -> int:
+    _require_details_compatible(args)
     inspection = inspect_inventory_backup(_inventory_path(args.path), args.backup)
     result = inspection.as_dict()
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
-        print(f"Inventory backup inspection (private notes omitted): {inspection.backup.backup_id}")
+        print("Backup comparison. Nothing changed.")
+        print(f"Backup: {inspection.backup.backup_id}")
         print(f"Target: {_terminal_safe(inspection.target)}")
         print(f"Active state: {inspection.active_state}")
-        print(f"Active revision: {inspection.active_revision or 'unavailable'}")
-        print(
-            f"Active revision protection: {inspection.active_revision_protection or 'unavailable'}"
-        )
-        print(f"Backup revision: {inspection.backup.backup_id}")
-        print(f"Backup revision protection: {inspection.backup.revision_protection}")
         if inspection.comparison is not None:
-            print("Sanitized comparison:")
-            print(json.dumps(inspection.comparison, indent=2, sort_keys=True))
-        if inspection.active_snapshot is not None:
-            print("Sanitized active snapshot:")
-            print(json.dumps(inspection.active_snapshot, indent=2, sort_keys=True))
-        print("Sanitized backup snapshot:")
-        print(json.dumps(inspection.backup_snapshot, indent=2, sort_keys=True))
+            active_count = _snapshot_resource_count(inspection.active_snapshot)
+            backup_count = _snapshot_resource_count(inspection.backup_snapshot)
+            print(f"Roster in backup: {active_count} -> {backup_count} resources")
+            print("Using it would " + _comparison_change_summary(inspection.comparison))
+            print(
+                "Other changes: preferences "
+                f"{inspection.comparison['preferences_change']}; roster notes "
+                f"{inspection.comparison['inventory_private_notes']}; revision privacy state "
+                f"{inspection.comparison['revision_privacy_nonce_effect']}."
+            )
+            print(
+                "Private resource notes: "
+                + _private_note_count_summary(inspection.comparison)
+                + "; values are never shown."
+            )
+        else:
+            print("Comparison unavailable because the active roster is not valid.")
+        if args.details:
+            print(f"Active revision: {inspection.active_revision or 'unavailable'}")
+            print(
+                "Active revision protection: "
+                f"{inspection.active_revision_protection or 'unavailable'}"
+            )
+            print(f"Backup revision protection: {inspection.backup.revision_protection}")
+            if inspection.comparison is not None:
+                print("Sanitized comparison:")
+                print(json.dumps(inspection.comparison, indent=2, sort_keys=True))
+            if inspection.active_snapshot is not None:
+                print("Sanitized active snapshot:")
+                print(json.dumps(inspection.active_snapshot, indent=2, sort_keys=True))
+            print("Sanitized backup snapshot:")
+            print(json.dumps(inspection.backup_snapshot, indent=2, sort_keys=True))
+        else:
+            print("Use --details for complete sanitized snapshots or --json for machine evidence.")
     return 0
 
 
 def _handle_inventory_backup_rollback(args: argparse.Namespace) -> int:
+    _require_details_compatible(args)
     _require_preview_apply_contract(args, subject="rollback")
     plan = plan_inventory_rollback(_inventory_path(args.path), args.backup)
     if not args.apply:
@@ -2837,31 +3116,37 @@ def _handle_inventory_backup_rollback(args: argparse.Namespace) -> int:
         if args.json:
             print(json.dumps(result, indent=2, sort_keys=True))
         else:
-            print("Inventory rollback preview (no files changed)")
+            print("Rollback preview. Nothing changed.")
             print(f"Target: {_terminal_safe(plan.target)}")
             print(f"Source backup: {plan.source_backup_id}")
-            print(f"Current revision: {plan.original_revision}")
-            print(f"Current revision protection: {plan.active_revision_protection}")
-            print(f"Restored revision: {plan.candidate_revision}")
-            print(f"Restored revision protection: {plan.candidate_revision_protection}")
+            print(
+                f"Roster: {_snapshot_resource_count(plan.active_snapshot)} -> "
+                f"{_snapshot_resource_count(plan.candidate_snapshot)} resources"
+            )
+            print("Rollback would " + _comparison_change_summary(plan.comparison))
+            print("Private notes: restored exactly from the backup; values are not shown.")
             if plan.comparison["revision_privacy_nonce_effect"] != "unchanged":
                 print(
-                    "Warning: rollback changes hidden revision blinding state; confirm the "
+                    "Warning: rollback changes the hidden revision privacy state; confirm the "
                     "backup nonce was not exposed or reused."
                 )
-            print("Sanitized comparison:")
-            print(json.dumps(plan.comparison, indent=2, sort_keys=True))
-            print("Sanitized active snapshot:")
-            print(json.dumps(plan.active_snapshot, indent=2, sort_keys=True))
-            print("Sanitized rollback candidate snapshot:")
-            print(json.dumps(plan.candidate_snapshot, indent=2, sort_keys=True))
-            print("Hidden private notes will be restored exactly but are not shown here.")
-            print("Applying first creates an exact safety backup of the active inventory.")
+            if args.details:
+                print(f"Current revision protection: {plan.active_revision_protection}")
+                print(f"Restored revision protection: {plan.candidate_revision_protection}")
+                print("Sanitized comparison:")
+                print(json.dumps(plan.comparison, indent=2, sort_keys=True))
+                print("Sanitized active snapshot:")
+                print(json.dumps(plan.active_snapshot, indent=2, sort_keys=True))
+                print("Sanitized rollback candidate snapshot:")
+                print(json.dumps(plan.candidate_snapshot, indent=2, sort_keys=True))
+            else:
+                print("Use --details for complete sanitized snapshots.")
+            print("On apply: create an exact safety backup, then restore this backup.")
             print(f"Expected revision: {plan.original_revision}")
             print(f"Expected plan: {plan.plan_token}")
             print(
-                "Rerun with --apply --expect-revision <revision> --expect-plan <plan> "
-                "after reviewing this preview."
+                "Next: rerun with --apply --expect-revision <revision> "
+                "--expect-plan <plan> using the values above."
             )
         return 0
 
@@ -3069,8 +3354,14 @@ def _handle_project_validate(args: argparse.Namespace) -> int:
 
 
 def _handle_route(args: argparse.Namespace) -> int:
-    if args.width is not None and args.format not in {"summary", "presentation"}:
-        raise ConfigurationError("--width is only available with --format summary or presentation")
+    if args.width is not None and args.format not in {
+        "summary",
+        "agent-summary",
+        "presentation",
+    }:
+        raise ConfigurationError(
+            "--width is only available with --format summary, agent-summary, or presentation"
+        )
     if (args.max_words is not None or args.max_lines is not None) and args.format != "presentation":
         raise ConfigurationError(
             "--max-words and --max-lines are only available with --format presentation"
@@ -3124,6 +3415,8 @@ def _emit_route_plan(
         print(json.dumps(plan.model_dump(mode="json"), indent=2, sort_keys=True))
     elif output_format == "markdown":
         print(render_markdown(plan), end="")
+    elif output_format == "agent-summary":
+        print(render_agent_summary(plan, goal=project.goal, width=width), end="")
     elif output_format == "presentation":
         presentation = render_agent_presentation(
             plan,
@@ -3183,6 +3476,8 @@ def _handle_skill_path(args: argparse.Namespace) -> int:
 _REQUIRED_SKILL_FILES = (
     Path("SKILL.md"),
     Path("scripts/atready.py"),
+    Path("references/quick-resource-intake.md"),
+    Path("references/resource-onboarding.md"),
     Path("references/output-contract.md"),
     Path("references/routing-rules.md"),
     Path("references/runtime-setup.md"),
@@ -3229,11 +3524,12 @@ def _handle_skill_status(args: argparse.Namespace) -> int:
             f"{_terminal_safe(workspace_locations[0])} (not found in this directory or a parent)"
         )
     ready = personal_status == "ready" or bool(ready_workspaces)
-    print(f"Codex skill ready: {'yes' if ready else 'no'}")
+    print(f"Standalone skill copy ready: {'yes' if ready else 'no'}")
+    print("Plugin-managed Codex installations are not checked by this command.")
     if not ready:
         print(
-            "Next: copy the bundled project-atready folder into the personal location "
-            "shown above, then restart Codex."
+            "Next: if you use the standalone skill, follow the guarded copy command in the "
+            "AtReady README, then restart Codex."
         )
     print("No files changed.")
     return 0

@@ -807,15 +807,36 @@ def test_core_inventory_reads_use_acl_aware_descriptor_path(
     assert "macOS extended ACL" in captured.err
 
 
-def test_init_refuses_to_overwrite(tmp_path: Path, capsys) -> None:
+def test_init_keeps_an_existing_valid_personal_roster(tmp_path: Path, capsys) -> None:
     inventory = tmp_path / "inventory.yaml"
     assert main(["init", "--path", str(inventory)]) == 0
     capsys.readouterr()
     original = inventory.read_text(encoding="utf-8")
-    assert main(["init", "--path", str(inventory)]) == 2
+    assert main(["init", "--path", str(inventory)]) == 0
     captured = capsys.readouterr()
-    assert "refusing to overwrite" in captured.err
+    assert "Personal roster already exists" in captured.out
+    assert "Kept unchanged" in captured.out
+    assert "atready add" in captured.out
+    assert captured.err == ""
     assert inventory.read_text(encoding="utf-8") == original
+
+
+def test_init_json_reports_an_existing_roster_without_changing_it(tmp_path: Path, capsys) -> None:
+    inventory = tmp_path / "inventory.yaml"
+    assert main(["init", "--path", str(inventory)]) == 0
+    capsys.readouterr()
+    original = inventory.read_bytes()
+
+    assert main(["init", "--path", str(inventory), "--json"]) == 0
+
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt == {
+        "created": None,
+        "inventory_kind": "personal",
+        "kept": str(inventory),
+        "resources": 0,
+    }
+    assert inventory.read_bytes() == original
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX mode assertion")
@@ -951,6 +972,10 @@ def test_project_route_yaml_snapshot_and_all_schemas(tmp_path: Path, monkeypatch
     assert presentation["summary"].count("Personal Local Coding Agent") == 1
     assert presentation["summary"].endswith("No routed project resources were contacted or run.\n")
 
+    assert main(["route", "--project", str(project_path), "--format", "agent-summary"]) == 0
+    agent_summary = capsys.readouterr().out
+    assert agent_summary == presentation["summary"]
+
     assert main(["route", "--project", str(project_path), "--format", "markdown"]) == 0
     markdown = capsys.readouterr().out
     assert "# AtReady route" in markdown
@@ -979,7 +1004,8 @@ def test_project_route_yaml_snapshot_and_all_schemas(tmp_path: Path, monkeypatch
 
     assert main(["route", "--project", str(project_path), "--format", "json", "--width", "80"]) == 2
     assert (
-        "--width is only available with --format summary or presentation" in capsys.readouterr().err
+        "--width is only available with --format summary, agent-summary, or presentation"
+        in capsys.readouterr().err
     )
 
     assert (
@@ -1119,6 +1145,9 @@ def test_route_returns_gap_exit_when_required_alternate_is_unavailable(
     assert presentation["route"] == plan
     assert "1 open gap" in presentation["summary"]
     assert presentation["summary"].endswith("No routed project resources were contacted or run.\n")
+
+    assert main(["route", "--project", str(project_path), "--format", "agent-summary"]) == 3
+    assert capsys.readouterr().out == presentation["summary"]
 
     assert main(["route", "--project", str(project_path), "--format", "markdown"]) == 3
     markdown = capsys.readouterr().out
@@ -1278,7 +1307,7 @@ def test_inventory_replace_and_remove_are_preview_first_and_backed_up(
     assert json.loads(capsys.readouterr().out)["resources"] == []
 
 
-def test_inventory_replace_and_remove_human_output_explains_full_effect(
+def test_inventory_replace_and_remove_human_output_is_concise_with_details_available(
     tmp_path: Path, capsys
 ) -> None:
     inventory = tmp_path / "inventory.yaml"
@@ -1291,13 +1320,22 @@ def test_inventory_replace_and_remove_human_output_explains_full_effect(
 
     assert main(replace_args) == 0
     replace_output = capsys.readouterr().out
-    assert "replacement preview (no files changed)" in replace_output
-    assert "Current resource (private notes omitted)" in replace_output
-    assert "Replacement resource (private notes omitted)" in replace_output
+    assert "Replace resource preview. Nothing changed." in replace_output
+    assert "Changes: name" in replace_output
     assert "Private notes effect:" in replace_output
-    assert "Selection-fact status: selection-facts-declared" in replace_output
-    assert "Scoring-input defaults:" in replace_output
-    assert "Route eligibility evaluated: false." in replace_output
+    assert "This is a full replacement" in replace_output
+    assert "Use --details" in replace_output
+    assert "Current resource (private notes omitted)" not in replace_output
+    assert len(replace_output.splitlines()) <= 12
+    assert len(replace_output.split()) <= 140
+
+    assert main([*replace_args, "--details"]) == 0
+    replace_details = capsys.readouterr().out
+    assert "Current resource (private notes omitted)" in replace_details
+    assert "Replacement resource (private notes omitted)" in replace_details
+    assert "Selection-fact status: selection-facts-declared" in replace_details
+    assert "Scoring-input defaults:" in replace_details
+    assert "Route eligibility evaluated: false." in replace_details
 
     assert main([*replace_args, "--json"]) == 0
     replace_preview = json.loads(capsys.readouterr().out)
@@ -1326,9 +1364,21 @@ def test_inventory_replace_and_remove_human_output_explains_full_effect(
     ]
     assert main(remove_args) == 0
     remove_output = capsys.readouterr().out
-    assert "removal preview (no files changed)" in remove_output
-    assert "Resource to remove (private notes omitted)" in remove_output
-    assert "Resource count: 1 -> 0" in remove_output
+    assert "Remove resource preview. Nothing changed." in remove_output
+    assert "Resource to remove (private notes omitted)" not in remove_output
+    assert "Roster: 1 -> 0 resources" in remove_output
+    assert "Use --details" in remove_output
+    assert len(remove_output.splitlines()) <= 10
+    assert len(remove_output.split()) <= 110
+
+    assert main([*remove_args, "--details"]) == 0
+    remove_details = capsys.readouterr().out
+    assert "Resource to remove (private notes omitted)" in remove_details
+
+    assert main([*remove_args, "--details", "--json"]) == 2
+    assert "--details cannot be combined with --json" in capsys.readouterr().err
+    assert main([*remove_args, "--details", "--apply"]) == 2
+    assert "--details is preview-only" in capsys.readouterr().err
 
     assert main([*remove_args, "--json"]) == 0
     remove_preview = json.loads(capsys.readouterr().out)
@@ -1346,6 +1396,30 @@ def test_inventory_replace_and_remove_human_output_explains_full_effect(
         == 0
     )
     assert "Removed resource 'local-coding-agent'" in capsys.readouterr().out
+
+
+def test_bounded_terminal_items_caps_long_maintenance_lists() -> None:
+    assert cli._bounded_terminal_items(["one", "two", "three", "four", "five"]) == (
+        "one, two, three (+2 more)"
+    )
+    long_value = "x" * 100
+    assert cli._bounded_terminal_text(long_value) == "x" * 77 + "..."
+
+
+@pytest.mark.parametrize(
+    "args",
+    (
+        ["inventory", "replace", "--help"],
+        ["inventory", "remove", "--help"],
+        ["inventory", "backup", "inspect", "--help"],
+        ["inventory", "backup", "rollback", "--help"],
+    ),
+)
+def test_maintenance_help_offers_complete_sanitized_details(args: list[str], capsys) -> None:
+    with pytest.raises(SystemExit) as result:
+        main(args)
+    assert result.value.code == 0
+    assert "--details" in capsys.readouterr().out
 
 
 def test_preview_plan_token_binds_absolute_target_across_working_directories(
@@ -3132,12 +3206,54 @@ def test_human_backup_lifecycle_output_labels_sources_and_irreversible_steps(
         == 0
     )
     inspection_output = capsys.readouterr().out
-    assert "private notes omitted" in inspection_output
-    assert "Sanitized comparison:" in inspection_output
-    assert "Sanitized active snapshot:" in inspection_output
-    assert "Sanitized backup snapshot:" in inspection_output
-    assert "code-implementation" in inspection_output
+    assert "Backup comparison. Nothing changed." in inspection_output
+    assert "values are never shown" in inspection_output
+    assert "Sanitized comparison:" not in inspection_output
+    assert "Sanitized active snapshot:" not in inspection_output
+    assert "Sanitized backup snapshot:" not in inspection_output
+    assert "Use --details" in inspection_output
+    assert len(inspection_output.splitlines()) <= 9
+    assert len(inspection_output.split()) <= 110
     assert sentinel not in inspection_output
+
+    assert (
+        main(
+            [
+                "inventory",
+                "backup",
+                "inspect",
+                "--path",
+                str(inventory),
+                "--backup",
+                added["backup_id"],
+                "--details",
+            ]
+        )
+        == 0
+    )
+    inspection_details = capsys.readouterr().out
+    assert "Sanitized comparison:" in inspection_details
+    assert "Sanitized active snapshot:" in inspection_details
+    assert "Sanitized backup snapshot:" in inspection_details
+    assert "code-implementation" in inspection_details
+    assert sentinel not in inspection_details
+    assert (
+        main(
+            [
+                "inventory",
+                "backup",
+                "inspect",
+                "--path",
+                str(inventory),
+                "--backup",
+                added["backup_id"],
+                "--details",
+                "--json",
+            ]
+        )
+        == 2
+    )
+    assert "--details cannot be combined with --json" in capsys.readouterr().err
 
     rollback_args = [
         "inventory",
@@ -3150,12 +3266,21 @@ def test_human_backup_lifecycle_output_labels_sources_and_irreversible_steps(
     ]
     assert main(rollback_args) == 0
     rollback_preview_output = capsys.readouterr().out
-    assert "rollback preview (no files changed)" in rollback_preview_output
-    assert "Hidden private notes will be restored exactly" in rollback_preview_output
-    assert "Sanitized active snapshot:" in rollback_preview_output
-    assert "Sanitized rollback candidate snapshot:" in rollback_preview_output
-    assert "code-implementation" in rollback_preview_output
+    assert "Rollback preview. Nothing changed." in rollback_preview_output
+    assert "Private notes: restored exactly" in rollback_preview_output
+    assert "Sanitized active snapshot:" not in rollback_preview_output
+    assert "Sanitized rollback candidate snapshot:" not in rollback_preview_output
+    assert "Use --details" in rollback_preview_output
+    assert len(rollback_preview_output.splitlines()) <= 12
+    assert len(rollback_preview_output.split()) <= 150
     assert sentinel not in rollback_preview_output
+
+    assert main([*rollback_args, "--details"]) == 0
+    rollback_details = capsys.readouterr().out
+    assert "Sanitized active snapshot:" in rollback_details
+    assert "Sanitized rollback candidate snapshot:" in rollback_details
+    assert "code-implementation" in rollback_details
+    assert sentinel not in rollback_details
     assert main([*rollback_args, "--json"]) == 0
     rollback_preview = json.loads(capsys.readouterr().out)
     assert (

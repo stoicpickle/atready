@@ -151,6 +151,8 @@ def _write_cli_fixture_wheel(
 
 def test_skill_frontmatter_and_resources_are_portable() -> None:
     text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    intake_reference = (SKILL / "references" / "resource-onboarding.md").read_text(encoding="utf-8")
+    complete_contract = text + "\n" + intake_reference
     _, frontmatter, body = text.split("---", 2)
     normalized_body = " ".join(body.split())
     metadata = yaml.safe_load(frontmatter)
@@ -158,19 +160,22 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert metadata["name"] == "project-atready"
     assert set(metadata) == {"name", "description"}
     assert "TODO" not in body
-    assert body.count('"/absolute/path/to/project-atready/scripts/atready.py"') >= 6
+    assert body.count('"/absolute/path/to/project-atready/scripts/atready.py"') >= 3
     assert "Never invoke a bare `atready` command or bypass the launcher" in normalized_body
     assert "never searches `PATH` for `atready`" in normalized_body
     assert "uses trusted `uv`, offline and without configuration files" in normalized_body
     assert re.search(r"(?m)^\s*atready(?:\s|$)", body) is None
-    assert "config path" in body
-    assert "inventory validate /absolute/path/to/inventory.yaml" in body
-    assert "init --path /absolute/path/to/inventory.yaml --json" in body
+    assert "do not precede it with `config path` or a separate validation call" in normalized_body
+    assert "init --path /absolute/path/to/inventory.yaml --json" in complete_contract
     assert "inventory snapshot /absolute/path/to/inventory.yaml --format json" in body
+    assert "inventory snapshot --format json" in body
     assert "project template" in body
-    assert "project validate /absolute/path/to/project.yaml" in body
+    assert "do not run a separate project validation during the normal path" in normalized_body
     assert "--inventory /absolute/path/to/inventory.yaml" in body
-    assert "--format presentation" in body
+    assert "for the default roster, omit `--inventory`" in normalized_body.lower()
+    assert "route" in body
+    assert "--project /absolute/path/to/project.yaml" in body
+    assert body.count("--format agent-summary") >= 2
     assert "[output-contract.md](references/output-contract.md)" in body
     assert "## Planning workflow" in body
     assert "Use AtReady for two jobs" in normalized_body
@@ -185,28 +190,25 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "already-installed Python 3.11 or newer interpreter" in normalized_body
     assert "## Resource intake workflow" in body
     assert "before planning when the user asks to add one resource" in normalized_body
-    assert "approved local execution and filesystem access" in normalized_body
-    assert "schema resource-declaration" in body
-    assert "inventory add" in body
-    assert "--resource-file /absolute/path/to/declaration.yaml --json" in body
-    assert "--expect-revision" in body
-    assert "--expect-plan" in body
-    assert "inventory validate /absolute/path/to/inventory.yaml --strict --json" in body
-    assert "inventory list /absolute/path/to/inventory.yaml --json" in body
+    assert "approved local execution and filesystem access" in complete_contract
+    assert "schema resource-declaration" in complete_contract
+    assert "inventory add" in complete_contract
+    assert "--resource-file /absolute/path/to/declaration.yaml --json" in complete_contract
+    assert "--expect-revision" in complete_contract
+    assert "--expect-plan" in complete_contract
+    assert (
+        "inventory validate /absolute/path/to/inventory.yaml --strict --json" in complete_contract
+    )
+    assert "inventory list /absolute/path/to/inventory.yaml --json" in complete_contract
     assert "private notes, revision nonces" in normalized_body
     assert "fresh unpredictable temporary directory" in normalized_body
     assert "`0700` directory" in normalized_body
     assert "`0600` `project.yaml`" in normalized_body
     assert "remove only the exact temporary file" in normalized_body.casefold()
-    assert "complete evidence record" in normalized_body
-    assert "Treat `route` as the complete evidence record" in normalized_body
-    assert (
-        "Follow the reference's limit flags and `presentation_status` branches" in normalized_body
-    )
+    assert "ends with the exact successful-route boundary" in normalized_body
+    assert "bounded presentation format only for an explicit word or line limit" in normalized_body
     assert "exit `3` for a route with gaps" in normalized_body
-    assert "invalid or missing envelope data" in normalized_body.casefold()
-    assert "Follow the output contract for exact `ready` or `limit-conflict`" in normalized_body
-    assert "Preserve every assignment, gap, uncertainty, disposition" in normalized_body
+    assert "Build requested details from the full JSON route" in normalized_body
     assert "references/runtime-setup.md" in body
     assert "references/routing-rules.md" in body
     assert "references/output-contract.md" in body
@@ -214,79 +216,85 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "detailed evidence or inert handoff packets" in normalized_body
     assert "only when the user explicitly asks" in normalized_body
     assert "A resource-fit plan is advice, not authorization" in normalized_body
+    assert "treat that as new planning input, not implementation authorization" in normalized_body
+    assert "rebuild a fresh protected project, reroute" in normalized_body
+    assert "not forced assignments" in normalized_body
+    assert "never simulate a pin by changing scores" in normalized_body
     assert "Do not activate for ordinary project planning" in metadata["description"]
     assert "Add one user-declared resource" in metadata["description"]
     assert "add, onboard, register, or save a resource" in metadata["description"]
     assert "rough project goal" in metadata["description"]
     assert "explicitly invokes AtReady" in metadata["description"]
-    assert len(text.splitlines()) <= 225
-    assert len(text.split()) <= 1_650
+    assert len(text.splitlines()) <= 180
+    assert len(text.split()) <= 1_400
     assert (SKILL / "scripts" / "atready.py").is_file()
     assert (SKILL / "references" / "routing-rules.md").is_file()
     assert (SKILL / "references" / "output-contract.md").is_file()
     assert (SKILL / "references" / "runtime-setup.md").is_file()
+    assert (SKILL / "references" / "quick-resource-intake.md").is_file()
     assert (SKILL / "references" / "resource-onboarding.md").is_file()
     assert (SKILL / "references" / "model-routing.md").is_file()
 
 
 def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first() -> None:
     body = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    quick = (SKILL / "references" / "quick-resource-intake.md").read_text(encoding="utf-8")
     reference_path = SKILL / "references" / "resource-onboarding.md"
     reference = reference_path.read_text(encoding="utf-8")
     normalized = " ".join(reference.split())
     folded = normalized.casefold()
 
+    assert "[quick-resource-intake.md](references/quick-resource-intake.md)" in body
     assert "[resource-onboarding.md](references/resource-onboarding.md)" in body
     body_normalized = " ".join(body.split())
-    name_first = "If unnamed, ask only for the resource name and stop"
+    name_first = "If the resource is unnamed, ask only"
     assert name_first in body_normalized
-    assert body.index(name_first) < body.index("### 1. Check the local boundary")
-    assert "Do not invoke the launcher" in body_normalized
-    assert "inspect the roster" in body_normalized
-    assert "ask only the unanswered subset of the three human-language questions" in body_normalized
-    assert "A bare-name request gets all three" in body_normalized
-    assert "never repeat supplied facts" in body_normalized
-    assert "Keep IDs, mappings, defaults, target, transport, and disclosure" in body_normalized
-    assert "details out of the question turn" in body_normalized
-    assert "Use only facts the user states" in body_normalized
-    assert "Handle one resource at a time" in body_normalized
-    assert "The add request does not authorize initialization" in body_normalized
-    assert "ask whether to create one empty personal roster" in body_normalized
-    assert "never overwrite it" in body_normalized
-    assert "Keep provider discovery, computer scans, account inspection" in body_normalized
-    assert "credentials, tokens, and private notes outside this workflow" in body_normalized
+    assert body.index(name_first) < body.index("quick-resource-intake.md")
+    assert "Do not read a reference, inspect memory or the repository" in body_normalized
+    assert "invoke the launcher, resolve a target, or inspect the roster" in body_normalized
+    assert "read only [quick-resource-intake.md]" in body_normalized
+    assert "Do not read another reference or run any command" in body_normalized
+    assert "during the question or recap turns" in body_normalized
+    assert "bare-name reply gets all three" in body_normalized
+    assert "Only after explicit approval of the latest recap" in body_normalized
+    assert body.index("quick-resource-intake.md") < body.index("resource-onboarding.md")
+    assert "first point where local execution or filesystem access may be used" in body_normalized
+    assert "Never narrate internal loading or checks" in body_normalized
     assert "user-run terminal fallback" in body_normalized
-    assert "the skill must not invoke it" in body_normalized
-    assert "claim authority or changes" in body_normalized
-    assert "Show the actual CLI preview without changing its fields" in body_normalized
-    assert "After a separate exact-save authorization" in body_normalized
-    assert "create the declaration exclusively as `0600`" in body_normalized
-    assert "owner, type, link count, modes, and absence of a macOS extended ACL" in body_normalized
-    assert "receipt says `applied: true`" in body_normalized
-    assert "has `observed_revision_protection`" in body_normalized
-    assert "same revision" in body_normalized
-    assert "without claiming success or retrying the apply" in body_normalized
-    assert "Return the receipt and validation result" in body_normalized
+    assert "Show the actual CLI preview unchanged" in body_normalized
+    assert "separate `Save exactly this entry?` approval" in body_normalized
+    assert "Never claim success from an uncertain apply receipt" in body_normalized
     assert "Do not use the planning output contract" in body_normalized
-    assert "Do not append the routing boundary sentence" in body_normalized
+    assert "do not append the routing boundary sentence" in body_normalized
+
+    quick_folded = " ".join(quick.split()).casefold()
+    assert len(quick.splitlines()) <= 120
+    assert len(quick.split()) <= 900
+    assert "must not trigger a command" in quick_folded
+    assert "memory search" in quick_folded
+    assert "repository inspection" in quick_folded
+    assert "ask only the unanswered subset" in quick_folded
+    assert "a bare name gets all three" in quick_folded
+    assert "keep the whole response under 100 words" in quick_folded
+    assert "keep the recap under 110 words" in quick_folded
+    assert "approval must follow the latest displayed version" in quick_folded
+    assert "only an explicit yes to `preview this entry?`" in quick_folded
+    for forbidden in (
+        "python3 ",
+        "config path",
+        "inventory validate",
+        "schema resource-declaration",
+        "resource profiles --json",
+    ):
+        assert forbidden not in quick
+
     assert "one resource at a time" in folded
-    assert "keep additional resources in a names-only queue" in folded
-    assert "**Quick Setup**" in reference
-    assert "**Detailed Setup**" in reference
+    assert "load this complete reference only after" in folded
+    assert "Quick Setup" in reference
+    assert "Detailed Setup" in reference
     assert "Assisted Setup presented as Quick Setup" in reference
     assert reference.count("`schema resource-declaration`") == 1
     assert "exactly once for this onboarding task" in folded
-    assert "default to assisted setup" in folded
-    assert "default to quick setup without explaining modes" in folded
-    assert "> What resource do you want to add?" in reference
-    assert "Your roster is ready" not in reference
-    assert "A name is enough to start" in reference
-    assert reference.index("If the user has not supplied a resource name") < reference.index(
-        "resolve the explicit or default inventory target"
-    )
-    assert "Do not invoke the launcher, resolve the target, inspect the roster" in normalized
-    assert "must stay under 35 words" in folded
-    assert "do not repeat its target or safety explanation" in folded
     assert "ask only the unanswered subset of the three visible questions" in folded
     assert "a bare-name request gets all three" in folded
     assert "keep the complete card under 100 words" in folded
@@ -294,11 +302,9 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "the goal is one natural reply, not a schema interview" in folded
     assert "**Easy reply:**" not in reference
     assert "reply naturally" in folded
-    quick_setup = _markdown_h2_section(reference, "3. Assisted Setup presented as Quick Setup")
-    card = quick_setup.split("Then show one compact, prefilled card", 1)[1].split(
-        "Interpret the natural reply internally",
-        1,
-    )[0]
+    card = quick.split("Ask only the unanswered subset", 1)[1].split("Keep the whole response", 1)[
+        0
+    ]
     _assert_three_human_questions(card)
     assert len(card.split()) <= 100
     for deferred in (
@@ -328,7 +334,11 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "Do not use the planning output contract or its headings" in body_normalized
     assert "explicitly asks for detailed evidence" in body_normalized
     assert "the user's project as the subject" in output_folded
-    assert "## Deterministic response" in output_contract
+    assert "## Normal response" in output_contract
+    assert "`route --format agent-summary`" in output_contract
+    assert "return stdout verbatim" in output_folded.casefold()
+    assert "Do not load full route evidence for a normal response" in output_folded
+    assert "## Explicit response limits" in output_contract
     assert "return `summary` verbatim" in output_folded
     assert "Never rewrite, reorder, shorten, truncate, preface, or append" in output_folded
     assert "`presentation_status: ready`" in output_contract
@@ -344,8 +354,7 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "Complete route with one or more gaps" in output_contract
     assert "Launcher and runtime compatibility checks" in output_contract
     assert "one bounded recovery action" in output_folded
-    assert "return `summary` verbatim for a normal or concise request" in output_folded
-    assert "Only an explicit request for detailed evidence" in output_folded
+    assert "a user-supplied word or line limit selects this branch" in output_folded
     assert "A CLI-provided `Next:` line is valid" in output_contract
     assert "Do not add the `Plan`, `Resource fit`, or" in output_folded
     assert "`Gaps and uncertainty` headings" in output_folded
@@ -357,11 +366,12 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "never hide a retained path" in output_folded
     assert "never change the actual route or mutation status" in body_normalized.casefold()
     assert "Use this branch only when the user explicitly asks" in output_folded
-    assert "Build it from `route`, not from the summary or memory" in output_folded
+    assert "Run `route --format json`" in output_folded
+    assert "Read `routing-rules.md` only for this branch" in output_folded
     assert "Keep scores, plan IDs, fingerprints, raw status labels" in output_folded
     assert "## Concise response" not in output_contract
     assert "## Default response" not in output_contract
-    assert output_contract.count("No routed project resources were contacted or run.") == 2
+    assert output_contract.count("No routed project resources were contacted or run.") == 3
     assert "lead with a tentative plain-language purpose" in folded
     assert "prepare a lowercase resource id" in folded
     assert "editable serialization proposals" in folded

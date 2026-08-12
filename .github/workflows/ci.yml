@@ -88,11 +88,11 @@ jobs:
       - name: Smoke installed wheel
         run: >-
           uv run --isolated --no-project
-          --with ./dist/project_atready-0.1.6-py3-none-any.whl
+          --with ./dist/project_atready-0.1.7-py3-none-any.whl
           python scripts/smoke_wheel.py
 
       - name: Smoke staged plugin
         run: >-
           uv run --isolated --no-project
-          --with ./dist/project_atready-0.1.6-py3-none-any.whl
+          --with ./dist/project_atready-0.1.7-py3-none-any.whl
           python scripts/smoke_plugin.py

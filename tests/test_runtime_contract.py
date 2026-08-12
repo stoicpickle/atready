@@ -91,6 +91,7 @@ def test_runtime_contract_is_deterministic_value_free_and_side_effect_free(capsy
     }
     assert list(SUPPORTED_RUNTIME_FEATURE_IDS) == sorted(set(SUPPORTED_RUNTIME_FEATURE_IDS))
     assert "routing.presentation-bundle.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
+    assert "routing.agent-summary.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
 
     assert main(["runtime", "contract", "--json"]) == 0
     first = capsys.readouterr()
@@ -124,6 +125,16 @@ def test_doctor_human_output_explains_effect_boundaries(capsys) -> None:
     assert "Writes performed: false" in captured.out
     for feature_id in SUPPORTED_RUNTIME_FEATURE_IDS:
         assert feature_id in captured.out
+
+
+def test_bare_doctor_reports_a_runtime_self_check_not_plugin_compatibility(capsys) -> None:
+    assert main(["doctor"]) == 0
+
+    captured = capsys.readouterr()
+    assert "runtime self-check passed" in captured.out
+    assert "no plugin requirements were supplied" in captured.out
+    assert "ready for this plugin contract" not in captured.out
+    assert captured.err == ""
 
 
 def test_doctor_rejects_incompatible_contract_without_exposing_values(capsys) -> None:

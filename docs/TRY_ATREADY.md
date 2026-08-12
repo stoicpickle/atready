@@ -55,7 +55,9 @@ atready plan
 2. `atready add` guides you through adding one tool, agent, service, subscription, app, or person
    you actually have available. Starter suggestions are editable and are not verified facts about
    your account. `Not sure` is a valid answer when the flow offers it.
-3. `atready plan` asks for a real but non-sensitive goal and one to three steps from a rough plan,
+3. `atready plan` uses Quick Fit for one real, public-data piece of work and its required
+   capabilities. It shows the standard eligibility defaults before routing. Use
+   `atready plan --mode detailed` for private data or the full one-to-three-step interview,
    then suggests where your saved resources fit. It does not create the complete project plan.
 
 During `atready add`, AtReady shows a no-write preview first. Nothing is saved until you separately

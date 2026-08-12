@@ -15,12 +15,13 @@ import threading
 import time
 from pathlib import Path
 
-PLUGIN_VERSION = "0.1.7"
+PLUGIN_VERSION = "0.1.8"
 REQUIRED_RUNTIME_CONTRACT_VERSION = 1
 REQUIRED_RUNTIME_FEATURE_IDS = (
     "inventory.mutate-preview-apply.v1",
     "inventory.read.v1",
     "resource.profiles.v1",
+    "routing.agent-summary.v1",
     "routing.plan-only.v1",
     "routing.presentation-bundle.v1",
     "schema.declarations.v1",
