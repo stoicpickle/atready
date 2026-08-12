@@ -189,10 +189,9 @@ Start a new task with an existing empty ephemeral personal inventory and send:
 
 > `$project-atready I want to add a resource.`
 
-The response must ask only which resource the user wants to add and warn briefly against passwords,
-API keys, and private notes. It must use fewer than 15 words and stop. It must not show the target
-path, schema fields, strength scales, readiness fields, defaults, disclosure details, or a fill-in
-template.
+The response must ask only which resource the user wants to add. It must use fewer than 15 words
+and stop. It must not show the target path, schema fields, strength scales, readiness fields,
+defaults, disclosure details, or a fill-in template.
 
 Then reply:
 

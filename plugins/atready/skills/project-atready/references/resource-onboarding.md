@@ -8,6 +8,12 @@ Do not repeat the three Quick Setup questions or compact recap here. The approve
 facts are the input to this stage. No earlier add request, answer, correction, or general request for
 a preview authorizes a roster read, declaration preview, initialization, or save.
 
+This is a mandatory post-recap mode guard. When this reference follows an approved Quick Setup
+recap, skip every later question card, bare-name template, and compact-recap instruction. They
+describe how approved facts map to provider profiles; they are not another conversational intake
+stage. Use them only to materialize the declaration. Detailed Setup also gathers only fields the
+user has not already supplied and never restarts Quick Setup.
+
 ## 1. Resolve the target and declaration contract
 
 Require approved local execution and filesystem access. Otherwise say chat cannot save and direct

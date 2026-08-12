@@ -83,6 +83,8 @@ def test_public_copy_positions_atready_as_codex_resource_context() -> None:
     assert "AtReady is a small, local-first planning tool" not in readme
     assert "The CLI is the product" not in readme
     assert "It does not create the complete project plan." in guide
+    assert "complete example plan" not in guide.casefold()
+    assert "example resource-fit advice" in guide
 
 
 def test_demo_sample_keeps_the_exact_safety_close_after_next_steps() -> None:

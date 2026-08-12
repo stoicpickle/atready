@@ -37,9 +37,9 @@ The demo uses bundled fake resources. It does not read or change your personal i
 atready demo
 ```
 
-The command prints a complete example plan without creating files, using the network, or reading or
-changing your personal resource list. Read the result once: what resource did it choose, why, and
-what did it leave out?
+The command prints example resource-fit advice without creating files, using the network, or
+reading or changing your personal resource list. Read the result once: what resource did it
+suggest, why, and what did it leave out?
 
 ## 3. Try your own resource fit check
 

@@ -295,11 +295,11 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "Assisted Setup presented as Quick Setup" in reference
     assert reference.count("`schema resource-declaration`") == 1
     assert "exactly once for this onboarding task" in folded
-    assert "ask only the unanswered subset of the three visible questions" in folded
-    assert "a bare-name request gets all three" in folded
-    assert "keep the complete card under 100 words" in folded
-    assert "one compact, prefilled card" in folded
-    assert "the goal is one natural reply, not a schema interview" in folded
+    assert "mandatory post-recap mode guard" in folded
+    assert "skip every later question card" in folded
+    assert "they are not another conversational intake stage" in folded
+    assert "use them only to materialize the declaration" in folded
+    assert "never restarts quick setup" in folded
     assert "**Easy reply:**" not in reference
     assert "reply naturally" in folded
     card = quick.split("Ask only the unanswered subset", 1)[1].split("Keep the whole response", 1)[
