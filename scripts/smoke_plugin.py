@@ -208,7 +208,7 @@ def main_smoke() -> None:
     fixtures = repository_root / "evals" / "fixtures"
 
     with tempfile.TemporaryDirectory(prefix="atready-plugin-smoke-") as directory:
-        staging_root = Path(directory)
+        staging_root = Path(directory).resolve()
         staged_plugin = staging_root / "atready"
         shutil.copytree(canonical_plugin, staged_plugin)
         wrapper = staged_plugin / "skills" / "project-atready" / "scripts" / "atready.py"
