@@ -5,13 +5,10 @@ description: Add one user-declared resource to an AtReady roster through a conve
 
 # AtReady
 
-Use AtReady for two jobs: add resources or place saved resources in a plan. The CLI owns mutations,
-eligibility, assignments, gaps, and handoffs.
+Use AtReady for two jobs: intake and plan placement. The CLI owns mutations and routing.
 
-Resolve this `SKILL.md` directory once and replace
-`/absolute/path/to/project-atready` below with it. Resolve one already-installed Python 3.11 or
-newer interpreter and replace `/absolute/path/to/python3` below with it. Use
-it to run the bundled launcher. Never invoke a bare `atready` command or bypass
+Resolve this `SKILL.md` directory. Resolve one already-installed Python 3.11 or newer interpreter.
+Replace both absolute placeholders below and run the bundled launcher. Never invoke a bare `atready` command or bypass
 the launcher. It uses trusted `uv`, offline and without configuration files, resolves its exact
 tool bin, verifies the runtime contract, and never searches `PATH` for `atready`.
 
@@ -20,7 +17,7 @@ tool bin, verifies the runtime contract, and never searches `PATH` for `atready`
 Respect concise, short, brief, quick, promo, or on-screen limits and explicit limits. For a direct question
 without routing or state change, use no more than three short sentences or bullets. During a workflow,
 give only current facts and one next action. Do not repeat boundaries or the prompt. Keep exact
-targets, CLI preview or receipt, mutation state, material uncertainty, separate approval, and route boundaries.
+targets, CLI preview or receipt, mutation state, uncertainty, separate approval, and route boundaries.
 Never change route or mutation status to satisfy a limit.
 
 ## Resource intake workflow
@@ -45,13 +42,13 @@ Only after approval of an unchanged bundled-purpose Quick Setup recap with three
 read [quick-resource-preview.md](references/quick-resource-preview.md). Read
 [resource-onboarding.md](references/resource-onboarding.md) only for Detailed Setup, a custom or
 ambiguous resource, a corrected purpose, extra planning facts, any `Not sure` answer, or a complete
-declaration. Reuse supplied facts and ask only what remains necessary. This is the first point where local execution or filesystem access may be used. Otherwise offer `atready add` as a user-run terminal fallback.
+declaration. Reuse supplied facts and ask only what remains necessary. This is the first point where local execution or filesystem access may be used. Otherwise request authorization or provide the exact resolved bundled-launcher command as an inert user-run terminal fallback; never offer bare `atready add`.
 
 Show the actual CLI preview unchanged, then stop for a separate `Save exactly this entry?`
 approval. Any correction or changed declaration, target, revision, or plan requires a new compact
 recap and preview. Never claim success from an uncertain apply receipt or retry an apply.
 
-On a no-write preview roster/revision mismatch, preserve approved task-local facts and invite exact `retry preview`. In the same task it reruns a fresh no-write preview without intake or recap; it never retries apply, reuses old tokens, saves, or waives save approval.
+On a no-write preview mismatch, preserve approved task-local facts and invite exact `retry preview` once. Rerun preview without intake or recap. On another mismatch, say the roster keeps changing and nothing was saved; do not offer another retry. It never retries apply, reuses old tokens, saves, or waives save approval.
 
 Exclude provider discovery, scans, account or billing inspection, credentials, tokens, and private
 notes. Use only user-stated facts. Do not use the planning output

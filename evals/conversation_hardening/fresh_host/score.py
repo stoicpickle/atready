@@ -435,7 +435,7 @@ def _score_preview_retry(
     _check(
         checks,
         "intake-answers-unchanged",
-        turns[2]["text"] == "Strong, available now, and yes for private repository code."
+        turns[2]["text"].strip() == "Strong, available now, and yes for private repository code."
         and not turns[2]["actions"],
         "user supplies the unchanged scripted intake answers",
     )
@@ -461,12 +461,16 @@ def _score_preview_retry(
     _check(
         checks,
         "preview-approved",
-        turns[4]["text"] == "Yes, preview this entry." and not turns[4]["actions"],
+        turns[4]["text"].strip() == "Yes, preview this entry." and not turns[4]["actions"],
         "user explicitly approves the current recap before preview",
     )
     internal_narration = re.compile(
-        r"(?i)\b(?:loading|loaded|checking|checked|searching|memory|repository|reference|"
-        r"tool call)\b"
+        r"\b(?:loading|loaded|checking|checked|searching)\b"
+        r"|\b(?:memory|repository|filesystem|roster|catalog|profile)\s+"
+        r"(?:search|lookup|inspection|check|scan)\b"
+        r"|\b(?:reference|skill|contract)\s+(?:file|load\w*)\b"
+        r"|\btool\s+call\b",
+        re.IGNORECASE,
     )
     _check(
         checks,
@@ -531,7 +535,7 @@ def _score_preview_retry(
     _check(
         checks,
         "save-declined",
-        turns[8]["text"] == "No. Do not save it." and not turns[8]["actions"],
+        turns[8]["text"].strip() == "No. Do not save it." and not turns[8]["actions"],
         "user explicitly declines the separate save approval",
     )
     _check(

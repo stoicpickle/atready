@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -276,17 +277,24 @@ def test_quick_setup_refuses_tty_oversize_and_unknown_profile_without_side_effec
 
 
 @pytest.mark.parametrize(
-    "raw",
+    ("raw", "expected_error"),
     [
-        _facts(name="CodeRabbit'; touch injected #"),
-        b'{"schema_version":1,"name":"CodeRabbit\nsecond-command",'
-        b'"strength":"strong","available_now":true,"private_work":true}\n',
-        _facts().removesuffix(b"\n"),
+        (
+            _facts(name="CodeRabbit'; touch injected #"),
+            "quick setup requires one unambiguous bundled profile",
+        ),
+        (
+            b'{"schema_version":1,"name":"CodeRabbit\nsecond-command",'
+            b'"strength":"strong","available_now":true,"private_work":true}\n',
+            "quick setup facts are invalid",
+        ),
+        (_facts().removesuffix(b"\n"), "quick setup facts must end with one newline"),
     ],
 )
 def test_quick_setup_transport_keeps_hostile_names_inert_and_requires_one_line(
     tmp_path: Path,
     raw: bytes,
+    expected_error: str,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -311,6 +319,7 @@ def test_quick_setup_transport_keeps_hostile_names_inert_and_requires_one_line(
         == 2
     )
     captured = capsys.readouterr()
+    assert expected_error in captured.err
     assert "touch injected" not in captured.out + captured.err
     assert not marker.exists()
     assert inventory.read_bytes() == original
@@ -339,6 +348,7 @@ def test_quick_setup_exits_after_one_line_without_waiting_for_stdin_close(
             stdin=subprocess.PIPE,
             stdout=stdout_file,
             stderr=stderr_file,
+            env={**os.environ, "ATREADY_HOME": str(tmp_path)},
         )
         assert process.stdin is not None
         process.stdin.write(_facts())

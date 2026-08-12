@@ -20,7 +20,9 @@ fields. Use only the user-approved facts.
 
 ## Preview
 
-Require approved local execution and filesystem access. Otherwise offer user-run `atready add`.
+Require approved local execution and filesystem access. Otherwise request that authorization or
+provide the exact resolved bundled-launcher command below as an inert user-run instruction; never
+offer or invoke a bare `atready add`.
 Start the exact pinned bundled launcher command with non-TTY piped stdin:
 
 ```bash
@@ -50,8 +52,10 @@ not provider verification. Display the actual nested preview unchanged and ask s
 On a no-write roster/revision mismatch before a complete preview, discard old revision and plan
 tokens, retain only the latest approved facts in this task, and say the roster changed, nothing was
 saved, and the user may say `retry preview`. Exact same-task `retry preview` re-resolves the target
-and repeats the preview command with the same facts. Do not repeat intake or recap approval. A fact
-change returns to recap. A different task restarts intake.
+and repeats the preview command with the same facts. This is the only retry. If it also mismatches,
+say the roster keeps changing and nothing was saved, and do not offer another retry in this task.
+Do not repeat intake or recap approval. A fact change returns to recap. A different task restarts
+intake.
 
 ## Apply and verify
 

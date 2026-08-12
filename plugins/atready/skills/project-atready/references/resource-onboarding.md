@@ -554,7 +554,9 @@ task. Reply concisely that the roster changed, nothing was saved, and the user m
 `retry preview`. On that same-task instruction, re-resolve and revalidate the target, create a new
 protected declaration from the unchanged facts, and repeat this no-write preview. Do not reload
 the quick-intake reference, repeat answered questions, or ask for recap approval again. A changed
-fact still returns to the recap loop. A different task starts intake again.
+fact still returns to the recap loop. This is the only retry. If it also mismatches, say the roster
+keeps changing and nothing was saved, and do not offer another retry in this task. A different task
+starts intake again.
 
 Stop again and ask:
 

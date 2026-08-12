@@ -16,7 +16,8 @@ uv tool install --force --no-config --no-python-downloads \
   'git+https://github.com/stoicpickle/atready.git@main'
 ```
 
-This is a moving public-source beta channel, not an immutable or PyPI release. The bundled launcher
+This is a moving public-source beta channel, not an immutable or PyPI release, and it is not
+verified against a pinned or signed release. The bundled launcher
 performs the authoritative compatibility check before every operation. Return to the AtReady
 plugin flow and retry there after installation; do not invoke a bare `atready` executable as a
 substitute for the bundled launcher. Plugin and runtime product versions may differ; compatibility

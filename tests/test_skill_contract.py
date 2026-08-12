@@ -275,7 +275,7 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     body_normalized = " ".join(body.split())
     name_first = "If the resource is unnamed, ask only"
     assert name_first in body_normalized
-    assert body.index(name_first) < body.index("quick-resource-intake.md")
+    assert body_normalized.index(name_first) < body_normalized.index("quick-resource-intake.md")
     assert "Use no tools or filesystem access and narrate nothing" in body_normalized
     assert "read only [quick-resource-intake.md]" in body_normalized
     assert "Do not read another reference or run any command" in body_normalized
@@ -286,12 +286,17 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     )
     assert "a corrected purpose, extra planning facts, any `Not sure` answer" in body_normalized
     assert "Reuse supplied facts and ask only what remains necessary" in body_normalized
-    assert body.index("quick-resource-intake.md") < body.index("quick-resource-preview.md")
-    assert body.index("quick-resource-preview.md") < body.index("resource-onboarding.md")
+    assert body_normalized.index("quick-resource-intake.md") < body_normalized.index(
+        "quick-resource-preview.md"
+    )
+    assert body_normalized.index("quick-resource-preview.md") < body_normalized.index(
+        "resource-onboarding.md"
+    )
     assert "only for Detailed Setup, a custom or ambiguous resource" in body_normalized
     assert "first point where local execution or filesystem access may be used" in body_normalized
     assert "recaps use no tools and expose no internal work" in body_normalized.casefold()
     assert "user-run terminal fallback" in body_normalized
+    assert "never offer bare `atready add`" in body_normalized
     assert "Show the actual CLI preview unchanged" in body_normalized
     assert "separate `Save exactly this entry?` approval" in body_normalized
     assert "Never claim success from an uncertain apply receipt" in body_normalized
@@ -299,6 +304,8 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "do not append the routing boundary sentence" in body_normalized
     assert "approved task-local facts" in body_normalized.casefold()
     assert "without intake or recap" in body_normalized.casefold()
+    assert "invite exact `retry preview` once" in body_normalized
+    assert "do not offer another retry" in body_normalized
     assert (
         "never retries apply, reuses old tokens, saves, or waives save approval"
         in body_normalized.casefold()
@@ -329,6 +336,12 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     ):
         assert forbidden not in quick
 
+    quick_preview = (SKILL / "references" / "quick-resource-preview.md").read_text(encoding="utf-8")
+    quick_preview_folded = " ".join(quick_preview.split()).casefold()
+    assert "never offer or invoke a bare `atready add`" in quick_preview_folded
+    assert "this is the only retry" in quick_preview_folded
+    assert "do not offer another retry" in quick_preview_folded
+
     assert "one resource at a time" in folded
     assert "load this complete reference only for explicitly requested detailed setup" in folded
     assert "bundled-profile quick setup uses" in folded
@@ -341,6 +354,8 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "detailed setup/custom-resource branch" in folded
     assert "not a reason to load this file during normal quick setup" in folded
     assert "never restarts quick setup" in folded
+    assert "this is the only retry" in folded
+    assert "do not offer another retry" in folded
     assert "**Easy reply:**" not in reference
     assert "reply naturally" in folded
     card = quick.split("Ask only the unanswered subset", 1)[1].split("Keep the whole response", 1)[
@@ -930,6 +945,7 @@ def test_runtime_setup_reference_is_safe_and_self_contained() -> None:
     assert "git+https://github.com/stoicpickle/atready.git@main" in reference
     assert "moving public-source beta channel" in normalized
     assert "not an immutable or PyPI release" in normalized
+    assert "not verified against a pinned or signed release" in normalized
     assert "atready runtime contract --json" not in reference
     assert "retry there after installation" in normalized
     assert "do not invoke a bare `atready` executable" in normalized

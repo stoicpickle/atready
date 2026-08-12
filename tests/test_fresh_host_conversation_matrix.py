@@ -363,6 +363,25 @@ def test_preview_retry_requires_both_explicit_approval_inputs(
     assert failed_check in _failed(report, "resource-add-preview-retry")
 
 
+def test_preview_retry_allows_scripted_whitespace_and_repository_work_wording(
+    tmp_path: Path,
+) -> None:
+    value = _passing_transcript()
+    case = next(item for item in value["cases"] if item["id"] == "resource-add-preview-retry")
+    case["turns"][2]["text"] = f"  {case['turns'][2]['text']}\n"
+    case["turns"][3]["text"] = case["turns"][3]["text"].replace(
+        "pull-request feedback", "repository analysis"
+    )
+    case["turns"][4]["text"] = f"\n{case['turns'][4]['text']}  "
+    case["turns"][8]["text"] = f" {case['turns'][8]['text']}\n"
+    transcript = tmp_path / "transcript.json"
+    _write_transcript(transcript, value)
+
+    report = _load_scorecard().score_transcript(transcript)
+
+    assert _failed(report, "resource-add-preview-retry") == set()
+
+
 def test_resource_case_rejects_repeated_question_stale_correction_and_early_action(
     tmp_path: Path,
 ) -> None:
@@ -405,7 +424,7 @@ def test_preview_retry_case_rejects_narration_repeated_questions_and_apply(
     tmp_path: Path,
 ) -> None:
     transcript = _passing_transcript()
-    retry = transcript["cases"][1]
+    retry = next(item for item in transcript["cases"] if item["id"] == "resource-add-preview-retry")
     retry["turns"][1]["text"] = (
         "I loaded the reference and checked the repository. How strong is CodeRabbit? "
         "Is it available now? Would you use it with private code?"
@@ -445,7 +464,7 @@ def test_planning_cases_reject_paraphrase_repetition_and_invented_account_fact(
     tmp_path: Path,
 ) -> None:
     transcript = _passing_transcript()
-    planning = transcript["cases"][2]
+    planning = next(item for item in transcript["cases"] if item["id"] == "planning-follow-up")
     planning["turns"][1]["text"] = "A paraphrased route.\n" + BOUNDARY
     planning["turns"][3]["text"] = (
         "Goal: repeat it all. Synthetic Codex Seat also helped. "
