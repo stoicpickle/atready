@@ -84,7 +84,7 @@ def test_provider_free_hardening_gate_combines_bounded_receipts(monkeypatch) -> 
 
 def test_hardening_gate_binds_the_exact_wheel_digest(monkeypatch, tmp_path: Path) -> None:
     module = _load_gate()
-    wheel = tmp_path / "project_atready-0.1.8-py3-none-any.whl"
+    wheel = tmp_path / "project_atready-0.1.9-py3-none-any.whl"
     wheel.write_bytes(b"synthetic wheel")
     observed: list[tuple[str, list[str]]] = []
 

@@ -915,7 +915,7 @@ def test_build_backend_and_sdist_are_explicitly_bounded() -> None:
     assert clean_first_use["if"] == "matrix.python == '3.11'"
     assert clean_first_use["run"] == (
         "uv run --no-sync python scripts/hardening_gate.py "
-        "--wheel ./dist/project_atready-0.1.8-py3-none-any.whl"
+        "--wheel ./dist/project_atready-0.1.9-py3-none-any.whl"
     )
     assert set(ci_job["strategy"]["matrix"]["os"]) == {
         "ubuntu-latest",

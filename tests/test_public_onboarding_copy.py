@@ -9,7 +9,11 @@ ROOT = Path(__file__).parents[1]
 README = ROOT / "README.md"
 TRY_GUIDE = ROOT / "docs" / "TRY_ATREADY.md"
 
-PUBLIC_INSTALL = "uv tool install git+https://github.com/stoicpickle/atready.git"
+PUBLIC_INSTALL = (
+    "uv tool install --force --no-config --no-python-downloads \\\n"
+    "  --default-index https://pypi.org/simple \\\n"
+    "  'git+https://github.com/stoicpickle/atready.git@main'"
+)
 SHELL_FALLBACK = "uv tool update-shell"
 THREE_STEP_JOURNEY = "atready init\natready add\natready plan"
 
@@ -27,6 +31,7 @@ def test_readme_leads_with_the_public_install_and_one_command_demo() -> None:
     assert "atready demo inventory" not in onboarding
     assert "uv tool install ." not in onboarding
     assert readme.index(PUBLIC_INSTALL) < readme.index(SHELL_FALLBACK)
+    assert "`UV_INDEX`, `UV_INDEX_URL`, or `UV_EXTRA_INDEX_URL`" in onboarding
     assert readme.index(SHELL_FALLBACK) < readme.index("atready demo\n```")
     assert (
         "does not read or change your personal resource list, create\n"
@@ -63,6 +68,7 @@ def test_first_time_guide_uses_the_same_short_public_journey() -> None:
     assert "## 3. Try your own resource fit check" in guide
     assert THREE_STEP_JOURNEY in guide
     assert guide.index(PUBLIC_INSTALL) < guide.index(SHELL_FALLBACK)
+    assert "`UV_INDEX`, `UV_INDEX_URL`, or `UV_EXTRA_INDEX_URL`" in guide
     assert guide.index(SHELL_FALLBACK) < guide.index("atready --version")
     assert guide.index("atready --version") < guide.index("atready demo\n```")
     assert guide.index("atready demo\n```") < guide.index(THREE_STEP_JOURNEY)

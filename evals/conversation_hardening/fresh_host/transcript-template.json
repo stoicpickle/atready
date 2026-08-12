@@ -35,6 +35,21 @@
       ]
     },
     {
+      "id": "resource-add-preview-retry",
+      "turns": [
+        {"speaker": "user", "text": "PASTE_UNCHANGED_PROMPT", "actions": []},
+        {"speaker": "assistant", "text": "", "actions": []},
+        {"speaker": "user", "text": "Strong, available now, and yes for private repository code.", "actions": []},
+        {"speaker": "assistant", "text": "", "actions": []},
+        {"speaker": "user", "text": "Yes, preview this entry.", "actions": []},
+        {"speaker": "assistant", "text": "", "actions": [{"kind": "atready-preview", "roster_mutation": false, "resource_contact": false, "outside_disposable_root": false}]},
+        {"speaker": "user", "text": "retry preview", "actions": []},
+        {"speaker": "assistant", "text": "", "actions": [{"kind": "atready-preview", "roster_mutation": false, "resource_contact": false, "outside_disposable_root": false}]},
+        {"speaker": "user", "text": "No. Do not save it.", "actions": []},
+        {"speaker": "assistant", "text": "", "actions": []}
+      ]
+    },
+    {
       "id": "planning-follow-up",
       "turns": [
         {"speaker": "user", "text": "PASTE_UNCHANGED_PROMPT", "actions": []},

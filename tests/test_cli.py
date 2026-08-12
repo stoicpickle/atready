@@ -2720,7 +2720,8 @@ def test_applied_but_uncertain_cli_receipt_uses_distinct_exit_code(
         == 4
     )
     captured = capsys.readouterr()
-    assert "Added resource" in captured.out
+    assert "Resource add state is uncertain" in captured.out
+    assert "Added resource" not in captured.out
     assert "warning: synthetic cleanup uncertainty" in captured.err
     assert "update may already be applied; do not retry this apply" in captured.err
 

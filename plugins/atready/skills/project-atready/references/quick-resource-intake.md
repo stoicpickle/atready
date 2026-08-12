@@ -11,6 +11,8 @@ When the resource is unnamed, ask only:
 > What resource do you want to add?
 
 Stop. Do not explain the setup process. Do not narrate that a reference or contract is loading.
+This exact response is the complete turn. It uses no tool, memory, repository, filesystem, or
+reference access.
 
 ## Three questions
 
@@ -82,6 +84,10 @@ If usage limits are unknown and materially affect readiness, say so in the singl
 line. If private work is allowed, say that sensitive work remains excluded until explicitly
 permitted.
 
+The recap is a response-only turn: render it from the answers already in task context and make no
+tool call, memory lookup, repository or filesystem inspection, profile lookup, or target check.
+Keep internal reasoning, loading, checks, orchestration, and reference names out of the response.
+
 ## Corrections and approval
 
 A correction supplies facts only. Apply only the requested edits, recompute dependent mappings,
@@ -91,3 +97,8 @@ follow the latest displayed version.
 
 Only an explicit yes to `Preview this entry?` authorizes moving to the protected preview stage.
 It never authorizes a save or any resource execution.
+
+The five-field Quick Setup preview applies only when the user accepts the tentative bundled purpose
+and gives definite strength, availability, and private-work answers. A corrected purpose, extra
+planning fact, or `Not sure` answer moves to Detailed Setup after recap approval. Reuse every
+supplied fact and ask only what the complete declaration still needs; do not restart intake.

@@ -13,6 +13,7 @@ SUPPORTED_RUNTIME_FEATURE_IDS = (
     "inventory.read.v1",
     "resource.discovery-consent.v1",
     "resource.profiles.v1",
+    "resource.quick-preview.v1",
     "routing.agent-summary.v1",
     "routing.capacity-demand.v1",
     "routing.compare.v1",

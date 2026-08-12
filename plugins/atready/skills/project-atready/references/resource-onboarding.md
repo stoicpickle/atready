@@ -1,18 +1,17 @@
 # Protected Resource Preview and Save
 
-Load this complete reference only after the user explicitly approves the latest compact recap from
-[quick-resource-intake.md](quick-resource-intake.md), or when the user explicitly requests Detailed
-Setup. Complete one resource at a time. Never combine declarations or preview and apply authority.
+Load this complete reference only for explicitly requested Detailed Setup, a custom or ambiguous
+resource, or a complete declaration. Bundled-profile Quick Setup uses
+[quick-resource-preview.md](quick-resource-preview.md) after recap approval instead. Complete one
+resource at a time. Never combine declarations or preview and apply authority.
 
 Do not repeat the three Quick Setup questions or compact recap here. The approved conversational
 facts are the input to this stage. No earlier add request, answer, correction, or general request for
 a preview authorizes a roster read, declaration preview, initialization, or save.
 
-This is a mandatory post-recap mode guard. When this reference follows an approved Quick Setup
-recap, skip every later question card, bare-name template, and compact-recap instruction. They
-describe how approved facts map to provider profiles; they are not another conversational intake
-stage. Use them only to materialize the declaration. Detailed Setup also gathers only fields the
-user has not already supplied and never restarts Quick Setup.
+This is the Detailed Setup/custom-resource branch. Its retained provider sections document mapping
+and enrichment; they are not a reason to load this file during normal Quick Setup. Detailed Setup
+gathers only fields the user has not already supplied and never restarts Quick Setup.
 
 ## 1. Resolve the target and declaration contract
 
@@ -549,6 +548,14 @@ unchanged, including the canonical target, complete routing-visible resource, gr
 note presence, expected revision, and plan token. Remove only the exact declaration and empty
 directory, and report any retained path.
 
+If this no-write invocation returns a revision or roster-state mismatch before a complete preview,
+discard every old revision and plan token but retain the latest approved intake facts only in this
+task. Reply concisely that the roster changed, nothing was saved, and the user may say exactly
+`retry preview`. On that same-task instruction, re-resolve and revalidate the target, create a new
+protected declaration from the unchanged facts, and repeat this no-write preview. Do not reload
+the quick-intake reference, repeat answered questions, or ask for recap approval again. A changed
+fact still returns to the recap loop. A different task starts intake again.
+
 Stop again and ask:
 
 > Save exactly this entry? AtReady will back up the current roster, apply this reviewed
@@ -573,6 +580,9 @@ declaration and repeat its exact semantics with the preview's revision and plan 
 A changed declaration, target, revision, or plan requires a fresh preview. Remove the exact
 temporary input and directory on every path and report any retained path. Never retry an apply or
 claim success from an uncertain receipt.
+
+`retry preview` is preview recovery only. It cannot retry an apply, reuse prior authorization to
+save, or waive the separate `Save exactly this entry?` approval after the refreshed preview.
 
 Do not preview or apply a second resource until the current resource has a final receipt, is
 declined, or is blocked. Then take the next names-only queue entry through this workflow from the

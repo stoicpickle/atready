@@ -40,7 +40,7 @@ def test_submission_bundle_is_minimal_safe_and_deterministic(tmp_path: Path) -> 
     assert first.read_bytes() == second.read_bytes()
     assert first_receipt["sha256"] == hashlib.sha256(first.read_bytes()).hexdigest()
     assert first_receipt["sha256"] == second_receipt["sha256"]
-    assert first_receipt["plugin_version"] == "0.1.9"
+    assert first_receipt["plugin_version"] == "0.1.10"
     assert first_receipt["submission_type"] == "skills-only"
 
     with zipfile.ZipFile(first) as archive:
@@ -54,7 +54,7 @@ def test_submission_bundle_is_minimal_safe_and_deterministic(tmp_path: Path) -> 
         assert not any(name.startswith("apps/") or "/__pycache__/" in name for name in names)
         assert not any("screenshot" in name or name.endswith("logo.png") for name in names)
         manifest = json.loads(archive.read(".codex-plugin/plugin.json"))
-        assert manifest["version"] == first_receipt["plugin_version"] == "0.1.9"
+        assert manifest["version"] == first_receipt["plugin_version"] == "0.1.10"
         assert "screenshots" not in manifest["interface"]
         assert manifest["interface"]["logo"] == "./assets/icon.png"
         assert manifest["interface"]["composerIcon"] == "./assets/icon.png"

@@ -137,6 +137,68 @@ def test_receipt_keeps_distinct_runtime_and_plugin_versions_in_their_own_fields(
     assert receipt["plugin_version"] == "4.5.6"
 
 
+def test_release_contract_binds_runtime_and_public_recovery_channel() -> None:
+    assert release_bundle._release_contract() == (
+        PROJECT["name"],
+        NORMALIZED_NAME,
+        VERSION,
+        PLUGIN["version"],
+    )
+
+
+def test_release_contract_refuses_runtime_compatibility_version_drift(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    launcher = tmp_path / "atready.py"
+    launcher.write_text(
+        f"PLUGIN_VERSION = {PLUGIN['version']!r}\n"
+        "REVIEWED_RUNTIME_VERSION = '0.0.0'\n"
+        "PUBLIC_RUNTIME_SOURCE = "
+        "'git+https://github.com/stoicpickle/atready.git@main'\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(release_bundle, "_LAUNCHER", launcher)
+
+    with pytest.raises(
+        release_bundle.ReleaseBundleError,
+        match="runtime package and launcher compatibility versions do not match",
+    ):
+        release_bundle._release_contract()
+
+
+def test_release_contract_refuses_placeholder_recovery_source(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    launcher = tmp_path / "atready.py"
+    launcher.write_text(
+        f"PLUGIN_VERSION = {PLUGIN['version']!r}\n"
+        f"REVIEWED_RUNTIME_VERSION = {VERSION!r}\n"
+        "PUBLIC_RUNTIME_SOURCE = 'git+https://github.com/stoicpickle/atready.git@RELEASE_VERSION'\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(release_bundle, "_LAUNCHER", launcher)
+
+    with pytest.raises(
+        release_bundle.ReleaseBundleError,
+        match="public runtime source must name the public main channel",
+    ):
+        release_bundle._release_contract()
+
+
+def test_release_contract_refuses_readme_recovery_command_drift(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    readme = tmp_path / "README.md"
+    readme.write_text("# Synthetic README\n", encoding="utf-8")
+    monkeypatch.setattr(release_bundle, "_README", readme)
+
+    with pytest.raises(
+        release_bundle.ReleaseBundleError,
+        match="recovery command does not match README onboarding",
+    ):
+        release_bundle._release_contract()
+
+
 def test_release_bundle_verification_refuses_artifact_tampering(tmp_path: Path) -> None:
     dist, wheel, _ = _seed_dist(tmp_path)
     assert _run("create", dist).returncode == 0

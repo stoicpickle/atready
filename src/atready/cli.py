@@ -63,6 +63,11 @@ from atready.models import (
 )
 from atready.paths import create_private_file, resolve_paths
 from atready.project import project_from_path, project_from_text
+from atready.quick_setup import (
+    load_quick_setup_facts_stdin,
+    quick_setup_mapping_summary,
+    resource_from_quick_setup,
+)
 from atready.render import (
     render_agent_presentation,
     render_agent_summary,
@@ -517,6 +522,31 @@ def build_parser() -> argparse.ArgumentParser:
     profile_parser.add_argument("profile", help="Exact profile ID or bundled alias")
     profile_parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
     profile_parser.set_defaults(handler=_handle_resource_profile)
+    quick_add_parser = resource_commands.add_parser(
+        "quick-add",
+        help="Preview or apply one approved Quick Setup fact set",
+        description=(
+            "Read one strict, versioned JSON Quick Setup fact set from non-interactive stdin, "
+            "map it through one bundled profile, and delegate to the existing inventory-add "
+            "preview/apply contract. This does not inspect providers or accounts, contact the "
+            "resource, or run it. Custom resources require detailed inventory add setup."
+        ),
+    )
+    quick_add_parser.add_argument("--path", type=Path, help="Defaults to user config")
+    quick_add_parser.add_argument(
+        "--facts-stdin",
+        action="store_true",
+        required=True,
+        help=(
+            "Read exactly schema_version, name, strength, available_now, and private_work "
+            "from the first bounded, newline-terminated JSON line on non-interactive stdin"
+        ),
+    )
+    quick_add_parser.add_argument("--apply", action="store_true")
+    quick_add_parser.add_argument("--expect-revision")
+    quick_add_parser.add_argument("--expect-plan")
+    quick_add_parser.add_argument("--json", action="store_true", help="Emit orchestration JSON")
+    quick_add_parser.set_defaults(handler=_handle_resource_quick_add)
     discover_parser = resource_commands.add_parser(
         "discover",
         help="Locate an executable; optional version execution has unknown external side effects",
@@ -2059,6 +2089,92 @@ def _handle_resource_profile(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_resource_quick_add(args: argparse.Namespace) -> int:
+    _require_preview_apply_contract(args, subject="quick setup addition")
+    stream = getattr(sys.stdin, "buffer", None)
+    if stream is None:
+        raise ConfigurationError("--facts-stdin requires binary standard input")
+    facts = load_quick_setup_facts_stdin(stream)
+    parsed, profile_id = resource_from_quick_setup(facts)
+    try:
+        plan = plan_add_resource(
+            _inventory_path(args.path),
+            parsed.resource,
+            defaulted_fields=parsed.defaulted_fields,
+        )
+    except ConfigurationError as exc:
+        message = str(exc)
+        if facts.name in message or profile_id in message:
+            raise ConfigurationError(
+                "quick setup preview could not be prepared; inspect the roster or use "
+                "detailed setup"
+            ) from None
+        raise
+    mapping = quick_setup_mapping_summary(facts, profile_id=profile_id)
+    if not args.apply:
+        preview = plan.preview()
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "correction": {
+                            "instruction": (
+                                "Rerun this preview with one complete corrected facts envelope."
+                            ),
+                            "supported": True,
+                        },
+                        "effects": {
+                            "inventory_read": True,
+                            "network_accessed": False,
+                            "provider_or_account_inspected": False,
+                            "resource_run": False,
+                            "writes_performed": False,
+                        },
+                        "format": "atready-resource-quick-preview-v1",
+                        "mapping": mapping,
+                        "preview": preview,
+                        "status": "preview-ready",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print("Quick Setup mappings (bundled proposal plus user-declared facts)")
+            print(json.dumps(mapping, indent=2, sort_keys=True))
+            _print_inventory_add_preview(preview)
+        return 0
+
+    result, uncertain = _inventory_add_receipt_result(
+        plan,
+        parsed.resource,
+        expected_revision=args.expect_revision,
+        expected_plan=args.expect_plan,
+    )
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "effects": {
+                        "inventory_read": True,
+                        "network_accessed": False,
+                        "provider_or_account_inspected": False,
+                        "resource_run": False,
+                        "writes_performed": True,
+                    },
+                    "format": "atready-resource-quick-apply-v1",
+                    "mapping": mapping,
+                    "receipt": result,
+                    "status": "applied-with-uncertainty" if uncertain else "applied",
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 4 if uncertain else 0
+    return _print_inventory_add_receipt(result, resource=parsed.resource, uncertain=uncertain)
+
+
 def _handle_resource_discover(args: argparse.Namespace) -> int:
     if args.inspect_version and args.executable is None:
         raise IntakeError(
@@ -2302,14 +2418,13 @@ def _print_inventory_add_preview(result: dict[str, Any], *, guided: bool = False
         )
 
 
-def _commit_inventory_add(
+def _inventory_add_receipt_result(
     plan: Any,
     resource: Any,
     *,
     expected_revision: str,
     expected_plan: str,
-    json_output: bool,
-) -> int:
+) -> tuple[dict[str, Any], bool]:
     receipt = commit_add_resource(
         plan,
         expected_revision=expected_revision,
@@ -2331,31 +2446,63 @@ def _commit_inventory_add(
         or bool(receipt.warnings)
         or (os.name == "posix" and not receipt.directory_synced)
     )
+    return result, uncertain
+
+
+def _print_inventory_add_receipt(
+    result: dict[str, Any],
+    *,
+    resource: Any,
+    uncertain: bool,
+) -> int:
+    if uncertain:
+        print(
+            f"Resource add state is uncertain for {resource.id!r} at "
+            f"{_terminal_safe(result['target'])}"
+        )
+    else:
+        print(f"Added resource {resource.id!r} to {_terminal_safe(result['target'])}")
+    print(f"Candidate revision: {result['candidate_revision']}")
+    print(f"Candidate revision privacy state: {result['candidate_revision_protection']}")
+    print(f"Observed revision: {result['revision'] or 'unavailable'}")
+    print(
+        "Observed revision privacy state: "
+        f"{result['observed_revision_protection'] or 'unavailable'}"
+    )
+    print(f"Replacement verified: {str(result['replacement_verified']).lower()}")
+    print(f"Backup ID: {result['backup_id']}")
+    print(f"Backup path: {_terminal_safe(result['backup_path'])}")
+    if not result["directory_synced"]:
+        print("warning: parent-directory fsync was unavailable", file=sys.stderr)
+    for warning in result["warnings"]:
+        print(f"warning: {_terminal_safe(warning)}", file=sys.stderr)
+    if uncertain:
+        print(
+            "warning: update may already be applied; do not retry this apply; "
+            "inspect the target and backup before another update",
+            file=sys.stderr,
+        )
+    return 4 if uncertain else 0
+
+
+def _commit_inventory_add(
+    plan: Any,
+    resource: Any,
+    *,
+    expected_revision: str,
+    expected_plan: str,
+    json_output: bool,
+) -> int:
+    result, uncertain = _inventory_add_receipt_result(
+        plan,
+        resource,
+        expected_revision=expected_revision,
+        expected_plan=expected_plan,
+    )
     if json_output:
         print(json.dumps(result, indent=2, sort_keys=True))
-    else:
-        print(f"Added resource {resource.id!r} to {_terminal_safe(receipt.target)}")
-        print(f"Candidate revision: {receipt.candidate_revision}")
-        print(f"Candidate revision privacy state: {plan.revision_protection}")
-        print(f"Observed revision: {receipt.revision or 'unavailable'}")
-        print(
-            "Observed revision privacy state: "
-            f"{result['observed_revision_protection'] or 'unavailable'}"
-        )
-        print(f"Replacement verified: {str(receipt.replacement_verified).lower()}")
-        print(f"Backup ID: {receipt.backup_id}")
-        print(f"Backup path: {_terminal_safe(receipt.backup_path)}")
-        if not receipt.directory_synced:
-            print("warning: parent-directory fsync was unavailable", file=sys.stderr)
-        for warning in receipt.warnings:
-            print(f"warning: {_terminal_safe(warning)}", file=sys.stderr)
-        if uncertain:
-            print(
-                "warning: update may already be applied; do not retry this apply; "
-                "inspect the target and backup before another update",
-                file=sys.stderr,
-            )
-    return 4 if uncertain else 0
+        return 4 if uncertain else 0
+    return _print_inventory_add_receipt(result, resource=resource, uncertain=uncertain)
 
 
 def _print_guided_recap(parsed: ParsedResourceDeclaration, target: Path) -> None:

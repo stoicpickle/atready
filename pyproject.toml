@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "project-atready"
-version = "0.1.8"
+version = "0.1.9"
 description = "Repeatable assignment planning for declared project resources"
 readme = "README.md"
 requires-python = ">=3.11"

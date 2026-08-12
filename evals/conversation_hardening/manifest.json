@@ -152,8 +152,8 @@
         "evals/PLAN_COMMUNICATION_EVAL.md"
       ],
       "required": [
-        "For a direct question without routing or state change, answer in no more than three short sentences or bullets.",
-        "Do not repeat boundaries or restate the prompt.",
+        "For a direct question without routing or state change, use no more than three short sentences or bullets.",
+        "Do not repeat boundaries or the prompt.",
         "The follow-up must answer directly in one sentence."
       ]
     },

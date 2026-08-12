@@ -15,12 +15,15 @@ import threading
 import time
 from pathlib import Path
 
-PLUGIN_VERSION = "0.1.9"
+PLUGIN_VERSION = "0.1.10"
+REVIEWED_RUNTIME_VERSION = "0.1.9"
+PUBLIC_RUNTIME_SOURCE = "git+https://github.com/stoicpickle/atready.git@main"
 REQUIRED_RUNTIME_CONTRACT_VERSION = 1
 REQUIRED_RUNTIME_FEATURE_IDS = (
     "inventory.mutate-preview-apply.v1",
     "inventory.read.v1",
     "resource.profiles.v1",
+    "resource.quick-preview.v1",
     "routing.agent-summary.v1",
     "routing.capacity-demand.v1",
     "routing.compare.v1",
@@ -29,6 +32,7 @@ REQUIRED_RUNTIME_FEATURE_IDS = (
     "schema.declarations.v1",
 )
 _HANDSHAKE_TIMEOUT_SECONDS = 10
+_VERSION_PROBE_TIMEOUT_SECONDS = 2
 _MAX_HANDSHAKE_BYTES = 32_768
 _UV_TOOL_BIN_ARGUMENTS = ("--offline", "--no-config", "tool", "dir", "--bin")
 _FEATURE_ID = re.compile(r"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$")
@@ -74,8 +78,12 @@ def _terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
         process.kill()
 
 
-def _run_bounded(command: list[str]) -> subprocess.CompletedProcess[str]:
-    """Run one doctor command while bounding stdout and stderr during capture."""
+def _run_bounded(
+    command: list[str], *, timeout_seconds: float | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Run one compatibility command while bounding time, stdout, and stderr."""
+
+    timeout = _HANDSHAKE_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds
 
     process = subprocess.Popen(  # noqa: S603
         command,
@@ -114,7 +122,7 @@ def _run_bounded(command: list[str]) -> subprocess.CompletedProcess[str]:
     for thread in threads:
         thread.start()
 
-    deadline = time.monotonic() + _HANDSHAKE_TIMEOUT_SECONDS
+    deadline = time.monotonic() + timeout
     timed_out = False
     while process.poll() is None:
         remaining = deadline - time.monotonic()
@@ -136,12 +144,12 @@ def _run_bounded(command: list[str]) -> subprocess.CompletedProcess[str]:
         _terminate_process_tree(process)
         for thread in threads:
             thread.join(0.25)
-        raise subprocess.TimeoutExpired(command, _HANDSHAKE_TIMEOUT_SECONDS)
+        raise subprocess.TimeoutExpired(command, timeout)
 
     if failures:
         raise failures[0]
     if timed_out:
-        raise subprocess.TimeoutExpired(command, _HANDSHAKE_TIMEOUT_SECONDS)
+        raise subprocess.TimeoutExpired(command, timeout)
     if stop.is_set():
         raise _BoundedOutputError("doctor output exceeded its bounded capture")
     return subprocess.CompletedProcess(
@@ -229,6 +237,53 @@ def _resolve_command(*, platform: str | None = None) -> tuple[str, list[str]]:
     return executable, [executable]
 
 
+def _runtime_update_command() -> str:
+    return (
+        "uv tool install --force --no-config --no-python-downloads "
+        "--default-index https://pypi.org/simple "
+        f"'{PUBLIC_RUNTIME_SOURCE}'"
+    )
+
+
+def _observe_runtime_version(command: list[str]) -> str:
+    """Return one bounded product version, or ``unknown`` when it cannot be trusted."""
+
+    try:
+        result = _run_bounded(
+            [*command, "--version"],
+            timeout_seconds=_VERSION_PROBE_TIMEOUT_SECONDS,
+        )
+    except (OSError, UnicodeError, subprocess.TimeoutExpired, _BoundedOutputError):
+        return "unknown"
+
+    lines = result.stdout.splitlines()
+    if result.returncode != 0 or result.stderr or len(lines) != 1:
+        return "unknown"
+    prefix = "atready "
+    if not lines[0].startswith(prefix):
+        return "unknown"
+    version = lines[0][len(prefix) :]
+    if _PRODUCT_VERSION.fullmatch(version) is None:
+        return "unknown"
+    return version
+
+
+def _runtime_remediation(command: list[str], summary: str) -> str:
+    observed = _observe_runtime_version(command)
+    return (
+        f"{summary} Observed local runtime version: {observed}. AtReady did not delegate your "
+        "request; these compatibility probes do not ask the runtime to read or write your "
+        "roster. Run this exact update yourself:\n\n"
+        f"{_runtime_update_command()}\n\n"
+        f"This reinstalls from AtReady's moving public-source beta channel. This plugin was "
+        f"reviewed with runtime {REVIEWED_RUNTIME_VERSION}. uv may still honor inherited "
+        "UV_INDEX, UV_INDEX_URL, or UV_EXTRA_INDEX_URL values; clear them first for PyPI-only "
+        "dependency resolution. Then "
+        "retry the AtReady preview or other request in this same task; the launcher will re-check "
+        "compatibility before any roster operation."
+    )
+
+
 def _verify_runtime_contract(command: list[str]) -> None:
     doctor_arguments = [
         "doctor",
@@ -244,19 +299,25 @@ def _verify_runtime_contract(command: list[str]) -> None:
         result = _run_bounded([*command, *doctor_arguments])
     except (OSError, UnicodeError, subprocess.TimeoutExpired) as exc:
         raise SystemExit(
-            "AtReady could not verify the installed local runtime; refusing to continue. "
-            "Reinstall or update project-atready, then retry through the plugin."
+            _runtime_remediation(
+                command,
+                "AtReady could not verify the installed local runtime, so it stopped.",
+            )
         ) from exc
     except _BoundedOutputError as exc:
         raise SystemExit(
-            "AtReady received an invalid local runtime compatibility report; refusing to "
-            "continue. Reinstall or update project-atready, then retry through the plugin."
+            _runtime_remediation(
+                command,
+                "AtReady received an invalid local runtime compatibility report, so it stopped.",
+            )
         ) from exc
 
     if result.returncode != 0 or result.stderr or not result.stdout:
         raise SystemExit(
-            "AtReady received an invalid local runtime compatibility report; refusing to "
-            "continue. Reinstall or update project-atready, then retry through the plugin."
+            _runtime_remediation(
+                command,
+                "AtReady received an invalid local runtime compatibility report, so it stopped.",
+            )
         )
 
     try:
@@ -308,14 +369,18 @@ def _verify_runtime_contract(command: list[str]) -> None:
             raise ValueError("invalid contract values")
     except (TypeError, ValueError, json.JSONDecodeError) as exc:
         raise SystemExit(
-            "AtReady received an invalid local runtime compatibility report; refusing to "
-            "continue. Reinstall or update project-atready, then retry through the plugin."
+            _runtime_remediation(
+                command,
+                "AtReady received an invalid local runtime compatibility report, so it stopped.",
+            )
         ) from exc
 
     if not set(REQUIRED_RUNTIME_FEATURE_IDS).issubset(features):
         raise SystemExit(
-            "AtReady received an incomplete local runtime compatibility report; refusing "
-            "to continue. Update project-atready. No command was delegated."
+            _runtime_remediation(
+                command,
+                "AtReady received an incomplete local runtime compatibility report, so it stopped.",
+            )
         )
 
 

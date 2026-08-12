@@ -152,8 +152,11 @@ def _write_cli_fixture_wheel(
 def test_skill_frontmatter_and_resources_are_portable() -> None:
     text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     intake_reference = (SKILL / "references" / "resource-onboarding.md").read_text(encoding="utf-8")
+    quick_preview = (SKILL / "references" / "quick-resource-preview.md").read_text(encoding="utf-8")
     output_reference = (SKILL / "references" / "output-contract.md").read_text(encoding="utf-8")
-    complete_contract = text + "\n" + intake_reference + "\n" + output_reference
+    complete_contract = (
+        text + "\n" + quick_preview + "\n" + intake_reference + "\n" + output_reference
+    )
     normalized_contract = " ".join(complete_contract.split())
     _, frontmatter, body = text.split("---", 2)
     normalized_body = " ".join(body.split())
@@ -253,6 +256,7 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert (SKILL / "references" / "output-contract.md").is_file()
     assert (SKILL / "references" / "runtime-setup.md").is_file()
     assert (SKILL / "references" / "quick-resource-intake.md").is_file()
+    assert (SKILL / "references" / "quick-resource-preview.md").is_file()
     assert (SKILL / "references" / "resource-onboarding.md").is_file()
     assert (SKILL / "references" / "model-routing.md").is_file()
 
@@ -266,27 +270,39 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     folded = normalized.casefold()
 
     assert "[quick-resource-intake.md](references/quick-resource-intake.md)" in body
+    assert "[quick-resource-preview.md](references/quick-resource-preview.md)" in body
     assert "[resource-onboarding.md](references/resource-onboarding.md)" in body
     body_normalized = " ".join(body.split())
     name_first = "If the resource is unnamed, ask only"
     assert name_first in body_normalized
     assert body.index(name_first) < body.index("quick-resource-intake.md")
-    assert "Do not read a reference, inspect memory or the repository" in body_normalized
-    assert "invoke the launcher, resolve a target, or inspect the roster" in body_normalized
+    assert "Use no tools or filesystem access and narrate nothing" in body_normalized
     assert "read only [quick-resource-intake.md]" in body_normalized
     assert "Do not read another reference or run any command" in body_normalized
     assert "during the question or recap turns" in body_normalized
     assert "bare-name reply gets all three" in body_normalized
-    assert "Only after explicit approval of the latest recap" in body_normalized
-    assert body.index("quick-resource-intake.md") < body.index("resource-onboarding.md")
+    assert (
+        "Only after approval of an unchanged bundled-purpose Quick Setup recap" in body_normalized
+    )
+    assert "a corrected purpose, extra planning facts, any `Not sure` answer" in body_normalized
+    assert "Reuse supplied facts and ask only what remains necessary" in body_normalized
+    assert body.index("quick-resource-intake.md") < body.index("quick-resource-preview.md")
+    assert body.index("quick-resource-preview.md") < body.index("resource-onboarding.md")
+    assert "only for Detailed Setup, a custom or ambiguous resource" in body_normalized
     assert "first point where local execution or filesystem access may be used" in body_normalized
-    assert "Never narrate internal loading or checks" in body_normalized
+    assert "recaps use no tools and expose no internal work" in body_normalized.casefold()
     assert "user-run terminal fallback" in body_normalized
     assert "Show the actual CLI preview unchanged" in body_normalized
     assert "separate `Save exactly this entry?` approval" in body_normalized
     assert "Never claim success from an uncertain apply receipt" in body_normalized
     assert "Do not use the planning output contract" in body_normalized
     assert "do not append the routing boundary sentence" in body_normalized
+    assert "approved task-local facts" in body_normalized.casefold()
+    assert "without intake or recap" in body_normalized.casefold()
+    assert (
+        "never retries apply, reuses old tokens, saves, or waives save approval"
+        in body_normalized.casefold()
+    )
 
     quick_folded = " ".join(quick.split()).casefold()
     assert len(quick.splitlines()) <= 120
@@ -300,6 +316,10 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "keep the recap under 110 words" in quick_folded
     assert "approval must follow the latest displayed version" in quick_folded
     assert "only an explicit yes to `preview this entry?`" in quick_folded
+    assert "this exact response is the complete turn" in quick_folded
+    assert "uses no tool, memory, repository, filesystem, or reference access" in quick_folded
+    assert "the recap is a response-only turn" in quick_folded
+    assert "reference names out of the response" in quick_folded
     for forbidden in (
         "python3 ",
         "config path",
@@ -310,16 +330,16 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
         assert forbidden not in quick
 
     assert "one resource at a time" in folded
-    assert "load this complete reference only after" in folded
+    assert "load this complete reference only for explicitly requested detailed setup" in folded
+    assert "bundled-profile quick setup uses" in folded
+    assert "quick-resource-preview.md" in folded
     assert "Quick Setup" in reference
     assert "Detailed Setup" in reference
     assert "Assisted Setup presented as Quick Setup" in reference
     assert reference.count("`schema resource-declaration`") == 1
     assert "exactly once for this onboarding task" in folded
-    assert "mandatory post-recap mode guard" in folded
-    assert "skip every later question card" in folded
-    assert "they are not another conversational intake stage" in folded
-    assert "use them only to materialize the declaration" in folded
+    assert "detailed setup/custom-resource branch" in folded
+    assert "not a reason to load this file during normal quick setup" in folded
     assert "never restarts quick setup" in folded
     assert "**Easy reply:**" not in reference
     assert "reply naturally" in folded
@@ -346,7 +366,7 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "## Response discipline" in body
     assert "concise, short, brief, quick, promo, or on-screen" in body_normalized
     assert "no more than three short sentences or bullets" in body_normalized
-    assert "give only the facts needed for the current state and one next action" in body_normalized
+    assert "give only current facts and one next action" in body_normalized
     assert "CLI preview or receipt" in body_normalized
     assert "separate approval" in body_normalized
     assert "no more than three short sentences and 60 words" in body_normalized
@@ -385,7 +405,7 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "report the retained path before the unchanged `summary`" in output_folded
     assert "only exception to whole-response verbatim output" in output_folded
     assert "never hide a retained path" in output_folded
-    assert "never change the actual route or mutation status" in body_normalized.casefold()
+    assert "never change route or mutation status" in body_normalized.casefold()
     assert "Use this branch only when the user explicitly asks" in output_folded
     assert "Run `route --format json`" in output_folded
     assert "Read `routing-rules.md` only for this branch" in output_folded
@@ -747,6 +767,74 @@ def test_quick_setup_recap_is_compact_and_corrections_reset_preview_approval() -
     assert "even when one message contains both an edit and preview language" in folded
 
 
+def test_preview_mismatch_has_one_same_task_no_write_recovery_path() -> None:
+    skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    quick_preview = (SKILL / "references" / "quick-resource-preview.md").read_text(encoding="utf-8")
+    onboarding = (SKILL / "references" / "resource-onboarding.md").read_text(encoding="utf-8")
+    folded = " ".join((skill + "\n" + quick_preview + "\n" + onboarding).split()).casefold()
+
+    for contract in (
+        "revision or roster-state mismatch before a complete preview",
+        "retain the latest approved intake facts only in this task",
+        "the roster changed, nothing was saved",
+        "the user may say exactly `retry preview`",
+        "re-resolve and revalidate the target",
+        "repeat this no-write preview",
+        "do not reload the quick-intake reference",
+        "repeat answered questions",
+        "a changed fact still returns to the recap loop",
+        "a different task starts intake again",
+        "cannot retry an apply",
+        "waive the separate `save exactly this entry?` approval",
+    ):
+        assert contract in folded
+
+
+def test_quick_preview_reference_uses_one_bounded_runtime_orchestration_command() -> None:
+    skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    quick = (SKILL / "references" / "quick-resource-preview.md").read_text(encoding="utf-8")
+    folded = " ".join(quick.split()).casefold()
+
+    assert len(quick.splitlines()) <= 100
+    assert len(quick.split()) <= 650
+    assert skill.index("quick-resource-intake.md") < skill.index("quick-resource-preview.md")
+    assert skill.index("quick-resource-preview.md") < skill.index("resource-onboarding.md")
+    assert quick.count("resource quick-add --facts-stdin") == 2
+    assert "resource quick-add --facts-stdin --json" in quick
+    assert "resource quick-add --facts-stdin --apply" in quick
+    assert "--expect-revision preview_expect_revision" in folded
+    assert "--expect-plan preview_expect_plan" in folded
+    for required in (
+        "schema_version",
+        "status: preview-ready",
+        "atready-resource-quick-preview-v1",
+        "network_accessed",
+        "provider_or_account_inspected",
+        "resource_run",
+        "writes_performed",
+        "one canonical nested `preview`",
+        "display the actual nested preview unchanged",
+        "save exactly this entry?",
+        "resend the same facts",
+        "host's stdin channel",
+        "one bounded exact json line plus a newline",
+        "the cli consumes that line and exits",
+        "never place the json or resource name in a shell command",
+        "no shell interpolation or temporary declaration",
+        "atready-resource-quick-apply-v1",
+        "replacement_verified: true",
+        "never retry apply",
+    ):
+        assert required in folded
+    assert "printf" not in quick
+    for detailed_only in (
+        "schema resource-declaration",
+        "resource profiles --json",
+        "--resource-file",
+    ):
+        assert detailed_only not in quick
+
+
 def test_private_work_does_not_invent_sensitive_data_permission() -> None:
     onboarding = (SKILL / "references" / "resource-onboarding.md").read_text(encoding="utf-8")
     folded = " ".join(onboarding.split()).casefold()
@@ -838,8 +926,10 @@ def test_runtime_setup_reference_is_safe_and_self_contained() -> None:
     reference = (SKILL / "references" / "runtime-setup.md").read_text(encoding="utf-8")
     normalized = " ".join(reference.split())
 
-    assert "uv tool install --no-config --default-index https://pypi.org/simple" in reference
-    assert "project-atready==RELEASE_VERSION" in reference
+    assert "uv tool install --force --no-config --no-python-downloads" in reference
+    assert "git+https://github.com/stoicpickle/atready.git@main" in reference
+    assert "moving public-source beta channel" in normalized
+    assert "not an immutable or PyPI release" in normalized
     assert "atready runtime contract --json" not in reference
     assert "retry there after installation" in normalized
     assert "do not invoke a bare `atready` executable" in normalized

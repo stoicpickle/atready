@@ -20,6 +20,7 @@ _PACKAGE = _ROOT / "src" / "atready" / "__init__.py"
 _MANIFEST = _ROOT / "plugins" / "atready" / ".codex-plugin" / "plugin.json"
 _BUILD_CONSTRAINTS = _ROOT / "build-constraints.txt"
 _LAUNCHER = _ROOT / "plugins" / "atready" / "skills" / "project-atready" / "scripts" / "atready.py"
+_README = _ROOT / "README.md"
 _WORKFLOW_PATH = ".github/workflows/release-candidate.yml"
 _RECEIPT_NAME = "release-receipt.json"
 _CHECKSUMS_NAME = "SHA256SUMS"
@@ -85,10 +86,23 @@ def _release_contract() -> tuple[str, str, str, str]:
         raise ReleaseBundleError("plugin manifest version must be a non-empty string")
     package_version = _assigned_string(_PACKAGE, "__version__")
     launcher_plugin_version = _assigned_string(_LAUNCHER, "PLUGIN_VERSION")
+    reviewed_runtime_version = _assigned_string(_LAUNCHER, "REVIEWED_RUNTIME_VERSION")
+    public_runtime_source = _assigned_string(_LAUNCHER, "PUBLIC_RUNTIME_SOURCE")
     if version != package_version:
         raise ReleaseBundleError("runtime package and module versions do not match")
     if manifest_version != launcher_plugin_version:
         raise ReleaseBundleError("plugin manifest and launcher versions do not match")
+    if version != reviewed_runtime_version:
+        raise ReleaseBundleError("runtime package and launcher compatibility versions do not match")
+    if public_runtime_source != "git+https://github.com/stoicpickle/atready.git@main":
+        raise ReleaseBundleError("launcher public runtime source must name the public main channel")
+    public_install_command = (
+        "uv tool install --force --no-config --no-python-downloads \\\n"
+        "  --default-index https://pypi.org/simple \\\n"
+        f"  '{public_runtime_source}'"
+    )
+    if public_install_command not in _README.read_text(encoding="utf-8"):
+        raise ReleaseBundleError("launcher recovery command does not match README onboarding")
     if manifest.get("name") != "atready":
         raise ReleaseBundleError("plugin manifest identity does not match atready")
     normalized_name = re.sub(r"[-_.]+", "_", name)

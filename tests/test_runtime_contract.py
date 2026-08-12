@@ -94,6 +94,7 @@ def test_runtime_contract_is_deterministic_value_free_and_side_effect_free(capsy
     assert "routing.agent-summary.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
     assert "routing.capacity-demand.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
     assert "routing.compare.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
+    assert "resource.quick-preview.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
 
     assert main(["runtime", "contract", "--json"]) == 0
     first = capsys.readouterr()

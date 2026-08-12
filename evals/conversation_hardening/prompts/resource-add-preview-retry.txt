@@ -1,0 +1,5 @@
+$project-atready Add CodeRabbit to my AtReady roster.
+
+Use only synthetic facts. I will answer the three compact questions, approve the recap, and the
+first no-write preview will report a synthetic roster-revision mismatch. Preserve my answers in
+this task and let me say `retry preview`. Do not save, contact CodeRabbit, or inspect provider state.
