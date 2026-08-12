@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import io
 import sys
+from datetime import date
 from pathlib import Path
 
 import pytest
 
 import atready.cli as cli
 from atready.cli import main
+from atready.models import ProjectBrief
 from atready.templates import demo_inventory
 from atready.yamlio import dumps_yaml
 
@@ -23,7 +25,7 @@ def _demo_path(tmp_path: Path) -> Path:
     return path
 
 
-def _successful_answers() -> str:
+def _successful_answers(*, approval: str = "") -> str:
     return (
         "\n".join(
             [
@@ -37,11 +39,44 @@ def _successful_answers() -> str:
                 "",  # empty check is rejected
                 "The focused tests pass",
                 "",  # standard eligibility
-                "",  # make the plan
+                approval,  # approve, edit, or accept the default
             ]
         )
         + "\n"
     )
+
+
+def test_guided_plan_can_revise_the_recap_before_routing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    inventory = _demo_path(tmp_path)
+    original = inventory.read_bytes()
+    monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        _TTYInput(_successful_answers(approval="edit") + _successful_answers()),
+    )
+
+    assert (
+        main(
+            [
+                "plan",
+                "--mode",
+                "detailed",
+                "--inventory",
+                str(inventory),
+                "--allow-demo",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert output.count("REVIEW WHAT ATREADY UNDERSTOOD") == 2
+    assert "The previous recap was not routed" in output
+    assert output.count("Resource fit: Guided AtReady plan") == 1
+    assert inventory.read_bytes() == original
 
 
 def test_guided_plan_refuses_non_terminal_input_before_reading(tmp_path: Path, capsys) -> None:
@@ -53,6 +88,103 @@ def test_guided_plan_refuses_non_terminal_input_before_reading(tmp_path: Path, c
     assert "interactive and requires a terminal" in captured.err
     assert "atready route --help" in captured.err
     assert not missing.exists()
+
+
+def test_guided_plan_quick_fit_is_the_default_and_routes_after_three_replies(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    inventory = _demo_path(tmp_path)
+    original = inventory.read_bytes()
+    monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        _TTYInput("Implement and test a small feature\n2\n\n"),
+    )
+
+    assert main(["plan", "--inventory", str(inventory), "--allow-demo"]) == 0
+
+    output = capsys.readouterr().out
+    before_result = output[: output.index("Resource fit:")]
+    assert "QUICK FIT REVIEW" in before_result
+    assert "Work: Implement and test a small feature" in before_result
+    assert "Needs: code-implementation (basic or better)" in before_result
+    assert (
+        "public data; internet allowed; any workflow or cost; verified facts only" in before_result
+    )
+    assert "For private data or other limits" in before_result
+    assert "Check this resource fit? [Y/n/edit]:" in before_result
+    assert "How many steps" not in output
+    assert "Expected result" not in output
+    assert "Eligibility controls" not in output
+    assert len(before_result.split()) <= 180
+    assert "Resource fit: Quick Fit" in output
+    assert inventory.read_bytes() == original
+
+
+def test_guided_quick_recap_bounds_display_without_changing_project(capsys) -> None:
+    work = "x" * cli._MAX_GUIDED_INPUT_CHARACTERS
+    capability_ids = [f"capability-{index}" for index in range(5)]
+    project = ProjectBrief.model_validate(
+        {
+            "schema_version": 1,
+            "id": "bounded-display",
+            "name": "Bounded display",
+            "goal": work,
+            "as_of": date.today(),
+            "constraints": {},
+            "workstreams": [
+                {
+                    "id": "work",
+                    "name": "Work",
+                    "objective": work,
+                    "required_capabilities": [
+                        {"id": capability, "importance": 1.0, "minimum": 0.40}
+                        for capability in capability_ids
+                    ],
+                    "inputs": ["User description"],
+                    "allowed_scope": ["Requested work"],
+                    "exclusions": ["Other work"],
+                    "deliverable": "Requested result",
+                    "acceptance_criteria": ["User accepts the result"],
+                    "verification": ["User review"],
+                    "stop_conditions": ["Stop before resource use"],
+                    "next_owner": "User",
+                }
+            ],
+        }
+    )
+
+    cli._print_guided_quick_recap(project)
+
+    output = capsys.readouterr().out
+    work_line = next(line for line in output.splitlines() if line.startswith("Work: "))
+    assert len(work_line.removeprefix("Work: ")) == 80
+    assert "capability-0, capability-1, capability-2 (+2 more)" in output
+    assert project.goal == work
+    assert project.workstreams[0].objective == work
+    assert [item.id for item in project.workstreams[0].required_capabilities] == capability_ids
+
+
+def test_guided_plan_quick_fit_can_edit_before_routing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    inventory = _demo_path(tmp_path)
+    original = inventory.read_bytes()
+    monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        _TTYInput("Draft a feature\n2\nedit\nImplement and test the feature\n2\n\n"),
+    )
+
+    assert main(["plan", "--inventory", str(inventory), "--allow-demo"]) == 0
+
+    output = capsys.readouterr().out
+    assert output.count("QUICK FIT REVIEW") == 2
+    assert "The previous recap was not routed" in output
+    assert output.count("Resource fit: Quick Fit") == 1
+    assert inventory.read_bytes() == original
 
 
 def test_guided_plan_missing_inventory_points_to_init(
@@ -77,7 +209,19 @@ def test_guided_plan_can_cancel_without_writing_or_routing(
     monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
     monkeypatch.setattr(sys, "stdin", _TTYInput("cancel\n"))
 
-    assert main(["plan", "--inventory", str(inventory), "--allow-demo"]) == 0
+    assert (
+        main(
+            [
+                "plan",
+                "--mode",
+                "detailed",
+                "--inventory",
+                str(inventory),
+                "--allow-demo",
+            ]
+        )
+        == 0
+    )
 
     output = capsys.readouterr().out
     assert "Cancelled. No files changed and no resources were run." in output
@@ -93,11 +237,23 @@ def test_guided_plan_reprompts_after_terminal_controls_without_echoing_them(
     monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
     monkeypatch.setattr(sys, "stdin", _TTYInput("unsafe\x1b[31m goal\n" + _successful_answers()))
 
-    assert main(["plan", "--inventory", str(inventory), "--allow-demo"]) == 0
+    assert (
+        main(
+            [
+                "plan",
+                "--mode",
+                "detailed",
+                "--inventory",
+                str(inventory),
+                "--allow-demo",
+            ]
+        )
+        == 0
+    )
 
     captured = capsys.readouterr()
     assert "Remove control or zero-width characters, or type cancel." in captured.out
-    assert "Resource plan: Guided AtReady plan" in captured.out
+    assert "Resource fit: Guided AtReady plan" in captured.out
     assert "\x1b" not in captured.out + captured.err
     assert "unsafe\\x1b" not in captured.out + captured.err
     assert inventory.read_bytes() == original
@@ -124,7 +280,19 @@ def test_guided_plan_bounds_expected_result_without_writing(
     monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
     monkeypatch.setattr(sys, "stdin", _TTYInput(answers))
 
-    assert main(["plan", "--inventory", str(inventory), "--allow-demo"]) == 2
+    assert (
+        main(
+            [
+                "plan",
+                "--mode",
+                "detailed",
+                "--inventory",
+                str(inventory),
+                "--allow-demo",
+            ]
+        )
+        == 2
+    )
 
     captured = capsys.readouterr()
     assert "guided answer is too long" in captured.err
@@ -149,9 +317,25 @@ def test_guided_plan_routes_in_memory_and_matches_canonical_route(
     monkeypatch.setattr(cli, "route", capture_route)
     monkeypatch.setattr(sys, "stdin", _TTYInput(_successful_answers()))
 
-    assert main(["plan", "--inventory", str(inventory), "--allow-demo"]) == 0
+    assert (
+        main(
+            [
+                "plan",
+                "--mode",
+                "detailed",
+                "--inventory",
+                str(inventory),
+                "--allow-demo",
+            ]
+        )
+        == 0
+    )
     guided_output = capsys.readouterr().out
     assert captured_project is not None
+    assert guided_output.startswith("CHECK RESOURCE FIT\nInventory:")
+    assert "Check resource fit for these steps? [Y/n/edit]:" in guided_output
+    assert "PLAN A PROJECT" not in guided_output
+    assert "Make this resource plan?" not in guided_output
     assert "No project file will be written." in guided_output
     assert "No routed project resources were contacted or run." in guided_output
     workstream = captured_project.workstreams[0]
@@ -189,7 +373,7 @@ def test_guided_plan_routes_in_memory_and_matches_canonical_route(
         == 0
     )
     route_output = capsys.readouterr().out
-    assert guided_output[guided_output.index("Resource plan:") :] == route_output
+    assert guided_output[guided_output.index("Resource fit:") :] == route_output
 
 
 def test_guided_plan_surfaces_a_gap_from_custom_eligibility(
@@ -221,7 +405,19 @@ def test_guided_plan_surfaces_a_gap_from_custom_eligibility(
     monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
     monkeypatch.setattr(sys, "stdin", _TTYInput(answers))
 
-    assert main(["plan", "--inventory", str(inventory), "--allow-demo"]) == 3
+    assert (
+        main(
+            [
+                "plan",
+                "--mode",
+                "detailed",
+                "--inventory",
+                str(inventory),
+                "--allow-demo",
+            ]
+        )
+        == 3
+    )
 
     output = capsys.readouterr().out
     assert "Gaps and decisions" in output
@@ -235,10 +431,10 @@ def test_help_is_progressive_and_complete_help_remains_available(capsys) -> None
     assert result.value.code == 0
     beginner = capsys.readouterr().out
     assert "Get started:" in beginner
-    assert "plan      Make a resource plan" in beginner
+    assert "plan      Check resource fit" in beginner
     assert "Advanced command names:" in beginner
     assert "doctor  runtime  config  resource  skill  schema" in beginner
-    assert "demo      Run a complete synthetic resource plan" in beginner
+    assert "demo      Run a complete synthetic resource fit example" in beginner
 
     headings = {"Get started:", "Manage:", "More:", "Advanced command names:"}
     displayed_commands: set[str] = set()
@@ -289,7 +485,8 @@ def test_skill_status_is_read_only_and_reports_personal_discovery(
 
     output = capsys.readouterr().out
     assert f"Personal location: {personal} (ready)" in output
-    assert "Codex skill ready: yes" in output
+    assert "Standalone skill copy ready: yes" in output
+    assert "Plugin-managed Codex installations are not checked" in output
     assert "No files changed." in output
     after = sorted(str(path.relative_to(tmp_path)) for path in tmp_path.rglob("*"))
     assert after == before
@@ -311,8 +508,9 @@ def test_skill_status_rejects_an_incomplete_discovery_folder(
 
     output = capsys.readouterr().out
     assert f"Personal location: {personal} (incomplete)" in output
-    assert "Codex skill ready: no" in output
-    assert "Next: copy the bundled project-atready folder" in output
+    assert "Standalone skill copy ready: no" in output
+    assert "Plugin-managed Codex installations are not checked" in output
+    assert "follow the guarded copy command in the AtReady README" in output
     after = sorted(str(path.relative_to(tmp_path)) for path in tmp_path.rglob("*"))
     assert after == before
 

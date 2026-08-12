@@ -67,6 +67,10 @@ The deterministic presentation summary groups steps by resource for the Codex su
 terminal summary stays step oriented. They need not use the same layout, but their assignments,
 support, alternates, gaps, uncertainty, next action, and final boundary must agree.
 
+The shipped deterministic Codex summary must stay within 100 words and 12 nonempty lines at width
+120 for every committed scenario, including the four-resource web fixture. This is tested against
+the real renderer rather than hand-written example responses.
+
 Search both default human responses for raw evidence fields and enum values. None of these may
 appear: `score_bp`, `adjusted_score_bp`, `components_bp`, `plan_id`, `inventory_fingerprint`,
 `project_fingerprint`, `selected-primary`, `selected-support`, `reserved-alternate`,

@@ -1,9 +1,19 @@
 # Output Contract
 
-Treat `route` as the complete evidence record and the user's project as the subject. The CLI owns
-the normal response so the host cannot change assignments, gaps, or uncertainty while presenting it.
+Treat the user's project as the subject. The CLI owns the response so the host cannot change
+assignments, gaps, or uncertainty while presenting it.
 
-## Deterministic response
+## Normal response
+
+Run `route --format agent-summary`. Accept exit `0`, or the documented gap exit `3`, only when stdout is
+nonempty and ends with exactly `No routed project resources were contacted or run.` Return stdout
+verbatim after protected-input cleanup. Any other exit or malformed output is a no-route result.
+
+Do not add headings, prefaces, commentary, or a second boundary. The summary already contains the
+complete human-facing assignments, material gaps and uncertainty, one next action, and the boundary.
+Do not load full route evidence for a normal response.
+
+## Explicit response limits
 
 The `route --format presentation` result contains `presentation_status`, `summary`, and `route` from
 one calculation. Pass explicit positive-integer limits for a complete `ready` summary to the CLI
@@ -23,9 +33,8 @@ For `presentation_status: limit-conflict`, return `summary` verbatim; the determ
 copy identifies the limit and gives one bounded recovery action. Because an impossible limit may
 be smaller than the mandatory boundary itself, this conflict copy is an explicit exception to the
 requested ready-summary limit and can exceed it. `limits.required` describes the complete route
-summary, not the conflict notice. For `presentation_status: ready`,
-return `summary` verbatim for a normal or concise request. Only an explicit request for detailed
-evidence or inert handoff packets selects the detailed branch below instead. Never rewrite,
+summary, not the conflict notice. For `presentation_status: ready`, return `summary` verbatim. Only
+a user-supplied word or line limit selects this branch. Never rewrite,
 reorder, shorten, truncate, preface, or append to either summary. Do not add the `Plan`,
 `Resource fit`, or `Gaps and uncertainty` headings. A CLI-provided `Next:` line is valid.
 
@@ -44,9 +53,9 @@ unset routing roles or append a generic verification checklist.
 ## Detailed response
 
 Use this branch only when the user explicitly asks for detailed evidence or inert handoff packets.
-Build it from `route`, not from the summary or memory. Keep scores, plan IDs, fingerprints, raw
-status labels, complete dispositions, comparison traces, and handoff packets out of the normal
-deterministic response.
+Run `route --format json` and build it from that complete route, not from the summary or memory. Read
+`routing-rules.md` only for this branch. Keep scores, plan IDs, fingerprints, raw status labels,
+complete dispositions, comparison traces, and handoff packets out of the normal response.
 
 ### 1. Project interpretation
 

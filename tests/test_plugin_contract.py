@@ -522,6 +522,7 @@ def test_launcher_uses_a_fixed_doctor_vector_and_accepts_product_version_drift()
     )
     assert "resource.discovery-consent.v1" not in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
     assert "routing.presentation-bundle.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
+    assert "routing.agent-summary.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
 
     compatible = subprocess.CompletedProcess(
         args=["/resolved/atready", *_doctor_arguments(namespace)],

@@ -545,7 +545,7 @@ workstreams:
 
 ## Future release-notes draft (not for the probe)
 
-> Initial skills-only submission of AtReady plugin 0.1.7. For a fixed normalized project brief and
+> Initial skills-only submission of AtReady plugin 0.1.8. For a fixed normalized project brief and
 > inventory snapshot, its capability router deterministically assigns ordered workstreams. It uses
 > a user-maintained local inventory and a compatible local
 > runtime that performs no AtReady-authored provider API or connector calls,
@@ -598,7 +598,7 @@ Also open the four links in a signed-out browser and check the rendered text, no
 The current candidate may complete the local preparation items and a reversible portal draft probe
 only. Submission and publication items remain deliberately blocked for this nonrelease artifact.
 
-- [ ] Confirm the exact source commit and `0.1.7` plugin bundle; record the independently installed
+- [ ] Confirm the exact source commit and `0.1.8` plugin bundle; record the independently installed
       runtime version and prove its contract-and-feature handshake. Retain the available artifact
       hashes/attestations for each channel without implying their product versions must match.
 - [ ] Run the plugin/skill validators, exact-asset contract, staged-plugin smoke, clean first-user
@@ -654,7 +654,7 @@ the plugin version plus ZIP SHA-256:
 
 ```bash
 python3 scripts/build_plugin_submission.py \
-  --output dist/atready-plugin-0.1.7.zip
+  --output dist/atready-plugin-0.1.8.zip
 ```
 
 Run the repository's current-policy plugin validator, OpenAI's skill validator, and

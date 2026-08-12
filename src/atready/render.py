@@ -216,7 +216,7 @@ def render_summary(
     lines: list[str] = []
     _append_wrapped(
         lines,
-        f"Resource plan: {_untrusted_presentation_text(plan.project_name)}",
+        f"Resource fit: {_untrusted_presentation_text(plan.project_name)}",
         width=width,
     )
     if goal:
@@ -401,7 +401,7 @@ def render_summary(
         )
     _append_wrapped(
         lines,
-        "AtReady made this plan only.",
+        "AtReady only recommends resources where they fit.",
         width=width,
     )
     lines.append(_FINAL_SAFETY_BOUNDARY)
@@ -493,6 +493,24 @@ def _render_complete_agent_summary(
             if selection.resource_id not in resource_order:
                 resource_order.append(selection.resource_id)
 
+    generic_primary_reason = "Best eligible match after applying the project constraints."
+    generic_primary_resources: set[str] = set()
+    for resource_id, assignments in primary_groups.items():
+        selection = assignments[0].primary
+        assert selection is not None
+        has_continuity = any(
+            adjustment.code == "same-primary-continuity"
+            for assignment in assignments
+            for candidate in assignment.candidates
+            if candidate.resource_id == resource_id
+            for adjustment in candidate.adjustments
+        )
+        if (
+            not has_continuity
+            and _plain_selection_reason(selection.reason) == generic_primary_reason
+        ):
+            generic_primary_resources.add(resource_id)
+
     for resource_id in resource_order:
         name = resource_names[resource_id]
         primary_assignments = primary_groups[resource_id]
@@ -519,7 +537,8 @@ def _render_complete_agent_summary(
                     "Best eligible match after project constraints; continuity kept related "
                     "steps together."
                 )
-            clauses.append(f"Why: {reason.rstrip('.')}")
+            if resource_id not in generic_primary_resources or len(generic_primary_resources) == 1:
+                clauses.append(f"Why: {reason.rstrip('.')}")
         if support_assignments:
             steps = ", ".join(
                 _untrusted_presentation_text(item.workstream_name) for item in support_assignments
@@ -547,6 +566,14 @@ def _render_complete_agent_summary(
         if issues:
             text += " Uncertainty: " + "; ".join(issues) + "."
         _append_wrapped(lines, text, width=width)
+
+    if len(generic_primary_resources) > 1:
+        _append_wrapped(
+            lines,
+            "Why: Each primary above is the best eligible match after applying the project "
+            "constraints.",
+            width=width,
+        )
 
     for assignment in gaps:
         _append_wrapped(

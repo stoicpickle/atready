@@ -47,7 +47,7 @@ def test_summary_is_concise_plain_language_and_preserves_route_truth() -> None:
 
     rendered = render_summary(plan, goal=project.goal, width=80)
 
-    assert "Resource plan: Synthetic Web Product" in rendered
+    assert "Resource fit: Synthetic Web Product" in rendered
     assert "4 steps · 4 assigned · no open gaps" in rendered
     assert "Use: Synthetic Codex Seat" in rendered
     assert "Best eligible match after applying the project constraints." in rendered

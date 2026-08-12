@@ -173,26 +173,32 @@ def test_deterministic_agent_presentations_preserve_the_cross_surface_contract(
         "unknown-provenance",
     )
 
-    straightforward = render_agent_summary(_route_fixture("godot", "inventory.yaml"))
+    straightforward = render_agent_summary(_route_fixture("godot", "inventory.yaml"), width=120)
     assert len(straightforward.split()) <= 100
     assert straightforward.count("Synthetic Codex Seat") == 1
     assert straightforward.count("Synthetic CodeRabbit Seat") == 1
     assert "Architecture, Implementation" in straightforward
     assert "Independent review" in straightforward
 
-    unverified = render_agent_summary(_route_fixture("unverified"))
+    unverified = render_agent_summary(_route_fixture("unverified"), width=120)
     assert "0 of 1 steps assigned; 1 open gap" in unverified
     assert "Confirm access" in " ".join(unverified.split())
 
-    support = render_agent_summary(_route_fixture("degraded", "inventory-degraded.yaml"))
+    support = render_agent_summary(_route_fixture("degraded", "inventory-degraded.yaml"), width=120)
     assert support.count("Synthetic Reviewer") == 1
     assert "covering review" in support
 
-    alternate = render_agent_summary(_route_fixture("alternate"))
+    alternate = render_agent_summary(_route_fixture("alternate"), width=120)
     assert alternate.count("Synthetic Verifier B") == 1
     assert "AtReady will not switch automatically" in alternate
 
-    for presentation in (straightforward, unverified, support, alternate):
+    web = render_agent_summary(_route_fixture("web", "inventory.yaml"), width=120)
+    assert "Route: 4 steps assigned" in web
+    assert "Why: Each primary above" in web
+
+    for presentation in (straightforward, unverified, support, alternate, web):
+        assert len(presentation.split()) <= 100
+        assert len(presentation.splitlines()) <= 12
         assert not any(term in presentation for term in raw_terms)
         assert presentation.rstrip().endswith("No routed project resources were contacted or run.")
 

@@ -649,17 +649,17 @@ def main_smoke() -> None:
             "Use AtReady for two jobs",
             "Ask at most one consolidated clarification",
             "authorizes only the bounded, read-only inventory checks",
-            "inventory validate /absolute/path/to/inventory.yaml",
+            "do not precede it with `config path` or a separate validation call",
             "inventory snapshot /absolute/path/to/inventory.yaml --format json",
             "project template",
-            "project validate /absolute/path/to/project.yaml",
-            "Offer `atready add` only as a user-run terminal fallback",
-            "the skill must not invoke it or claim authority or changes",
-            "question budget is already used",
-            "--format presentation",
-            "presentation_status",
+            "do not run a separate project validation during the normal path",
+            "If the resource is unnamed, ask only",
+            "Do not read another reference or run any command",
+            "Only after explicit approval of the latest recap",
+            "offer `atready add` only as a user-run terminal fallback",
+            "--format agent-summary",
             "exit `3` for a route with gaps",
-            "exact `ready` or `limit-conflict` summary handling",
+            "new planning input, not implementation authorization",
             "A resource-fit plan is advice, not authorization",
         )
         normalized_skill_body = " ".join(skill_contract_text.split())
@@ -670,11 +670,31 @@ def main_smoke() -> None:
             raise AssertionError(
                 f"installed wheel bundled a stale planning skill: {missing_contract!r}"
             )
+        quick_intake = (installed_skill_root / "references" / "quick-resource-intake.md").read_text(
+            encoding="utf-8"
+        )
+        normalized_quick_intake = " ".join(quick_intake.split())
+        if (
+            "must not trigger a command" not in normalized_quick_intake
+            or "Ask only the unanswered subset" not in normalized_quick_intake
+            or "Only an explicit yes to `Preview this entry?`" not in normalized_quick_intake
+            or any(
+                command in quick_intake
+                for command in (
+                    "python3 ",
+                    "config path",
+                    "inventory validate",
+                    "schema resource-declaration",
+                )
+            )
+        ):
+            raise AssertionError("installed wheel bundled a stale quick intake contract")
         output_contract = (installed_skill_root / "references" / "output-contract.md").read_text(
             encoding="utf-8"
         )
         if (
             "`--max-words N` and `--max-lines N`" not in output_contract
+            or "`route --format agent-summary`" not in output_contract
             or "documented gap exit `3`" not in output_contract
             or "No routed project resources were contacted or run." not in output_contract
         ):
@@ -694,6 +714,7 @@ def main_smoke() -> None:
         ]
         presentation_state_before = _file_tree(Path(directory))
         route_text, _ = _run([*presentation_args, "--format", "json"])
+        agent_summary_text, _ = _run([*presentation_args, "--format", "agent-summary"])
         ready_text, _ = _run(
             [
                 *presentation_args,
@@ -760,6 +781,7 @@ def main_smoke() -> None:
             or ready_payload.get("presentation_status") != "ready"
             or ready_payload.get("route") != route_payload
             or ready_payload.get("summary") != expected_ready_summary
+            or agent_summary_text != expected_ready_summary
             or ready_payload.get("limits", {}).get("requested") != {"lines": 50, "words": 500}
             or ready_payload.get("limits", {}).get("required") != {"lines": 8, "words": 62}
         ):

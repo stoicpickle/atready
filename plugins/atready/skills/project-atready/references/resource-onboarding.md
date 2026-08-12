@@ -1,61 +1,69 @@
-# Guided Resource Onboarding
+# Protected Resource Preview and Save
 
-Use this branch when a personal inventory is empty or the user explicitly asks to onboard one or
-more resources. The conversation may accept a list; keep additional resources in a names-only
-queue. Complete and write one resource at a time; never combine declarations or preview/apply
-authorization.
+Load this complete reference only after the user explicitly approves the latest compact recap from
+[quick-resource-intake.md](quick-resource-intake.md), or when the user explicitly requests Detailed
+Setup. Complete one resource at a time. Never combine declarations or preview and apply authority.
 
-## 1. Resolve the contract and default to Assisted Setup
+Do not repeat the three Quick Setup questions or compact recap here. The approved conversational
+facts are the input to this stage. No earlier add request, answer, correction, or general request for
+a preview authorizes a roster read, declaration preview, initialization, or save.
 
-If the user has not supplied a resource name, ask only:
+This is a mandatory post-recap mode guard. When this reference follows an approved Quick Setup
+recap, skip every later question card, bare-name template, and compact-recap instruction. They
+describe how approved facts map to provider profiles; they are not another conversational intake
+stage. Use them only to materialize the declaration. Detailed Setup also gathers only fields the
+user has not already supplied and never restarts Quick Setup.
 
-> What resource do you want to add?
->
-> A name is enough to start. Do not include passwords, API keys, or private notes.
+## 1. Resolve the target and declaration contract
 
-Stop after that question. Do not invoke the launcher, resolve the target, inspect the roster, show
-the intake card, explain setup modes, or expose defaults, disclosure details, or a fill-in template.
-This name-first turn must stay under 35 words. If initialization just completed, do not repeat its
-target or safety explanation.
+Require approved local execution and filesystem access. Otherwise say chat cannot save and direct
+the user to the local `atready add` flow without invoking it.
 
-After the resource name is known, resolve the explicit or default inventory target read-only.
+Resolve the explicit or configured inventory target read-only. Validate that exact roster and query
+`schema resource-declaration` exactly once for this onboarding task. Reuse the schema result while
+materializing the approved declaration. Do not query it again unless the runtime contract or
+required feature set changes, or the task restarts.
 
-Before asking the three intake questions, invoke the pinned bundled launcher with
-`schema resource-declaration` exactly once for this onboarding
-task. Reuse that result when building the declaration; do not query the schema again unless the
-launcher's reported runtime contract or required feature set changes, or the task is restarted.
+Use only the pinned bundled launcher:
 
-If the user explicitly says Quick Setup or Assisted Setup, begin without asking them to choose a
-mode. Present the default path to users as **Quick Setup**; `Assisted Setup` remains the internal
-contract and evaluation name. If they ask generally to add or onboard resources, default to Quick
-Setup without explaining modes. Use Detailed Setup (the internal Advanced Setup branch) only when
-the user requests it, supplies a complete declaration, or rejects the assisted defaults.
+```bash
+python3 "/absolute/path/to/project-atready/scripts/atready.py" config path
+python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+  inventory validate /absolute/path/to/inventory.yaml
+python3 "/absolute/path/to/project-atready/scripts/atready.py" schema resource-declaration
+```
 
-Once the resource is known, keep the canonical target and short disclosure line for the actual
-no-write preview. A general planning or `preview-first`
-request permits questions and states a desired sequence; it is not authorization for an exact
-declaration preview or write.
+If the target is missing, ask whether to create one empty personal roster there and stop. The add or
+preview request does not authorize initialization. After separate approval, run:
 
-Never infer access, authentication, session state, billing, quota, verification, capabilities, or
-ratings from a product name, installation, subscription claim, or nearby configuration. Accept
-`unknown` where the schema permits it. State that unknown or stale access, session, quota, or
-provenance normally makes the resource unverified for routing.
+```bash
+python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+  init --path /absolute/path/to/inventory.yaml --json
+```
 
-**Quick Setup** hides the data model. After the name, it proposes a likely purpose and asks no more
-than three ordinary-language questions in one turn. The user may answer naturally; no mini-language
-or fill-in template is required. **Detailed Setup** exposes every routing, scoring, policy,
-provenance, capacity, and handoff field. Both add exactly one resource, require separate preview and
-save approvals, perform no account or provider discovery, and never authorize routed project work.
+Continue only when the initialization receipt names the exact target, says
+`inventory_kind: personal`, reports zero resources, and reports
+`revision_protection: nonce-v1-present`. Never overwrite an existing or invalid target.
 
-Completion criterion: the contract was queried once, the target is resolved, and the chosen or
-default intake depth is known without an extra mode-choice turn.
+Use Quick Setup unless the user requested Detailed Setup or supplied a complete declaration. Keep
+the canonical target and disclosure for the actual CLI preview. Never infer access, authentication,
+session state, billing, quota, verification, capabilities, or ratings from a product name,
+installation, subscription claim, or nearby configuration. Accept unknown where the schema permits
+it.
 
-## 2. Optional catalog profile
+Completion criterion: the target is safe and resolved, the schema was queried once, and the
+approved facts are ready to materialize without another intake turn.
 
-Before questions, use the pinned launcher as the source of truth for the current local profile
-catalog. `resource profiles --json` lists the bounded built-in profiles. `resource profile
-<profile-id> --json` shows catalog version `1` and the selected profile's editable category,
+## 2. Materialize an optional catalog profile
+
+Use the pinned launcher as the source of truth for the current local profile catalog. When the
+resource name or alias identifies one profile, query `resource profile <profile-id> --json`
+directly. Use `resource profiles --json` only when a direct match is unavailable and the bounded
+list is necessary. The selected profile shows catalog version `1` and editable category,
 capability, capacity-unit, and model-routing proposals. Catalog values are never inventory facts.
+
+For an already approved Quick Setup recap, use the following provider sections only to materialize
+the declaration. Do not render their question cards again.
 
 The public plugin workflow is conversation-only and performs no local executable or version
 inspection. Those standalone CLI capabilities remain outside this public-plugin candidate. If no
@@ -521,11 +529,25 @@ onboarding stops without a CLI preview or write.
 
 ## 8. Preview, approve, and apply
 
-Materialize or use the approved protected declaration according to the main skill, then invoke the
-main skill's pinned bundled launcher with `inventory add` and without `--apply`. Never resolve or
-invoke a same-name `atready` command from `PATH`. Show the actual CLI preview, including the
-canonical target, complete routing-visible resource, grouped defaults, note presence, expected
-revision, and plan token.
+Create one fresh unpredictable temporary directory outside every repository and register exact
+cleanup for success and error paths immediately. On POSIX, use a restrictive creation mask, create
+the directory as `0700`, create the declaration exclusively as `0600`, and verify its owner, regular
+file type, link count, modes, and absence of a macOS extended ACL before writing or use. Use
+equivalent native controls elsewhere and stop if they cannot be established.
+
+Materialize the approved declaration, then invoke only the pinned bundled launcher without
+`--apply`:
+
+```bash
+python3 "/absolute/path/to/project-atready/scripts/atready.py" inventory add \
+  --path /absolute/path/to/inventory.yaml \
+  --resource-file /absolute/path/to/declaration.yaml --json
+```
+
+Never resolve or invoke a same-name `atready` command from `PATH`. Show the actual CLI preview
+unchanged, including the canonical target, complete routing-visible resource, grouped defaults,
+note presence, expected revision, and plan token. Remove only the exact declaration and empty
+directory, and report any retained path.
 
 Stop again and ask:
 
@@ -536,10 +558,21 @@ If the user corrects the rendered preview instead of saving it, treat the correc
 Return to the compact recap with the edits applied, then require fresh preview approval and render a
 new CLI preview. Never patch or save the old preview.
 
-Apply only after a second explicit approval of that rendered preview. Repeat the same
-semantic declaration with its exact `--expect-revision` and `--expect-plan`; a changed declaration,
-target, revision, or plan requires a fresh preview. Treat an applied-but-uncertain receipt exactly
-as specified in the main skill.
+Apply only after a second explicit approval of that rendered preview. Recreate the same protected
+declaration and repeat its exact semantics with the preview's revision and plan token:
+
+```bash
+python3 "/absolute/path/to/project-atready/scripts/atready.py" inventory add \
+  --path /absolute/path/to/inventory.yaml \
+  --resource-file /absolute/path/to/declaration.yaml \
+  --apply \
+  --expect-revision PREVIEW_EXPECT_REVISION \
+  --expect-plan PREVIEW_EXPECT_PLAN --json
+```
+
+A changed declaration, target, revision, or plan requires a fresh preview. Remove the exact
+temporary input and directory on every path and report any retained path. Never retry an apply or
+claim success from an uncertain receipt.
 
 Do not preview or apply a second resource until the current resource has a final receipt, is
 declined, or is blocked. Then take the next names-only queue entry through this workflow from the
@@ -550,9 +583,21 @@ blocked, or uncertain status and no claim that another resource was onboarded.
 
 ## 9. Validate and offer progressive enrichment
 
-After the first verified add receipt, run the pinned launcher's read-only `inventory validate
---strict` against the explicit target. Report unknown or stale warnings as selection-fact gaps, not
-as storage failure.
+After the first apply receipt, run the pinned launcher's read-only verification:
+
+```bash
+python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+  inventory validate /absolute/path/to/inventory.yaml --strict --json
+python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+  inventory list /absolute/path/to/inventory.yaml --json
+```
+
+Call the save verified only when the receipt says `applied: true`, names the intended resource ID,
+has `replacement_verified: true`, has `revision` equal to `candidate_revision`, has no warnings,
+has `observed_revision_protection`, and, on POSIX, has `directory_synced: true`. Require the list to
+show the same revision and resource ID. Report unknown or stale strict warnings as selection-fact
+gaps, not storage failure. If any result is uncertain, report the exact state without claiming
+success.
 
 Close a successful receipt and strict validation with:
 

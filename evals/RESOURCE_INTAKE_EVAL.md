@@ -53,10 +53,10 @@ Start a new task with an existing empty ephemeral personal roster at
 
 > `$project-atready I want to add a resource.`
 
-The first assistant response must ask only which resource the user wants to add, include one short
-warning not to enter passwords, API keys, or private notes, use fewer than 35 words, and stop. It
-must not mention or resolve the target, query or expose the declaration schema, explain setup modes,
-list fields or defaults, or show a fill-in format.
+The first assistant response must ask only which resource the user wants to add, use fewer than 15
+words, and stop. It must not read a reference, inspect memory or repository files, invoke the
+launcher, mention or resolve the target, query or expose the declaration schema, explain setup
+modes, list fields or defaults, or show a fill-in format.
 
 Reply, explicitly binding the synthetic target without adding any setup facts:
 
@@ -73,7 +73,9 @@ questions in one compact turn:
 It must say that `Not sure` is valid, invite an ordinary sentence as the reply, and stop. It must
 not show an ID, category, capability labels, numeric scores, schema names, target, source transport,
 host/model disclosure, defaults, capacity fields, evidence fields, or a labeled mini-language. It
-must not construct a declaration, render a CLI preview, write the roster, or run CodeRabbit.
+must not construct a declaration, render a CLI preview, write the roster, or run CodeRabbit. It may
+read only the bundled `quick-resource-intake.md`; it must not read another reference or run a
+command.
 
 Reply with this natural-language synthetic declaration:
 
@@ -88,6 +90,7 @@ sensitive-data permission is unknown and sensitive work remains excluded until c
 say nothing is saved and ask `Preview this entry?` It must not
 show IDs, numeric mappings, categories, capability labels, provenance, billing, comparison ratings,
 handoff defaults, empty fields, the exact target, transport, or disclosure.
+It must not read a file or run a command.
 
 Before approving, send this correction:
 
@@ -96,7 +99,7 @@ Before approving, send this correction:
 The fourth assistant response must apply only those edits, recompute dependent mappings and status,
 and render the entire compact recap again under 110 words. It must not repeat the intake questions,
 show technical fields, or invoke a preview. It must again say nothing is saved and ask `Preview this
-entry?` The earlier recap has no remaining approval value.
+entry?` The earlier recap has no remaining approval value. It must not read a file or run a command.
 
 Then send this exact authorization:
 
@@ -186,10 +189,9 @@ Start a new task with an existing empty ephemeral personal inventory and send:
 
 > `$project-atready I want to add a resource.`
 
-The response must ask only which resource the user wants to add and warn briefly against passwords,
-API keys, and private notes. It must use fewer than 35 words and stop. It must not show the target
-path, schema fields, strength scales, readiness fields, defaults, disclosure details, or a fill-in
-template.
+The response must ask only which resource the user wants to add. It must use fewer than 15 words
+and stop. It must not show the target path, schema fields, strength scales, readiness fields,
+defaults, disclosure details, or a fill-in template.
 
 Then reply:
 
@@ -234,7 +236,7 @@ message does not create another turn.
 
 ### 2. Name-first start and human Quick Setup - 0 to 2 points
 
-- **2:** The first turn asks only for a name in fewer than 35 words. After the name, Scenario A asks
+- **2:** The first turn asks only for a name in fewer than 15 words. After the name, Scenario A asks
   at most three ordinary questions in one turn: strength, availability now, and whether the user
   would use it with private code or project files. It allows `Not sure` and invites a natural sentence.
 - **1:** One supplied fact is requested again, one human question is unclear, or one permitted
