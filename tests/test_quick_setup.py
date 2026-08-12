@@ -320,36 +320,40 @@ def test_quick_setup_exits_after_one_line_without_waiting_for_stdin_close(
     tmp_path: Path,
 ) -> None:
     inventory = tmp_path / "inventory.yaml"
+    stdout_path = tmp_path / "stdout.json"
+    stderr_path = tmp_path / "stderr.txt"
     assert main(["init", "--path", str(inventory)]) == 0
-    process = subprocess.Popen(  # noqa: S603 - exact current test interpreter
-        [
-            sys.executable,
-            "-c",
-            "from atready.cli import main; raise SystemExit(main())",
-            "resource",
-            "quick-add",
-            "--path",
-            str(inventory),
-            "--facts-stdin",
-            "--json",
-        ],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    assert process.stdin is not None
-    process.stdin.write(_facts())
-    process.stdin.flush()
-    try:
-        assert process.wait(timeout=3) == 0
-        assert process.stdout is not None
-        result = json.loads(process.stdout.read())
-        assert result["status"] == "preview-ready"
-    finally:
-        process.stdin.close()
-        if process.poll() is None:
-            process.kill()
-            process.wait(timeout=3)
+    with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
+        process = subprocess.Popen(  # noqa: S603 - exact current test interpreter
+            [
+                sys.executable,
+                "-c",
+                "from atready.cli import main; raise SystemExit(main())",
+                "resource",
+                "quick-add",
+                "--path",
+                str(inventory),
+                "--facts-stdin",
+                "--json",
+            ],
+            stdin=subprocess.PIPE,
+            stdout=stdout_file,
+            stderr=stderr_file,
+        )
+        assert process.stdin is not None
+        process.stdin.write(_facts())
+        process.stdin.flush()
+        try:
+            assert process.wait(timeout=3) == 0
+        finally:
+            process.stdin.close()
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=3)
+
+    result = json.loads(stdout_path.read_bytes())
+    assert result["status"] == "preview-ready"
+    assert stderr_path.read_bytes() == b""
 
 
 def test_quick_setup_never_calls_discovery_provider_or_network_seams(
