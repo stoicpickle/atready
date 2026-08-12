@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import stat
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -160,6 +163,50 @@ def test_private_file_acl_refusal_removes_created_artifact(
         paths.create_private_file(target, "synthetic private state")
 
     assert not target.exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX directory-mode contract")
+def test_private_directory_secures_every_new_intermediate_with_permissive_umask(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "one" / "two" / "three"
+    previous = os.umask(0)
+    try:
+        paths.ensure_private_directory(target)
+    finally:
+        os.umask(previous)
+
+    for directory in (tmp_path / "one", tmp_path / "one" / "two", target):
+        assert directory.stat().st_mode & 0o777 == 0o700
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX directory-mode contract")
+def test_private_directory_rejects_writable_existing_intermediate(tmp_path: Path) -> None:
+    writable = tmp_path / "writable"
+    writable.mkdir(mode=0o700)
+    writable.chmod(0o777)
+    target = writable / "private" / "report.json"
+
+    with pytest.raises(StorageError, match="writable AtReady directory ancestor"):
+        paths.create_private_file(target, "synthetic")
+
+    assert not target.exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX shared-temp contract")
+def test_private_directory_allows_root_owned_sticky_temp_ancestor() -> None:
+    shared_temp = Path(tempfile.gettempdir()).resolve()
+    details = shared_temp.stat()
+    mode = stat.S_IMODE(details.st_mode)
+    if details.st_uid != 0 or not mode & stat.S_ISVTX:
+        pytest.skip("platform temp root is not a root-owned sticky directory")
+
+    with tempfile.TemporaryDirectory(dir=shared_temp) as root_name:
+        target = Path(root_name) / "private" / "report.json"
+        paths.create_private_file(target, "synthetic")
+
+        assert target.read_text(encoding="utf-8") == "synthetic"
+        assert target.parent.stat().st_mode & 0o777 == 0o700
 
 
 @pytest.mark.skipif(paths.os.name != "posix", reason="fchmod is a POSIX-only contract")

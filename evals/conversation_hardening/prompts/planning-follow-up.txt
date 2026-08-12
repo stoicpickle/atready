@@ -1,0 +1,4 @@
+$project-atready Route evals/fixtures/project-godot.yaml using evals/fixtures/inventory.yaml. This
+is synthetic demo data. I authorize this read-only demo route. Do not contact or run any routed
+resource. After the route I will ask: "Why CodeRabbit?" Answer that follow-up directly without
+repeating the whole plan or its boundary.

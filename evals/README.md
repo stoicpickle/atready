@@ -49,4 +49,11 @@ confirmation, unknown handling, and preview and apply separation. Run it in a ne
 only synthetic data before a release that changes resource intake. Its transcript template belongs
 in a local evaluation evidence packet. Do not commit real user or account context here.
 
+The [provider-free conversation hardening lane](conversation_hardening/README.md) turns the shared
+intake, routing, correction, and authorization contracts into a repeatable offline scorecard. It
+scores actual deterministic route summaries where possible and reports host-model probes
+separately instead of treating instruction text as proof of model behavior. Run
+`uv run python evals/conversation_hardening/score.py` before a release that changes conversational
+workflow or output.
+
 The fixtures describe products only. They do not authenticate, call, or endorse the named services.

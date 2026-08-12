@@ -911,6 +911,17 @@ def test_build_backend_and_sdist_are_explicitly_bounded() -> None:
     assert _step(ci_job, "Verify exact artifact contents")["run"] == (
         "uv run --no-sync python scripts/verify_release_artifacts.py --dist dist"
     )
+    clean_first_use = _step(ci_job, "Prove clean source and wheel first use")
+    assert clean_first_use["if"] == "matrix.python == '3.11'"
+    assert clean_first_use["run"] == (
+        "uv run --no-sync python scripts/hardening_gate.py "
+        "--wheel ./dist/project_atready-0.1.7-py3-none-any.whl"
+    )
+    assert set(ci_job["strategy"]["matrix"]["os"]) == {
+        "ubuntu-latest",
+        "macos-latest",
+        "windows-latest",
+    }
     assert _step_index(ci_job, "Build distributions") < _step_index(
         ci_job, "Install locked release checks"
     )
@@ -922,4 +933,10 @@ def test_build_backend_and_sdist_are_explicitly_bounded() -> None:
     )
     assert _step_index(ci_job, "Verify rendered README links") < _step_index(
         ci_job, "Verify exact artifact contents"
+    )
+    assert _step_index(ci_job, "Verify exact artifact contents") < _step_index(
+        ci_job, "Smoke installed wheel"
+    )
+    assert _step_index(ci_job, "Smoke installed wheel") < _step_index(
+        ci_job, "Prove clean source and wheel first use"
     )
