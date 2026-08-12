@@ -59,21 +59,28 @@ def resolve_paths() -> AtReadyPaths:
 def ensure_private_directory(path: Path) -> None:
     """Create a user-only directory or validate an existing caller-owned one."""
 
-    path = path.expanduser()
-    try:
-        path.mkdir(mode=0o700, parents=True, exist_ok=False)
-    except FileExistsError:
-        _validate_existing_directory(path)
-        return
-    except OSError as exc:
-        raise StorageError(f"cannot create private directory {path}: {exc}") from exc
-
-    if os.name == "posix":
+    path = Path(os.path.abspath(path.expanduser()))
+    anchor = Path(path.anchor)
+    _validate_existing_ancestor(anchor)
+    current = anchor
+    for part in path.parts[1:]:
+        current /= part
         try:
-            path.chmod(0o700)
+            current.mkdir(mode=0o700, parents=False, exist_ok=False)
+        except FileExistsError:
+            if current == path:
+                _validate_existing_directory(current)
+            else:
+                _validate_existing_ancestor(current)
+            continue
         except OSError as exc:
-            raise StorageError(f"cannot secure private directory {path}: {exc}") from exc
-    _validate_existing_directory(path)
+            raise StorageError(f"cannot create private directory {current}: {exc}") from exc
+        if os.name == "posix":
+            try:
+                current.chmod(0o700)
+            except OSError as exc:
+                raise StorageError(f"cannot secure private directory {current}: {exc}") from exc
+        _validate_existing_directory(current)
 
 
 def validate_no_darwin_extended_acl(
@@ -134,6 +141,21 @@ def _validate_existing_directory(path: Path) -> None:
         subject="AtReady directory",
         directory=True,
     )
+
+
+def _validate_existing_ancestor(path: Path) -> None:
+    """Reject a linked, non-directory, or group/world-writable path ancestor."""
+
+    try:
+        details = path.lstat()
+    except OSError as exc:
+        raise StorageError(f"cannot inspect AtReady directory ancestor {path}: {exc}") from exc
+    if stat.S_ISLNK(details.st_mode):
+        raise StorageError(f"refusing symlinked AtReady directory ancestor: {path}")
+    if not stat.S_ISDIR(details.st_mode):
+        raise StorageError(f"refusing non-directory AtReady path ancestor: {path}")
+    if os.name == "posix" and stat.S_IMODE(details.st_mode) & 0o022:
+        raise StorageError(f"refusing writable AtReady directory ancestor: {path}")
 
 
 def _descriptor_identity(descriptor: int) -> os.stat_result | None:

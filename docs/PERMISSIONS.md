@@ -35,7 +35,7 @@ state; it never grants permission.
 | Write workspace files | No implicit access | Plans are returned visibly; saving one is a separate explicit user action |
 | Resolve the required AtReady local runtime | Explicit skill invocation only | The bundled launcher resolves the already-required trusted `uv` by exact name, asks it offline and without configuration files for one absolute tool-bin directory, and considers only that directory's platform-specific `atready` executable. Before delegation it runs a fixed, read-only `doctor` request and requires the declared runtime contract plus every feature used by the plugin. Product versions are informational and may differ. The launcher never enumerates, installs, or updates tools and ignores other `atready` commands on `PATH`; the trusted uv/startup environment remains the installer authority, and a compatible report is not publisher provenance |
 | Run plugin validation during development or release review | Explicit repository command with an exact system-skills directory | The repository wrapper loads only the expected OpenAI validator path beneath that directory, requires a reviewed SHA-256, bounded size, and no symlink, and rejects drift before execution. POSIX also rejects group- or world-writable validator files; Windows relies on the selected system-skills directory's user-controlled ACL. It adds compatibility only for the current documented `policy.products` field and preserves every unrelated upstream error. Updating the trusted digest is a reviewed code change, not an automatic capability expansion |
-| Run the repository hardening gate | Explicit developer command or reviewed CI workflow step | The developer-only gate launches fixed local scorecard and clean-install scripts with no shell. It creates disposable AtReady, legacy, Codex, home, and `uv` tool roots. The install phase may use normal `uv` package-index access; invoking the gate or the checked-in CI step authorizes only that bounded dependency installation. The wheel lane rejects symlinks and binds the child install to the supplied artifact SHA-256. After installation, common Python socket paths are blocked for every exercised AtReady command. The gate uses synthetic fixtures and must not read a real roster or Codex state. It is validation infrastructure, not a product runtime capability. |
+| Run the repository hardening gate | Explicit developer command or reviewed CI workflow step | The developer-only gate launches fixed local scorecard and clean-install scripts with no shell. It creates disposable AtReady, legacy, Codex, home, and `uv` tool roots. The install phase may use normal `uv` package-index access; invoking the gate or the checked-in CI step authorizes only that bounded dependency installation. The wheel lane rejects symlinks, copies descriptor-verified bytes to a private staged artifact, verifies its SHA-256, and gives only that staged path to `uv`. After installation, common Python socket paths are blocked for every exercised AtReady command. The gate uses synthetic fixtures and must not read a real roster or Codex state. It is validation infrastructure, not a product runtime capability. |
 | Broadly discover installed CLIs or applications | Not available | No PATH enumeration, package-manager query, application scan, recursive search, or arbitrary command; the optional local check is limited to one authorized profile's exact executable/version probe |
 | Inspect environment variables | Not available | Neither names nor values are enumerated |
 | Inspect MCP/app configuration or authentication | Not available | The local check reports no configuration, account, authentication, or credential state |
@@ -88,11 +88,11 @@ owner-only mode bits to storage it creates:
 - `0700` for a directory created by AtReady; and
 - `0600` for a file created by AtReady.
 
-When `init --path` targets a directory that already exists, AtReady
-validates that the parent is a real directory rather than a symlink, but does
-not change its permissions. v0.1 does not configure or verify Windows ACLs and
-therefore makes no owner-only access guarantee on Windows; use a per-user
-location whose access controls you have reviewed.
+For a private-file target, AtReady creates every missing directory component as `0700`. It rejects
+linked or non-directory components and, on POSIX, any existing ancestor writable by group or world;
+the final existing directory must also belong to the current user. Caller-owned directory modes are
+never changed. v0.1 does not configure or verify Windows ACLs and therefore makes no owner-only
+access guarantee on Windows; use a per-user location whose access controls you have reviewed.
 
 On macOS, sensitive files and directories are accepted only when the opened
 descriptor has no extended ACL entries. This is deliberately conservative:

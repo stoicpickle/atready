@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +16,41 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 TIMEOUT_SECONDS = 420
 MAX_WHEEL_BYTES = 64 * 1_048_576
+
+
+def _wheel_sha256(path: Path) -> str:
+    if path.suffix != ".whl":
+        raise RuntimeError(f"expected one local wheel file: {path}")
+    try:
+        lexical = path.lstat()
+    except OSError as exc:
+        raise RuntimeError(f"cannot inspect local wheel file: {path}") from exc
+    if stat.S_ISLNK(lexical.st_mode):
+        raise RuntimeError(f"refusing symlinked local wheel file: {path}")
+    flags = os.O_RDONLY
+    for name in ("O_BINARY", "O_CLOEXEC", "O_NOFOLLOW"):
+        flags |= int(getattr(os, name, 0))
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise RuntimeError(f"cannot open local wheel file safely: {path}") from exc
+    digest = hashlib.sha256()
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or opened.st_size > MAX_WHEEL_BYTES
+            or (lexical.st_dev, lexical.st_ino) != (opened.st_dev, opened.st_ino)
+        ):
+            raise RuntimeError(f"expected one bounded regular local wheel file: {path}")
+        for chunk in iter(lambda: os.read(descriptor, 1_048_576), b""):
+            digest.update(chunk)
+    except OSError as exc:
+        raise RuntimeError(f"cannot read local wheel file: {path}") from exc
+    finally:
+        os.close(descriptor)
+    return digest.hexdigest()
 
 
 def _run(command: list[str], *, subject: str) -> dict[str, Any]:
@@ -56,19 +92,11 @@ def run(*, wheel: Path | None = None) -> dict[str, Any]:
         "source" if wheel is None else "all",
     ]
     if wheel is not None:
-        if wheel.is_symlink() or wheel.suffix != ".whl":
-            raise RuntimeError(f"expected one non-symlink local wheel file: {wheel}")
-        try:
-            if not wheel.is_file() or wheel.stat().st_size > MAX_WHEEL_BYTES:
-                raise RuntimeError(f"expected one regular local wheel file: {wheel}")
-            wheel_bytes = wheel.read_bytes()
-        except OSError as exc:
-            raise RuntimeError(f"cannot read local wheel file: {wheel}") from exc
-        wheel_sha256 = hashlib.sha256(wheel_bytes).hexdigest()
+        wheel_sha256 = _wheel_sha256(wheel)
         install_command.extend(
             [
                 "--wheel",
-                str(wheel.resolve()),
+                str(wheel.absolute()),
                 "--wheel-sha256",
                 wheel_sha256,
             ]

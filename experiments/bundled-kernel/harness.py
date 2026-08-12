@@ -184,7 +184,7 @@ def _capture_canonical_journey(root: Path) -> dict[str, Any]:
 
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="atready-bundled-kernel-") as raw_root:
-        ephemeral_root = Path(raw_root)
+        ephemeral_root = Path(raw_root).resolve()
         canonical = _capture_canonical_journey(ephemeral_root)
         receipt_path = ephemeral_root / "canonical-receipt.json"
         receipt_path.write_text(json.dumps(canonical, sort_keys=True), encoding="utf-8")

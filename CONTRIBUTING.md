@@ -30,8 +30,9 @@ uv run --no-sync python scripts/hardening_gate.py \
 The clean first-use lane performs real, non-editable source and wheel installs into separate
 disposable `uv` tool roots. The install phase uses normal `uv` dependency resolution and may contact
 the configured package index; running the repository command is the developer or CI authorization
-for that bounded install. The wheel lane rejects symlinks and binds the child install to the exact
-artifact SHA-256. After each install it blocks common Python socket paths in each AtReady process,
+for that bounded install. The wheel lane rejects symlinks, copies the descriptor-verified bytes to
+a private staged artifact, verifies its SHA-256, and gives only that staged path to `uv`. After each
+install it blocks common Python socket paths in each AtReady process,
 redirects AtReady,
 legacy AtReady, Codex, and home-directory state into the disposable root, then proves version,
 doctor, demo, init, exact preview/apply resource addition, project validation, and routing with

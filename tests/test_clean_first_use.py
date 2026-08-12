@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import os
 import subprocess
@@ -96,13 +97,53 @@ def test_clean_first_use_rejects_symlink_and_digest_mismatch(tmp_path: Path) -> 
         linked = None
 
     assert wheel_sha256(wheel) != "0" * 64
+    lane = tmp_path / "lane"
+    lane.mkdir(mode=0o700)
     with pytest.raises(AssertionError, match="does not match"):
         _namespace()["_install"](
             "wheel",
-            tmp_path / "lane",
+            lane,
             wheel=wheel,
             wheel_sha256="0" * 64,
         )
     if linked is not None:
-        with pytest.raises(AssertionError, match="non-symlink"):
+        with pytest.raises(AssertionError, match="symlinked"):
             wheel_sha256(linked)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX permits replacing an open path")
+def test_wheel_install_stages_descriptor_bytes_before_path_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    namespace = _namespace()
+    stage_wheel = namespace["_stage_wheel"]
+    wheel = tmp_path / "project_atready-0.1.7-py3-none-any.whl"
+    original = b"synthetic reviewed wheel"
+    wheel.write_bytes(original)
+    replacement = tmp_path / "replacement.whl"
+    replacement.write_bytes(b"synthetic replacement wheel")
+    lane = tmp_path / "lane"
+    lane.mkdir(mode=0o700)
+    real_read = os.read
+    replaced = False
+
+    def read_then_replace_path(descriptor: int, length: int) -> bytes:
+        nonlocal replaced
+        chunk = real_read(descriptor, length)
+        if chunk and not replaced:
+            replaced = True
+            replacement.replace(wheel)
+        return chunk
+
+    monkeypatch.setattr(os, "read", read_then_replace_path)
+
+    staged = stage_wheel(
+        wheel,
+        lane,
+        expected_sha256=hashlib.sha256(original).hexdigest(),
+    )
+
+    assert replaced is True
+    assert staged.read_bytes() == original
+    assert wheel.read_bytes() == b"synthetic replacement wheel"

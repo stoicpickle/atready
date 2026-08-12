@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -170,23 +171,100 @@ def _run(
     return result
 
 
-def _wheel_sha256(path: Path) -> str:
-    if path.is_symlink() or path.suffix != ".whl":
-        raise AssertionError("wheel lane requires one non-symlink .whl artifact")
+def _open_wheel(path: Path) -> tuple[int, os.stat_result]:
+    if path.suffix != ".whl":
+        raise AssertionError("wheel lane requires one .whl artifact")
     try:
-        details = path.stat()
+        lexical = path.lstat()
     except OSError as exc:
         raise AssertionError("wheel lane cannot inspect its --wheel artifact") from exc
-    if not path.is_file() or details.st_size > _MAX_WHEEL_BYTES:
-        raise AssertionError("wheel lane requires one bounded regular --wheel artifact")
+    if stat.S_ISLNK(lexical.st_mode):
+        raise AssertionError("wheel lane refuses a symlinked --wheel artifact")
+    flags = os.O_RDONLY
+    for name in ("O_BINARY", "O_CLOEXEC", "O_NOFOLLOW"):
+        flags |= int(getattr(os, name, 0))
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise AssertionError("wheel lane cannot open its --wheel artifact safely") from exc
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or opened.st_size > _MAX_WHEEL_BYTES
+            or (lexical.st_dev, lexical.st_ino) != (opened.st_dev, opened.st_ino)
+        ):
+            raise AssertionError("wheel lane requires one bounded regular --wheel artifact")
+    except BaseException:
+        os.close(descriptor)
+        raise
+    return descriptor, opened
+
+
+def _wheel_sha256(path: Path) -> str:
+    descriptor, _details = _open_wheel(path)
     digest = hashlib.sha256()
     try:
-        with path.open("rb") as stream:
-            for chunk in iter(lambda: stream.read(1_048_576), b""):
-                digest.update(chunk)
+        for chunk in iter(lambda: os.read(descriptor, 1_048_576), b""):
+            digest.update(chunk)
     except OSError as exc:
         raise AssertionError("wheel lane cannot read its --wheel artifact") from exc
+    finally:
+        os.close(descriptor)
     return digest.hexdigest()
+
+
+def _stage_wheel(path: Path, root: Path, *, expected_sha256: str) -> Path:
+    """Copy one descriptor-bound wheel into the private lane before installing it."""
+
+    source, source_details = _open_wheel(path)
+    staged = root / path.name
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    for name in ("O_BINARY", "O_CLOEXEC", "O_NOFOLLOW"):
+        flags |= int(getattr(os, name, 0))
+    destination: int | None = None
+    digest = hashlib.sha256()
+    copied = 0
+    try:
+        destination = os.open(staged, flags, 0o600)
+        if os.name == "posix":
+            os.fchmod(destination, 0o600)
+        while True:
+            chunk = os.read(source, 1_048_576)
+            if not chunk:
+                break
+            digest.update(chunk)
+            copied += len(chunk)
+            written = 0
+            while written < len(chunk):
+                count = os.write(destination, chunk[written:])
+                if count <= 0:
+                    raise OSError("incomplete staged wheel write")
+                written += count
+        os.fsync(destination)
+    except BaseException:
+        if destination is not None:
+            try:
+                os.close(destination)
+            except OSError:
+                pass
+        try:
+            staged.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+    finally:
+        os.close(source)
+    assert destination is not None
+    os.close(destination)
+    if copied != source_details.st_size or digest.hexdigest() != expected_sha256:
+        staged.unlink(missing_ok=True)
+        raise AssertionError("wheel lane artifact does not match --wheel-sha256")
+    if _wheel_sha256(staged) != expected_sha256:
+        staged.unlink(missing_ok=True)
+        raise AssertionError("staged wheel does not match --wheel-sha256")
+    return staged
 
 
 def _install(
@@ -204,10 +282,7 @@ def _install(
     else:
         if wheel is None or wheel_sha256 is None:
             raise AssertionError("wheel lane requires --wheel and --wheel-sha256")
-        actual_digest = _wheel_sha256(wheel)
-        if actual_digest != wheel_sha256:
-            raise AssertionError("wheel lane artifact does not match --wheel-sha256")
-        package = wheel
+        package = _stage_wheel(wheel, root, expected_sha256=wheel_sha256)
     command = [
         uv,
         "tool",
@@ -222,7 +297,7 @@ def _install(
     ]
     if kind == "source":
         command.extend(["--build-constraints", str(_ROOT / "build-constraints.txt")])
-    command.append(str(package.resolve()))
+    command.append(str(package))
     environment = _isolated_install_environment(root)
     _run(
         command,
@@ -465,7 +540,7 @@ def main() -> int:
     else:
         with tempfile.TemporaryDirectory(prefix="atready-clean-first-use-") as directory:
             receipt = run_lanes(
-                Path(directory) / "lanes",
+                Path(directory).resolve() / "lanes",
                 kinds,
                 wheel=wheel,
                 wheel_sha256=args.wheel_sha256,

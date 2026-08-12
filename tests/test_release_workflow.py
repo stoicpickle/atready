@@ -934,6 +934,9 @@ def test_build_backend_and_sdist_are_explicitly_bounded() -> None:
     assert _step_index(ci_job, "Verify rendered README links") < _step_index(
         ci_job, "Verify exact artifact contents"
     )
+    assert _step_index(ci_job, "Verify exact artifact contents") < _step_index(
+        ci_job, "Smoke installed wheel"
+    )
     assert _step_index(ci_job, "Smoke installed wheel") < _step_index(
         ci_job, "Prove clean source and wheel first use"
     )

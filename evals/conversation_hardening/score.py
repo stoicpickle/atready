@@ -91,7 +91,11 @@ def _score_artifact(root: Path, case: dict[str, Any]) -> list[dict[str, Any]]:
     return checks
 
 
-def _score_route(root: Path, case: dict[str, Any], boundary: str) -> list[dict[str, Any]]:
+def _score_route(
+    root: Path,
+    case: dict[str, Any],
+    boundary: str,
+) -> tuple[list[dict[str, Any]], str]:
     case_id = str(case["id"])
     inventory_path = _inside(root, case.get("inventory"), label=f"{case_id}.inventory")
     project_path = _inside(root, case.get("project"), label=f"{case_id}.project")
@@ -138,7 +142,7 @@ def _score_route(root: Path, case: dict[str, Any], boundary: str) -> list[dict[s
     if not isinstance(expected_gap, bool):
         raise ScorecardError(f"{case_id}.expected_gap must be boolean")
     checks.append(_check(case_id, "gap-parity", has_gap is expected_gap, f"gap={has_gap}"))
-    return checks
+    return checks, summary
 
 
 def score(manifest_path: Path = DEFAULT_MANIFEST, *, root: Path = ROOT) -> dict[str, Any]:
@@ -169,14 +173,18 @@ def score(manifest_path: Path = DEFAULT_MANIFEST, *, root: Path = ROOT) -> dict[
     socket.socket.connect_ex = reject_network
     try:
         scored_cases: list[dict[str, Any]] = []
+        artifact_files: set[str] = set()
+        rendered_summaries: list[str] = []
         for case in cases:
             if not isinstance(case, dict) or not isinstance(case.get("id"), str):
                 raise ScorecardError("each offline case requires an id")
             kind = case.get("kind")
             if kind == "artifact":
+                artifact_files.update(_strings(case.get("files"), label=f"{case['id']}.files"))
                 checks = _score_artifact(root, case)
             elif kind == "route":
-                checks = _score_route(root, case, boundary)
+                checks, summary = _score_route(root, case, boundary)
+                rendered_summaries.append(summary)
             else:
                 raise ScorecardError(f"unsupported case kind: {kind!r}")
             passed = all(item["passed"] for item in checks)
@@ -204,14 +212,17 @@ def score(manifest_path: Path = DEFAULT_MANIFEST, *, root: Path = ROOT) -> dict[
         manifest.get("forbidden_invented_fact_terms"),
         label="forbidden_invented_fact_terms",
     )
-    artifact_text = "\n".join(
-        _read_regular(path, maximum=_MAX_ARTIFACT_BYTES)
-        for path in (
-            root / "plugins/atready/skills/project-atready/SKILL.md",
-            root / "plugins/atready/skills/project-atready/references/quick-resource-intake.md",
-        )
+    scanned_text = "\n".join(
+        [
+            _read_regular(
+                _inside(root, value, label="forbidden.scan"),
+                maximum=_MAX_ARTIFACT_BYTES,
+            )
+            for value in sorted(artifact_files)
+        ]
+        + rendered_summaries
     ).casefold()
-    invented_fact_gate = not any(term.casefold() in artifact_text for term in forbidden)
+    invented_fact_gate = not any(term.casefold() in scanned_text for term in forbidden)
     minimum = manifest.get("minimum_contract_pass_rate")
     required_safety = manifest.get("required_safety_pass_rate")
     if (
@@ -279,7 +290,11 @@ def score(manifest_path: Path = DEFAULT_MANIFEST, *, root: Path = ROOT) -> dict[
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
-    parser.add_argument("--report", type=Path)
+    parser.add_argument(
+        "--report",
+        type=Path,
+        help="Create a new private report under a user-owned, non-writable parent directory",
+    )
     args = parser.parse_args(argv)
     try:
         report = score(args.manifest)
