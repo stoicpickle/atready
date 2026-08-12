@@ -122,6 +122,12 @@ def _validate_existing_directory(path: Path) -> None:
         raise StorageError(f"refusing symlinked AtReady directory: {path}")
     if not stat.S_ISDIR(details.st_mode):
         raise StorageError(f"refusing non-directory AtReady path: {path}")
+    if os.name == "posix":
+        if details.st_uid != os.geteuid():
+            raise StorageError(f"refusing AtReady directory not owned by the current user: {path}")
+        mode = stat.S_IMODE(details.st_mode)
+        if mode & 0o022:
+            raise StorageError(f"refusing writable AtReady directory mode {oct(mode)}: {path}")
     validate_no_darwin_extended_acl(
         path,
         details,
@@ -356,6 +362,12 @@ def create_private_file(path: Path, content: str) -> None:
                 or final_file.st_nlink != 1
             ):
                 failure = StorageError(f"AtReady file target changed during creation: {path}")
+            elif os.name == "posix" and (
+                final_parent.st_uid != os.geteuid() or stat.S_IMODE(final_parent.st_mode) & 0o022
+            ):
+                failure = StorageError(
+                    f"AtReady directory permissions changed during creation: {path.parent}"
+                )
         except OSError:
             failure = StorageError(f"cannot verify AtReady file after creation: {path}")
 

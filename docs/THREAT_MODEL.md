@@ -52,6 +52,16 @@ The AI host and model provider are outside the AtReady product boundary.
 They are still part of the user's end-to-end privacy decision because hosted
 model processing may leave the machine.
 
+The repository's developer-only hardening gate is also outside the installed product runtime. A
+developer or reviewed CI workflow explicitly launches fixed local scripts without a shell. The
+gate redirects product, legacy, Codex, home, and `uv` tool state into new disposable directories and
+uses synthetic fixtures only. Its install phase may contact the configured package index through
+normal `uv` resolution; that access is bounded to dependency installation and is authorized by
+running the gate or its checked-in CI step. A wheel input must be a bounded, non-symlink regular
+file and the child install is bound to its SHA-256. After installation, the harness blocks common
+Python socket paths for every exercised AtReady command. This process-scoped guard is not an
+operating-system network sandbox and the receipt does not claim that it is.
+
 ## Assets
 
 - Capability inventory, access state, cost, quota, and suitability notes.
@@ -105,6 +115,10 @@ to secure or audit that provider.
   version invocation only after the second authorization. Claude Code and GitHub Copilot local
   discovery are POSIX-only in this catalog version rather than accepting unreviewed Windows command
   shims.
+- The developer hardening gate never turns installation or validation into an AtReady product
+  permission. It may fetch dependencies only during its explicitly invoked install phase, uses
+  disposable state, binds wheel bytes by digest, and reports the narrower process-scoped socket
+  guard used after installation.
 - Dated model-routing catalog entries are unverified suggestions, not provider observations,
   benchmarks, scores, defaults, or hidden router rules. They do not inspect provider configuration
   or model availability. A user may confirm model-specific resources separately; shared-capacity

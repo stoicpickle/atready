@@ -1,0 +1,6 @@
+$project-atready I want to add a resource.
+
+Use only synthetic facts. After you ask for the resource name, I will say CodeRabbit. After the
+three compact questions, I will answer: "Strong, available now, and yes for private repository
+code. Do not preview or save yet." I will then correct strength to solid before separately
+authorizing preview. Do not contact CodeRabbit or invent account, access, quota, or billing facts.

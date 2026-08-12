@@ -45,6 +45,8 @@ _MAX_BACKUP_TOTAL_BYTES = 64 * 1_048_576
 _MAX_MANIFEST_EVENTS = 4_096
 _MAX_MANIFEST_TOTAL_BYTES = 64 * 1_048_576
 _MAX_MANIFEST_EVENT_BYTES = 16 * 1_024
+_MAX_MANIFEST_DETAILS_DEPTH = 32
+_MAX_MANIFEST_DETAILS_VALUES = 1_024
 _MANIFEST_CAPACITY_REMEDIATION = (
     "start a new explicitly initialized inventory path and re-onboard the required state; "
     "in-place manifest pruning or rotation is unsupported"
@@ -2008,15 +2010,31 @@ def _canonical_manifest_bytes(value: dict[str, Any]) -> bytes:
 
 
 def _manifest_details_are_safe(value: Any) -> bool:
-    if value is None or isinstance(value, (bool, int, str)):
-        return True
-    if isinstance(value, list):
-        return all(isinstance(item, str) for item in value)
-    if isinstance(value, dict):
-        return all(
-            isinstance(key, str) and _manifest_details_are_safe(item) for key, item in value.items()
-        )
-    return False
+    """Validate bounded, value-free manifest metadata without recursive descent."""
+
+    pending: list[tuple[Any, int]] = [(value, 0)]
+    values_seen = 0
+    while pending:
+        item, depth = pending.pop()
+        values_seen += 1
+        if values_seen > _MAX_MANIFEST_DETAILS_VALUES or depth > _MAX_MANIFEST_DETAILS_DEPTH:
+            return False
+        if item is None or isinstance(item, (bool, int, str)):
+            continue
+        if isinstance(item, list):
+            if not all(isinstance(child, str) for child in item):
+                return False
+            values_seen += len(item)
+            if values_seen > _MAX_MANIFEST_DETAILS_VALUES:
+                return False
+            continue
+        if isinstance(item, dict):
+            if not all(isinstance(key, str) for key in item):
+                return False
+            pending.extend((child, depth + 1) for child in item.values())
+            continue
+        return False
+    return True
 
 
 def _sync_manifest_directory(path: Path) -> None:
@@ -2061,7 +2079,17 @@ def _append_manifest_file(path: Path, raw: bytes) -> str | None:
         break
     if descriptor is None or temp_path is None:
         raise StorageError("cannot allocate backup operation manifest temporary file")
-    failure = _populate_candidate_descriptor(descriptor, raw)
+    try:
+        failure = _populate_candidate_descriptor(descriptor, raw)
+    except BaseException as exc:
+        _scrub_close_unlink_temp(
+            descriptor,
+            temp_path,
+            exc,
+            descriptor_note="backup operation manifest descriptor cleanup failed",
+            unlink_note="backup operation manifest temporary-file cleanup failed",
+        )
+        raise
     try:
         os.close(descriptor)
     except OSError as exc:
@@ -2163,7 +2191,7 @@ class _BackupOperationManifest:
     ) -> InventoryBackupManifestEvent:
         try:
             value = json.loads(raw)
-        except (UnicodeError, json.JSONDecodeError) as exc:
+        except (UnicodeError, RecursionError, ValueError) as exc:
             raise StorageError("backup operation manifest event is not canonical JSON") from exc
         if not isinstance(value, dict) or _canonical_manifest_bytes(value) != raw:
             raise StorageError("backup operation manifest event is not canonical JSON")
@@ -2307,7 +2335,7 @@ class _BackupOperationManifest:
             raw = _read_regular_bytes(path)
             try:
                 value = json.loads(raw)
-            except (UnicodeError, json.JSONDecodeError) as exc:
+            except (UnicodeError, RecursionError, ValueError) as exc:
                 raise StorageError(
                     "backup operation manifest temporary artifact is not canonical JSON"
                 ) from exc
@@ -3117,6 +3145,7 @@ def _backup_current(target: Path, raw: bytes) -> tuple[str, Path]:
 def _populate_candidate_descriptor(descriptor: int, content: str | bytes) -> StorageError | None:
     """Write candidate bytes without raising an exception frame that retains them."""
 
+    raw: bytes | None = None
     try:
         if os.name == "posix":
             os.fchmod(descriptor, 0o600)
@@ -3140,9 +3169,38 @@ def _populate_candidate_descriptor(descriptor: int, content: str | bytes) -> Sto
             return StorageError("cannot recheck temporary-file extended access controls")
         if has_extended_acl:
             return StorageError("inventory temporary file gained a macOS extended ACL")
+    except KeyboardInterrupt:
+        del raw
+        del content
+        raise
     except (OSError, ValueError):
         return StorageError("cannot write inventory update temporary file")
     return None
+
+
+def _scrub_close_unlink_temp(
+    descriptor: int,
+    temp_path: Path,
+    error: BaseException,
+    *,
+    descriptor_note: str,
+    unlink_note: str,
+) -> None:
+    """Best-effort scrub one uncommitted temporary inode before propagating an interrupt."""
+
+    try:
+        os.ftruncate(descriptor, 0)
+        os.fsync(descriptor)
+    except BaseException:
+        error.add_note("temporary-file content cleanup could not be fully synced")
+    try:
+        os.close(descriptor)
+    except BaseException:
+        error.add_note(descriptor_note)
+    try:
+        temp_path.unlink(missing_ok=True)
+    except BaseException:
+        error.add_note(unlink_note)
 
 
 def _write_candidate_temp(target: Path, content: str | bytes) -> Path:
@@ -3163,7 +3221,18 @@ def _write_candidate_temp(target: Path, content: str | bytes) -> Path:
         raise failure
 
     temp_path = Path(raw_path)
-    failure = _populate_candidate_descriptor(descriptor, content)
+    try:
+        failure = _populate_candidate_descriptor(descriptor, content)
+    except BaseException as exc:
+        _scrub_close_unlink_temp(
+            descriptor,
+            temp_path,
+            exc,
+            descriptor_note="temporary descriptor cleanup failed",
+            unlink_note="temporary-file cleanup failed",
+        )
+        del content
+        raise
     if failure is not None:
         try:
             os.ftruncate(descriptor, 0)
