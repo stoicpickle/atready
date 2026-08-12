@@ -89,10 +89,13 @@ owner-only mode bits to storage it creates:
 - `0600` for a file created by AtReady.
 
 For a private-file target, AtReady creates every missing directory component as `0700`. It rejects
-linked or non-directory components and, on POSIX, any existing ancestor writable by group or world;
-the final existing directory must also belong to the current user. Caller-owned directory modes are
-never changed. v0.1 does not configure or verify Windows ACLs and therefore makes no owner-only
-access guarantee on Windows; use a per-user location whose access controls you have reviewed.
+linked or non-directory components and, on POSIX, existing ancestors not owned by root or the current
+user. Group- or world-writable ancestors are rejected except for a root-owned sticky shared temporary
+directory such as the physical `/tmp` anchor; every child beneath that anchor must still be created or
+validated as private. The final existing directory must belong to the current user. Caller-owned
+directory modes are never changed. v0.1 does not configure or verify Windows ACLs and therefore makes
+no owner-only access guarantee on Windows; use a per-user location whose access controls you have
+reviewed.
 
 On macOS, sensitive files and directories are accepted only when the opened
 descriptor has no extended ACL entries. This is deliberately conservative:

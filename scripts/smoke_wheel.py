@@ -138,6 +138,7 @@ def _remove_inventory_nonce(path: Path) -> None:
 def main_smoke() -> None:
     _assert_installed_package()
     with tempfile.TemporaryDirectory(prefix="atready-wheel-smoke-") as directory:
+        directory = str(Path(directory).resolve())
         os.environ["ATREADY_HOME"] = directory
         contract_state_before = _private_state_snapshot(Path(directory))
         contract_text, contract_error = _run(["runtime", "contract", "--json"])

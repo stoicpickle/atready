@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import stat
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -189,6 +191,22 @@ def test_private_directory_rejects_writable_existing_intermediate(tmp_path: Path
         paths.create_private_file(target, "synthetic")
 
     assert not target.exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX shared-temp contract")
+def test_private_directory_allows_root_owned_sticky_temp_ancestor() -> None:
+    shared_temp = Path(tempfile.gettempdir()).resolve()
+    details = shared_temp.stat()
+    mode = stat.S_IMODE(details.st_mode)
+    if details.st_uid != 0 or not mode & stat.S_ISVTX:
+        pytest.skip("platform temp root is not a root-owned sticky directory")
+
+    with tempfile.TemporaryDirectory(dir=shared_temp) as root_name:
+        target = Path(root_name) / "private" / "report.json"
+        paths.create_private_file(target, "synthetic")
+
+        assert target.read_text(encoding="utf-8") == "synthetic"
+        assert target.parent.stat().st_mode & 0o777 == 0o700
 
 
 @pytest.mark.skipif(paths.os.name != "posix", reason="fchmod is a POSIX-only contract")

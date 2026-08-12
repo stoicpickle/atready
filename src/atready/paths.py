@@ -154,8 +154,16 @@ def _validate_existing_ancestor(path: Path) -> None:
         raise StorageError(f"refusing symlinked AtReady directory ancestor: {path}")
     if not stat.S_ISDIR(details.st_mode):
         raise StorageError(f"refusing non-directory AtReady path ancestor: {path}")
-    if os.name == "posix" and stat.S_IMODE(details.st_mode) & 0o022:
-        raise StorageError(f"refusing writable AtReady directory ancestor: {path}")
+    if os.name == "posix":
+        mode = stat.S_IMODE(details.st_mode)
+        writable = bool(mode & 0o022)
+        trusted_shared_anchor = details.st_uid == 0 and writable and bool(mode & stat.S_ISVTX)
+        if writable and not trusted_shared_anchor:
+            raise StorageError(f"refusing writable AtReady directory ancestor: {path}")
+        if details.st_uid not in {0, os.geteuid()}:
+            raise StorageError(
+                f"refusing AtReady directory ancestor not owned by root or the current user: {path}"
+            )
 
 
 def _descriptor_identity(descriptor: int) -> os.stat_result | None:
