@@ -13,6 +13,28 @@ Do not add headings, prefaces, commentary, or a second boundary. The summary alr
 complete human-facing assignments, material gaps and uncertainty, one next action, and the boundary.
 Do not load full route evidence for a normal response.
 
+For an explicit what-if question with another complete brief, run through the bundled launcher:
+
+```bash
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" compare \
+  --project /absolute/path/to/baseline.yaml \
+  --against /absolute/path/to/alternative.yaml \
+  --format summary
+```
+
+For a requested constraint change, replace `--against ...` with one or more of only
+`--data-class`, `--network-allowed` or `--no-network-allowed`, `--allow-unverified` or
+`--no-allow-unverified`, `--max-marginal-cost`, and `--forbid-resource`. Choose an alternative file
+or overrides, never both. Add `--inventory /absolute/path/to/inventory.yaml` only for a
+user-supplied roster path. Never invoke a bare `atready compare` command or use `--format json` in
+this host branch.
+
+Accept exit `0`, or gap exit `3`, only when stdout is nonempty and, after removing trailing
+whitespace, ends with exactly `No routed project resources were contacted or run.` Otherwise use
+the no-route response. After cleanup, return stdout verbatim. It shows only changed assignments and
+gaps, one review action, and the same final boundary. A comparison is evidence about an
+alternative, not adoption of that alternative.
+
 ## Explicit response limits
 
 The `route --format presentation` result contains `presentation_status`, `summary`, and `route` from

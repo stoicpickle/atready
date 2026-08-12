@@ -22,6 +22,8 @@ AtReady expands trust only after the preceding local boundary is proven.
 - Explicit, read-only synthetic demo inventory with route opt-in and visible labeling.
 - Bounded validation and sanitized routing snapshots.
 - Pure deterministic routing, complete dispositions, and inert handoffs.
+- Read-only route comparison that reports only assignment and gap changes between a baseline and
+  one alternative project or constraint set.
 - Public synthetic game, web, and creative evaluations.
 - Read-only, fail-closed filesystem case-semantics validation before every backup-namespace use:
   Darwin canonicalizes physical spelling, non-Darwin POSIX requires case-sensitive identity, and

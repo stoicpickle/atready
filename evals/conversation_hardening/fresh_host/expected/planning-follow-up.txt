@@ -1,0 +1,10 @@
+Goal: Build and review a deterministic battle-report feature.
+Route: 3 steps assigned.
+Synthetic Codex Seat: Architecture, Implementation. Why: Best eligible match
+after project constraints; continuity kept related steps together.
+Synthetic CodeRabbit Seat: Independent review. Why: Best eligible match after
+applying the project constraints.
+Uncertainty: This uses a demo inventory. Its contents are not verified as
+resources you can use.
+Next: Review the assignments before separately authorizing implementation.
+No routed project resources were contacted or run.

@@ -17,6 +17,7 @@ from unicodedata import category as unicode_category
 
 from atready import __version__
 from atready.catalog import InventoryCatalog
+from atready.comparison import compare_routes, render_route_comparison
 from atready.errors import AtReadyError, ConfigurationError
 from atready.intake import (
     IntakeError,
@@ -85,6 +86,7 @@ from atready.yamlio import dumps_yaml
 _MAX_CAPACITY_NUMBER_CHARACTERS = 64
 _MAX_GUIDED_INPUT_CHARACTERS = 512
 _RUNTIME_FEATURE_ID = re.compile(r"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$")
+_RESOURCE_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 _PLUGIN_VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.!+_-]{0,63}$")
 _DATA_SENSITIVITY_LADDER: tuple[DataClass, ...] = (
     DataClass.PUBLIC,
@@ -142,6 +144,7 @@ Manage:
   inventory Inspect or maintain your roster
   project   Create or validate a project brief
   route     Match an existing project brief to your roster
+  compare   Show what changes between two resource-fit routes
 
 More:
   welcome              Show the AtReady welcome screen
@@ -273,6 +276,22 @@ def _runtime_feature_id(value: str) -> str:
     if len(value) > 100 or _RUNTIME_FEATURE_ID.fullmatch(value) is None:
         raise argparse.ArgumentTypeError("required feature must be a bounded feature ID")
     return value
+
+
+def _resource_id(value: str) -> str:
+    if _RESOURCE_ID.fullmatch(value) is None:
+        raise argparse.ArgumentTypeError("resource ID must be a 1-64 character lowercase ID")
+    return value
+
+
+def _unit_score(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("expected a number from 0.0 to 1.0") from exc
+    if not math.isfinite(parsed) or not 0.0 <= parsed <= 1.0:
+        raise argparse.ArgumentTypeError("expected a number from 0.0 to 1.0")
+    return parsed
 
 
 def _configure_resource_declaration_parser(parser: argparse.ArgumentParser) -> None:
@@ -857,6 +876,73 @@ def build_parser() -> argparse.ArgumentParser:
         "--allow-demo", action="store_true", help="Explicitly permit synthetic demo resources"
     )
     route_parser.set_defaults(handler=_handle_route)
+
+    compare_parser = commands.add_parser(
+        "compare",
+        help="Show what changes between two resource-fit routes",
+        description=(
+            "Route one baseline and one alternative project brief against the same roster, then "
+            "show only changed assignments and gaps. This command is read-only and does not run "
+            "or contact resources."
+        ),
+    )
+    compare_parser.add_argument(
+        "--project", required=True, type=Path, help="Baseline project brief"
+    )
+    compare_parser.add_argument(
+        "--against",
+        type=Path,
+        help="Alternative project brief; otherwise use one or more overrides",
+    )
+    compare_parser.add_argument("--inventory", type=Path, help="Defaults to user config")
+    compare_parser.add_argument(
+        "--format",
+        choices=("summary", "json"),
+        default="summary",
+        help="summary is concise for people; json is stable machine-readable change evidence",
+    )
+    compare_parser.add_argument(
+        "--width",
+        type=_summary_width,
+        help=(
+            "Wrap summary prose to 40-120 columns (default: 80); the exact final safety "
+            "boundary remains one line"
+        ),
+    )
+    compare_parser.add_argument(
+        "--allow-demo", action="store_true", help="Explicitly permit synthetic demo resources"
+    )
+    compare_parser.add_argument(
+        "--data-class",
+        choices=_enum_values(DataClass),
+        help="Compare with this project data classification",
+    )
+    compare_parser.add_argument(
+        "--network-allowed",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Compare with network access allowed or forbidden",
+    )
+    compare_parser.add_argument(
+        "--allow-unverified",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Compare with unverified declarations allowed or blocked",
+    )
+    compare_parser.add_argument(
+        "--max-marginal-cost",
+        type=_unit_score,
+        help="Compare with a 0.0-1.0 marginal-cost ceiling",
+    )
+    compare_parser.add_argument(
+        "--forbid-resource",
+        action="append",
+        default=[],
+        type=_resource_id,
+        metavar="ID",
+        help="Exclude an exact resource ID in the alternative; repeat as needed",
+    )
+    compare_parser.set_defaults(handler=_handle_compare)
 
     skill_parser = commands.add_parser("skill", help="Inspect the bundled Codex skill")
     skill_commands = skill_parser.add_subparsers(dest="skill_command", required=True)
@@ -3400,6 +3486,62 @@ def _handle_route(args: argparse.Namespace) -> int:
         max_words=args.max_words,
         max_lines=args.max_lines,
     )
+
+
+def _handle_compare(args: argparse.Namespace) -> int:
+    if args.width is not None and args.format != "summary":
+        raise ConfigurationError("--width is only available with --format summary")
+    baseline_project = project_from_path(args.project.expanduser())
+    overrides_supplied = any(
+        (
+            args.data_class is not None,
+            args.network_allowed is not None,
+            args.allow_unverified is not None,
+            args.max_marginal_cost is not None,
+            bool(args.forbid_resource),
+        )
+    )
+    if args.against is not None and overrides_supplied:
+        raise ConfigurationError("choose --against or constraint overrides, not both")
+    if args.against is not None:
+        alternative_project = project_from_path(args.against.expanduser())
+    elif overrides_supplied:
+        constraint_values = baseline_project.constraints.model_dump(mode="json")
+        if args.data_class is not None:
+            constraint_values["data_class"] = args.data_class
+        if args.network_allowed is not None:
+            constraint_values["network_allowed"] = args.network_allowed
+        if args.allow_unverified is not None:
+            constraint_values["allow_unverified"] = args.allow_unverified
+        if args.max_marginal_cost is not None:
+            constraint_values["max_marginal_cost"] = args.max_marginal_cost
+        if args.forbid_resource:
+            constraint_values["forbidden_resources"] = sorted(
+                set([*constraint_values["forbidden_resources"], *args.forbid_resource])
+            )
+        alternative_project = baseline_project.model_copy(
+            update={"constraints": baseline_project.constraints.model_validate(constraint_values)}
+        )
+    else:
+        raise ConfigurationError(
+            "provide --against or at least one constraint override such as --data-class private"
+        )
+    catalog = InventoryCatalog.from_path(
+        _inventory_path(args.inventory),
+        today=max(baseline_project.as_of, alternative_project.as_of),
+    )
+    baseline = route(catalog.inventory, baseline_project, allow_demo=args.allow_demo)
+    alternative = route(catalog.inventory, alternative_project, allow_demo=args.allow_demo)
+    comparison = compare_routes(baseline, alternative)
+    if args.format == "json":
+        print(json.dumps(comparison.as_dict(), indent=2, sort_keys=True))
+    else:
+        print(render_route_comparison(comparison, width=args.width or 80), end="")
+    has_gap = any(
+        assignment.primary is None or assignment.unresolved_gaps
+        for assignment in alternative.assignments
+    )
+    return 3 if has_gap else 0
 
 
 def _emit_route_plan(

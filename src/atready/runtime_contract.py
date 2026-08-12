@@ -14,6 +14,8 @@ SUPPORTED_RUNTIME_FEATURE_IDS = (
     "resource.discovery-consent.v1",
     "resource.profiles.v1",
     "routing.agent-summary.v1",
+    "routing.capacity-demand.v1",
+    "routing.compare.v1",
     "routing.plan-only.v1",
     "routing.presentation-bundle.v1",
     "schema.declarations.v1",

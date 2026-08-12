@@ -54,6 +54,13 @@ def _require_capacity_range(value: int | float) -> int | float:
     return value
 
 
+def _require_positive_capacity_range(value: int | float) -> int | float:
+    _require_capacity_range(value)
+    if value == 0:
+        raise ValueError("capacity demand must be greater than zero")
+    return value
+
+
 def _require_basis_point_weight(value: float) -> float:
     if value != 0.0 and value < 0.0001:
         raise ValueError("value must be zero or at least one basis point")
@@ -70,6 +77,12 @@ CapacityNumber = Annotated[
     BeforeValidator(_require_native_number),
     AfterValidator(_require_capacity_range),
     WithJsonSchema({"type": "number", "minimum": 0, "maximum": 1e18}),
+]
+CapacityDemandNumber = Annotated[
+    int | float,
+    BeforeValidator(_require_native_number),
+    AfterValidator(_require_positive_capacity_range),
+    WithJsonSchema({"type": "number", "exclusiveMinimum": 0, "maximum": 1e18}),
 ]
 BasisPointWeight = Annotated[
     float,
@@ -243,6 +256,20 @@ class Capacity(StrictModel):
         if self.project_limit is not None and self.project_limit > self.remaining:
             raise ValueError("capacity project_limit cannot exceed remaining")
         return self
+
+
+class CapacityDemand(StrictModel):
+    """One exact, unit-scoped amount a workstream expects to need."""
+
+    unit: Slug
+    amount: CapacityDemandNumber
+
+    @field_validator("amount")
+    @classmethod
+    def canonicalize_numeric_value(cls, value: int | float) -> int | float:
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        return value
 
 
 class Economics(StrictModel):
@@ -499,6 +526,7 @@ class Workstream(StrictModel):
     verification: list[NonEmptyText] = Field(min_length=1, max_length=30)
     stop_conditions: list[NonEmptyText] = Field(min_length=1, max_length=20)
     next_owner: NonEmptyText
+    capacity_demand: CapacityDemand | None = None
     support: SupportPolicy = Field(default_factory=SupportPolicy)
     alternate_required: StrictBoolean = False
 

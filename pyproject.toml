@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "project-atready"
-version = "0.1.7"
+version = "0.1.8"
 description = "Repeatable assignment planning for declared project resources"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -44,10 +44,14 @@ Terms = "https://github.com/stoicpickle/atready/blob/main/TERMS.md"
 [dependency-groups]
 dev = [
   "build>=1.2,<2",
+  "hypothesis>=6.135,<7",
   "pillow==12.3.0",
   "pytest>=8.3,<10",
   "pytest-cov>=6,<8",
   "ruff>=0.9,<1",
+]
+elevated = [
+  "mutmut>=3.3,<4",
 ]
 release = [
   "readme-renderer[md]>=45,<46",
@@ -71,6 +75,16 @@ include = [
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers"
 testpaths = ["tests"]
+
+[tool.mutmut]
+source_paths = ["src/atready/"]
+only_mutate = ["src/atready/routing.py"]
+also_copy = ["evals/fixtures/"]
+pytest_add_cli_args_test_selection = [
+  "tests/test_routing.py",
+  "tests/test_routing_stress.py",
+  "tests/test_routing_properties.py",
+]
 
 [tool.coverage.run]
 branch = true

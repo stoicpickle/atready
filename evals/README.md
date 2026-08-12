@@ -56,4 +56,15 @@ separately instead of treating instruction text as proof of model behavior. Run
 `uv run python evals/conversation_hardening/score.py` before a release that changes conversational
 workflow or output.
 
+The [fresh-host conversation matrix](conversation_hardening/fresh_host/README.md) prepares a
+private, disposable packet for a human-observed host run. It checks correction, approval, concise
+follow-up, hostile text, and exact deterministic summaries without storing a real roster or account
+facts. Its offline scorer remains operator-attested: preparing or scoring a packet does not prove a
+fresh host was isolated or that the model behaved correctly.
+
+Routing invariants also have a bounded Hypothesis property and state-machine lane in
+`tests/test_routing_properties.py`. The optional [mutation-testing runbook](../docs/MUTATION_TESTING.md)
+describes a slower, manual routing audit. An interrupted mutation sample is evidence that the lane
+runs, not a passing release gate.
+
 The fixtures describe products only. They do not authenticate, call, or endorse the named services.

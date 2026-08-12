@@ -47,7 +47,7 @@ def test_readme_preserves_the_three_step_journey_and_contributor_setup() -> None
     assert beginner.index("atready init") < beginner.index("atready add")
     assert beginner.index("atready add") < beginner.index("atready plan")
     assert "git clone https://github.com/stoicpickle/atready.git" in contributing
-    assert "uv sync --all-groups" in contributing
+    assert "uv sync --group dev" in contributing
 
 
 def test_first_time_guide_uses_the_same_short_public_journey() -> None:

@@ -27,17 +27,17 @@ required feature set changes, or the task restarts.
 Use only the pinned bundled launcher:
 
 ```bash
-python3 "/absolute/path/to/project-atready/scripts/atready.py" config path
-python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" config path
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" \
   inventory validate /absolute/path/to/inventory.yaml
-python3 "/absolute/path/to/project-atready/scripts/atready.py" schema resource-declaration
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" schema resource-declaration
 ```
 
 If the target is missing, ask whether to create one empty personal roster there and stop. The add or
 preview request does not authorize initialization. After separate approval, run:
 
 ```bash
-python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" \
   init --path /absolute/path/to/inventory.yaml --json
 ```
 
@@ -539,7 +539,7 @@ Materialize the approved declaration, then invoke only the pinned bundled launch
 `--apply`:
 
 ```bash
-python3 "/absolute/path/to/project-atready/scripts/atready.py" inventory add \
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" inventory add \
   --path /absolute/path/to/inventory.yaml \
   --resource-file /absolute/path/to/declaration.yaml --json
 ```
@@ -562,7 +562,7 @@ Apply only after a second explicit approval of that rendered preview. Recreate t
 declaration and repeat its exact semantics with the preview's revision and plan token:
 
 ```bash
-python3 "/absolute/path/to/project-atready/scripts/atready.py" inventory add \
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" inventory add \
   --path /absolute/path/to/inventory.yaml \
   --resource-file /absolute/path/to/declaration.yaml \
   --apply \
@@ -586,9 +586,9 @@ blocked, or uncertain status and no claim that another resource was onboarded.
 After the first apply receipt, run the pinned launcher's read-only verification:
 
 ```bash
-python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" \
   inventory validate /absolute/path/to/inventory.yaml --strict --json
-python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" \
   inventory list /absolute/path/to/inventory.yaml --json
 ```
 

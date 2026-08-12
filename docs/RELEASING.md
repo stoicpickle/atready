@@ -47,7 +47,7 @@ Then dispatch the exact version at that commit:
 
 ```bash
 set -euo pipefail
-uv sync --locked --all-groups --no-install-project
+uv sync --locked --all-groups --no-group elevated --no-install-project
 source_sha="$(git rev-parse HEAD)"
 version="$(PYTHONPATH=src uv run --no-sync python -c \
   'import atready; print(atready.__version__)')"
@@ -64,7 +64,7 @@ files from two candidate runs:
 
 ```bash
 set -euo pipefail
-uv sync --locked --all-groups --no-install-project
+uv sync --locked --all-groups --no-group elevated --no-install-project
 source_sha="$(git rev-parse HEAD)"
 git fetch --no-tags origin main:refs/remotes/origin/main
 test "$(git rev-parse origin/main)" = "$source_sha"
@@ -166,7 +166,7 @@ product versions, repository, source/workflow SHA, filenames, and hashes, then r
 ```bash
 set -euo pipefail
 repository="stoicpickle/atready-dev"
-uv sync --locked --all-groups --no-install-project
+uv sync --locked --all-groups --no-group elevated --no-install-project
 source_sha="$(git rev-parse HEAD)"
 version="$(PYTHONPATH=src uv run --no-sync python -c \
   'import atready; print(atready.__version__)')"

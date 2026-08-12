@@ -33,11 +33,17 @@ from atready.models import (
 _UNAVAILABLE_GATES = {"access-inactive", "session-unavailable", "quota-exhausted"}
 _UNVERIFIED_GATES = {
     "access-unknown",
+    "capacity-reset-unknown",
+    "capacity-unknown",
     "confidence-unknown",
     "provenance-stale",
     "provenance-unknown",
     "quota-unknown",
     "session-unknown",
+}
+_ALLOW_UNVERIFIED_GATES = _UNVERIFIED_GATES - {
+    "capacity-reset-unknown",
+    "capacity-unknown",
 }
 _UNVERIFIED_ADJUSTMENTS = {
     "stale-provenance",
@@ -121,6 +127,56 @@ def _gate_resource(
     if resource.economics.marginal_cost > constraints.max_marginal_cost:
         gates.append("marginal-cost-exceeded")
 
+    demand = workstream.capacity_demand
+    capacity = resource.economics.capacity
+    if demand is not None:
+        if capacity is None:
+            gates.append("capacity-unknown")
+            notes.append(
+                f"[capacity-unknown] demand {demand.amount} {demand.unit}; "
+                "resource has no exact capacity declaration"
+            )
+        elif capacity.unit != demand.unit:
+            gates.append("capacity-unit-mismatch")
+            notes.append(
+                f"[capacity-unit-mismatch] demand {demand.amount} {demand.unit}; declared "
+                f"capacity uses {capacity.unit}; units were not converted"
+            )
+        elif capacity.last_verified > project.as_of:
+            gates.append("capacity-unknown")
+            notes.append(
+                f"[capacity-unknown] demand {demand.amount} {demand.unit}; declared capacity "
+                f"was verified after project as_of ({capacity.last_verified.isoformat()})"
+            )
+        elif (
+            capacity.resets_on is not None
+            and capacity.last_verified < capacity.resets_on <= project.as_of
+        ):
+            gates.append("capacity-reset-unknown")
+            notes.append(
+                f"[capacity-reset-unknown] demand {demand.amount} {demand.unit}; declared "
+                f"capacity reset on {capacity.resets_on.isoformat()} after verification; "
+                "post-reset remaining was not inferred"
+            )
+        else:
+            available = (
+                min(capacity.remaining, capacity.project_limit)
+                if capacity.project_limit is not None
+                else capacity.remaining
+            )
+            if available < demand.amount:
+                gates.append("capacity-insufficient")
+                outcome = "capacity-insufficient"
+            else:
+                outcome = "capacity-enough"
+            note = (
+                f"[{outcome}] demand {demand.amount} {demand.unit}; declared remaining "
+                f"{capacity.remaining} (verified {capacity.last_verified.isoformat()})"
+            )
+            if capacity.project_limit is not None:
+                note += f"; effective project limit {capacity.project_limit}"
+            notes.append(note)
+
     capability_scores = [
         resource.capabilities.get(item.id, 0.0) for item in workstream.required_capabilities
     ]
@@ -147,7 +203,7 @@ def _gate_resource(
             notes.append("last_verified is after project as_of")
 
     if constraints.allow_unverified:
-        gates = [gate for gate in gates if gate not in _UNVERIFIED_GATES]
+        gates = [gate for gate in gates if gate not in _ALLOW_UNVERIFIED_GATES]
     return sorted(set(gates)), notes
 
 

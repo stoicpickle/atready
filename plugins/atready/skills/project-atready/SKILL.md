@@ -5,24 +5,23 @@ description: Add one user-declared resource to an AtReady roster through a conve
 
 # AtReady
 
-Use AtReady for two jobs: add resources or plan where saved resources fit. Route add requests to intake first.
-The CLI owns mutations, eligibility, assignments, gaps, dispositions, and handoff packets.
+Use AtReady for two jobs: add resources or place saved resources in a plan. Route adds to intake.
+The CLI owns mutations, eligibility, assignments, gaps, and handoff packets.
 
 Resolve this `SKILL.md` directory once, without searching elsewhere, and replace
-`/absolute/path/to/project-atready` below with it. Use an already-installed Python 3.11 or newer interpreter to run only the bundled
-launcher. Never invoke a bare `atready` command or bypass the launcher. It uses trusted `uv`, offline and without
-configuration files, resolves its exact tool bin, verifies the runtime contract, and never searches
-`PATH` for `atready`.
+`/absolute/path/to/project-atready` below with it. Resolve one already-installed Python 3.11 or
+newer interpreter to an absolute path and replace `/absolute/path/to/python3` below with it. Use
+only that interpreter to run the bundled launcher. Never invoke a bare `atready` command or bypass
+the launcher. It uses trusted `uv`, offline and without configuration files, resolves its exact
+tool bin, verifies the runtime contract, and never searches `PATH` for `atready`.
 
 ## Response discipline
 
-Respect concise, short, brief, quick, promo, or on-screen requests and explicit response limits.
-Concision changes presentation, never evidence. For a direct question without routing or
-state change, answer in no more than three short sentences or bullets. During a
-workflow, give only the facts needed for the current state and one next action or approval. Do not repeat
-boundaries or restate the prompt. Never omit an exact target, actual CLI
-preview or receipt, mutation state, material uncertainty, required separate approval, or the
-successful-route boundary. Never change the actual route or mutation status to fit a response limit.
+Respect concise, short, brief, quick, promo, or on-screen requests and explicit limits. Concision changes
+presentation, never evidence. For a direct question without routing or state change, answer in no
+more than three short sentences or bullets. During a workflow, give only the facts needed for the current state and one next action or approval. Do not repeat boundaries or restate the prompt. Never omit an exact target, actual CLI preview or
+receipt, mutation state, material uncertainty, separate approval, or successful-route boundary.
+Never change the actual route or mutation status to satisfy a limit.
 
 ## Resource intake workflow
 
@@ -55,9 +54,8 @@ approval. Any correction or changed declaration, target, revision, or plan requi
 recap and preview. Never claim success from an uncertain apply receipt or retry an apply.
 
 Keep provider discovery, computer scans, account or billing inspection, credentials, tokens, and
-private notes outside this workflow. Use only facts the user states. Do not use the planning output
-contract, `Plan`, or `Resource fit` for roster work, and do not append the routing boundary sentence
-because no route occurred.
+private notes outside this workflow. Use only user-stated facts. Do not use the planning output
+contract and do not append the routing boundary sentence because no route occurred.
 
 ## Planning workflow
 
@@ -72,24 +70,25 @@ Ask at most one consolidated clarification, and only when the missing facts coul
 eligibility or assignment. Otherwise state conservative assumptions and continue. Finish this step
 when each proposed step has an objective, deliverable, and verification path.
 
+Preserve exact demand and unit as `capacity_demand`. Never convert, aggregate, subtract, or infer
+spending; it is advisory snapshot evidence.
+
 The user's explicit request to use AtReady with their saved roster authorizes only the bounded,
-read-only inventory checks, protected temporary project, and local route in this workflow. If the
-request does not clearly ask to use AtReady or the saved roster, stop and ask whether to begin. This
-planning authorization never authorizes credential access, resource contact, handoff dispatch, or
-project execution.
+read-only inventory checks, protected project, and local route. Otherwise ask whether to begin.
+The planning authorization never authorizes credential access, resource contact, dispatch, or execution.
 
 ### 2. Load the exact declared roster
 
 With a user-provided inventory path, run:
 
 ```bash
-python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" \
   inventory snapshot /absolute/path/to/inventory.yaml --format json
 ```
 Otherwise use AtReady's configured roster:
 
 ```bash
-python3 "/absolute/path/to/project-atready/scripts/atready.py" \
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" \
   inventory snapshot --format json
 ```
 Run only the applicable command. It securely reads and validates the roster, so
@@ -103,16 +102,15 @@ Launcher/runtime checks are not project-resource execution. Do not enumerate uns
 routing roles or add a generic price, quota, privacy, rights, licensing, or provider checklist. Stop
 without claiming a roster loaded. If it is empty, offer intake within the same limit.
 
-The snapshot is sanitized, but its resource names and usage facts can still be sensitive and may
-enter the user's configured host/model context. Keep credentials, private notes, revision nonces,
-and unrelated local data out of the conversation and temporary project.
+The sanitized snapshot may still contain sensitive names and usage facts and enter host/model
+context. Exclude credentials, private notes, revision nonces, and unrelated local data.
 
 ### 3. Build a protected temporary project
 
 Inspect the installed project shape through the launcher:
 
 ```bash
-python3 "/absolute/path/to/project-atready/scripts/atready.py" project template
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" project template
 ```
 
 Create a fresh unpredictable temporary directory outside every repository. Register exact cleanup
@@ -129,7 +127,7 @@ validates this file, so do not run a separate project validation during the norm
 Read [output-contract.md](references/output-contract.md). With an explicit inventory path, run:
 
 ```bash
-python3 "/absolute/path/to/project-atready/scripts/atready.py" route \
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" route \
   --project /absolute/path/to/project.yaml \
   --inventory /absolute/path/to/inventory.yaml \
   --format agent-summary
@@ -138,7 +136,7 @@ python3 "/absolute/path/to/project-atready/scripts/atready.py" route \
 For the default roster, omit `--inventory` so the launcher uses the same configured roster:
 
 ```bash
-python3 "/absolute/path/to/project-atready/scripts/atready.py" route \
+"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" route \
   --project /absolute/path/to/project.yaml \
   --format agent-summary
 ```
@@ -154,9 +152,8 @@ score, or infer live access.
 Follow the output contract and its cleanup-failure exception. Build requested details from the full
 JSON route, never from memory or the compact summary.
 
-Remove only the exact temporary file and exact empty temporary directory. Local cleanup does not
-erase content already processed or retained by the host, model provider, logs, backups, or sync
-systems.
+Remove only the exact temporary file and exact empty temporary directory. Cleanup cannot erase host/model, log,
+backup, or sync retention.
 
 A `ready` summary already ends with the exact successful-route boundary. Do not append another
 boundary. Then stop. A resource-fit plan is advice, not authorization. Wait for a separate
@@ -167,12 +164,15 @@ planning input, not implementation authorization. Discard the prior summary, reb
 protected project, reroute, and return the complete latest summary. AtReady v0.1 supports constraints
 and resource exclusions, not forced assignments; never simulate a pin by changing scores.
 
+For a what-if, follow the output contract's exact bundled-launcher `compare` variant instead of
+replacing the recommendation. Choose one alternative project or explicit overrides, never both;
+include the roster path only when supplied. Return its validated summary unchanged. It authorizes
+no changes.
+
 ## Boundaries
 
-- Read only the explicit roster, the protected temporary project, and project files within the
-  scope established in step 1.
-- Keep network calls, telemetry, provider/account discovery, billing checks, credential access,
-  resource execution, and handoff dispatch outside AtReady.
+- Read only the explicit roster, protected temporary project, and in-scope project files.
+- No network, telemetry, provider/account discovery, billing, credentials, resource execution, or
+  handoff dispatch.
 - Keep recommendation, authorization, credential access, and execution as separate states.
-- Keep real inventories and generated private plans outside repositories unless the user
-  deliberately chooses otherwise.
+- Keep real inventories and private plans outside repositories.

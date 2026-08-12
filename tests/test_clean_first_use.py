@@ -88,7 +88,7 @@ def test_clean_first_use_help_requires_a_wheel_for_wheel_lanes() -> None:
 
 def test_clean_first_use_rejects_symlink_and_digest_mismatch(tmp_path: Path) -> None:
     wheel_sha256 = _namespace()["_wheel_sha256"]
-    wheel = tmp_path / "project_atready-0.1.7-py3-none-any.whl"
+    wheel = tmp_path / "project_atready-0.1.8-py3-none-any.whl"
     wheel.write_bytes(b"synthetic wheel bytes")
     linked = tmp_path / "linked.whl"
     try:
@@ -118,7 +118,7 @@ def test_wheel_install_stages_descriptor_bytes_before_path_replacement(
 ) -> None:
     namespace = _namespace()
     stage_wheel = namespace["_stage_wheel"]
-    wheel = tmp_path / "project_atready-0.1.7-py3-none-any.whl"
+    wheel = tmp_path / "project_atready-0.1.8-py3-none-any.whl"
     original = b"synthetic reviewed wheel"
     wheel.write_bytes(original)
     replacement = tmp_path / "replacement.whl"
