@@ -18,7 +18,7 @@ It does not run the work, contact your tools, or spend your credits. You stay in
 > it. Expect changes. Please share what feels confusing or unnecessary.
 
 > **[Try AtReady and tell me how it went](https://github.com/stoicpickle/atready/blob/main/docs/TRY_ATREADY.md)**
-> One short install, demo, resource, and resource fit journey for first-time users.
+> A short first-use journey: install, run the demo, add a resource, and check its fit.
 
 ## The idea in one minute
 
@@ -304,6 +304,7 @@ atready inventory remove       Preview a concise resource removal
 atready inventory backup       Inspect or restore backups; add --details for full evidence
 atready project template       Print a starter project brief
 atready route                  Match an existing project brief to your roster
+atready compare                Compare one changed constraint without writing anything
 atready help planning           Show the beginner resource-fit workflow
 atready help --all              Show every advanced command
 ```
