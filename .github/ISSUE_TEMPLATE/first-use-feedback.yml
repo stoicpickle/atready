@@ -51,23 +51,23 @@ body:
       required: true
 
   - type: dropdown
-    id: plan_clarity
+    id: recommendation_clarity
     attributes:
-      label: 4. How easy was the resource plan to understand?
+      label: 4. How easy was the resource recommendation to understand?
       options:
         - Very easy. I knew what to do next
         - Mostly easy. One or two details were unclear
         - Difficult. I had to interpret the result
-        - I did not reach a resource plan
+        - I did not reach a resource recommendation
     validations:
       required: true
 
   - type: textarea
     id: impact_and_improvement
     attributes:
-      label: 5. Did the plan change what you would do, and what one improvement would help most?
-      description: It is completely fine if the plan did not change anything.
-      placeholder: It did/did not change my approach because... The one improvement I would make is...
+      label: 5. Would you use AtReady again?
+      description: Tell us whether the recommendation changed or clarified what you would do, and the one improvement that would matter most. It is fine if it did not help.
+      placeholder: I would or would not use AtReady again because... The recommendation changed or clarified... The one improvement I would make is...
     validations:
       required: true
 
