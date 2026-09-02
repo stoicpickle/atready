@@ -180,12 +180,32 @@ jobs:
           PYTHONPATH: src
         run: uv run --no-sync pytest tests/test_skill_contract.py
 
-      - name: Windows YAML input tests
+      - name: Windows YAML JSON line tests
         if: runner.os == 'Windows'
         timeout-minutes: 2
         env:
           PYTHONPATH: src
-        run: uv run --no-sync pytest tests/test_yamlio.py
+        run: >-
+          uv run --no-sync pytest tests/test_yamlio.py
+          -k "json_line_stdin and not tty"
+
+      - name: Windows YAML stdin tests
+        if: runner.os == 'Windows'
+        timeout-minutes: 2
+        env:
+          PYTHONPATH: src
+        run: >-
+          uv run --no-sync pytest tests/test_yamlio.py
+          -k "stdin_loader and not json_line"
+
+      - name: Windows YAML parsing and file tests
+        if: runner.os == 'Windows'
+        timeout-minutes: 2
+        env:
+          PYTHONPATH: src
+        run: >-
+          uv run --no-sync pytest tests/test_yamlio.py
+          -k "not tty and not stdin_loader and not json_line_stdin"
 
       - name: Test with branch coverage
         if: runner.os == 'Linux'
