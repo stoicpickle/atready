@@ -4,7 +4,6 @@ Synthetic Codex Seat: Architecture, Implementation. Why: Best eligible match
 after project constraints; continuity kept related steps together.
 Synthetic CodeRabbit Seat: Independent review. Why: Best eligible match after
 applying the project constraints.
-Uncertainty: This uses a demo inventory. Its contents are not verified as
-resources you can use.
+Uncertainty: This uses an unverified demo inventory.
 Next: Use this fit in Codex's plan; separately authorize implementation.
 No routed project resources were contacted or run.

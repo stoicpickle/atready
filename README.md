@@ -74,8 +74,7 @@ Goal: Ship a tested local CLI without network access or telemetry.
 1 step · 1 assigned · no open gaps
 
 Watch
-- This uses a demo inventory. Its contents are not verified as resources you can
-  use.
+- This uses an unverified demo inventory.
 
 1. Core implementation
    Use: Synthetic Local Coding Agent

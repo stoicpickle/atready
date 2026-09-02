@@ -268,7 +268,10 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "--against /absolute/path/to/alternative.yaml" in complete_contract
     assert "Never invoke a bare `atready compare` command" in normalized_contract
     assert "use `--format json` in this host branch" in normalized_contract
-    assert "after removing trailing whitespace, ends with exactly" in normalized_contract
+    assert (
+        "Create a validation copy by removing trailing whitespace from stdout" in output_reference
+    )
+    assert "return the original stdout verbatim, including its trailing newline" in output_reference
     assert "Do not activate for ordinary project planning" in metadata["description"]
     assert "Add one user-declared resource" in metadata["description"]
     assert "add, onboard, register, or save a resource" in metadata["description"]

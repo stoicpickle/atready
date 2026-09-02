@@ -39,11 +39,12 @@ file from a conversational brief for this command. A conversational what-if upda
 in-memory brief and reroutes through `--project-json-line`. Never invoke a bare `atready compare`
 command or use `--format json` in this host branch.
 
-Accept exit `0`, or gap exit `3`, only when stdout is nonempty and, after removing trailing
-whitespace, ends with exactly `No routed project resources were contacted or run.` Otherwise use
-the no-route response. After removing trailing output whitespace, return stdout verbatim. It shows only changed assignments and
-gaps, one review action, and the same final boundary. A comparison is evidence about an
-alternative, not adoption of that alternative.
+Create a validation copy by removing trailing whitespace from stdout. Accept exit `0`, or gap exit
+`3`, only when that copy is nonempty and ends with exactly
+`No routed project resources were contacted or run.` Otherwise use the no-route response. When
+validation succeeds, return the original stdout verbatim, including its trailing newline. It shows
+only changed assignments and gaps, one review action, and the same final boundary. A comparison is
+evidence about an alternative, not adoption of that alternative.
 
 ## Explicit response limits
 

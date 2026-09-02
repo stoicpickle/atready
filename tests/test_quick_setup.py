@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+import atready.cli as cli
 import atready.intake as intake
 from atready.catalog import InventoryCatalog
 from atready.cli import build_parser, main
@@ -214,12 +215,62 @@ def test_quick_setup_requires_separate_exact_apply_and_rederives_facts(
     applied = json.loads(capsys.readouterr().out)
     assert applied["format"] == "atready-resource-quick-apply-v1"
     assert applied["status"] == "applied"
+    assert "recovery" not in applied
     assert applied["receipt"]["resource_id"] == "coderabbit"
     assert applied["receipt"]["replacement_verified"] is True
     stored = InventoryCatalog.from_path(inventory).inventory.resources[0]
     assert stored.id == "coderabbit"
     assert stored.access.status.value == "unknown"
     assert stored.provenance.basis.value == "unknown"
+
+
+def test_quick_setup_uncertain_apply_forbids_retry_in_machine_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    inventory = tmp_path / "inventory.yaml"
+    raw = _facts()
+    assert main(["init", "--path", str(inventory)]) == 0
+    capsys.readouterr()
+    preview_result = _preview(inventory, raw, monkeypatch, capsys)
+    preview = preview_result["preview"]
+    assert isinstance(preview, dict)
+    receipt = {"target": str(inventory), "backup_path": str(tmp_path / "backup.yaml")}
+    monkeypatch.setattr(
+        cli,
+        "_inventory_add_receipt_result",
+        lambda *_args, **_kwargs: (receipt, True),
+    )
+    monkeypatch.setattr(sys, "stdin", _BinaryInput(raw))
+
+    assert (
+        main(
+            [
+                "resource",
+                "quick-add",
+                "--path",
+                str(inventory),
+                "--facts-stdin",
+                "--apply",
+                "--expect-revision",
+                preview["expect_revision"],
+                "--expect-plan",
+                preview["expect_plan"],
+                "--json",
+            ]
+        )
+        == 4
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "applied-with-uncertainty"
+    assert result["recovery"] == {
+        "instruction": (
+            "Do not retry this apply. Inspect receipt.target and receipt.backup_path before "
+            "another update."
+        ),
+        "retry_safe": False,
+    }
 
 
 @pytest.mark.parametrize(
@@ -407,6 +458,11 @@ def test_quick_setup_json_line_is_exclusive_bounded_and_signals_ready(
         parser.parse_args(["resource", "quick-add", "--facts-stdin", "--facts-json-line"])
     assert duplicate.value.code == 2
     assert "not allowed with argument --facts-stdin" in capsys.readouterr().err
+
+    with pytest.raises(SystemExit) as non_json:
+        parser.parse_args(["resource", "quick-add", "--facts-stdin"])
+    assert non_json.value.code == 2
+    assert "the following arguments are required: --json" in capsys.readouterr().err
 
     inventory = tmp_path / "inventory.yaml"
     assert main(["init", "--path", str(inventory)]) == 0

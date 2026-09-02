@@ -564,7 +564,12 @@ def build_parser() -> argparse.ArgumentParser:
     quick_add_parser.add_argument("--apply", action="store_true")
     quick_add_parser.add_argument("--expect-revision")
     quick_add_parser.add_argument("--expect-plan")
-    quick_add_parser.add_argument("--json", action="store_true", help="Emit orchestration JSON")
+    quick_add_parser.add_argument(
+        "--json",
+        action="store_true",
+        required=True,
+        help="Required orchestration JSON; humans should use atready add",
+    )
     quick_add_parser.set_defaults(handler=_handle_resource_quick_add)
     discover_parser = resource_commands.add_parser(
         "discover",
@@ -2191,35 +2196,32 @@ def _handle_resource_quick_add(args: argparse.Namespace) -> int:
     if not args.apply:
         preview = plan.preview()
         human_preview = _quick_setup_human_preview(facts, profile_id=profile_id)
-        if args.json:
-            print(
-                json.dumps(
-                    {
-                        "correction": {
-                            "instruction": (
-                                "Rerun this preview with one complete corrected facts envelope."
-                            ),
-                            "supported": True,
-                        },
-                        "effects": {
-                            "inventory_read": True,
-                            "network_accessed": False,
-                            "provider_or_account_inspected": False,
-                            "resource_run": False,
-                            "writes_performed": False,
-                        },
-                        "format": "atready-resource-quick-preview-v1",
-                        "human_preview": human_preview,
-                        "mapping": mapping,
-                        "preview": preview,
-                        "status": "preview-ready",
+        print(
+            json.dumps(
+                {
+                    "correction": {
+                        "instruction": (
+                            "Rerun this preview with one complete corrected facts envelope."
+                        ),
+                        "supported": True,
                     },
-                    indent=2,
-                    sort_keys=True,
-                )
+                    "effects": {
+                        "inventory_read": True,
+                        "network_accessed": False,
+                        "provider_or_account_inspected": False,
+                        "resource_run": False,
+                        "writes_performed": False,
+                    },
+                    "format": "atready-resource-quick-preview-v1",
+                    "human_preview": human_preview,
+                    "mapping": mapping,
+                    "preview": preview,
+                    "status": "preview-ready",
+                },
+                indent=2,
+                sort_keys=True,
             )
-        else:
-            print(human_preview)
+        )
         return 0
 
     result, uncertain = _inventory_add_receipt_result(
@@ -2228,28 +2230,29 @@ def _handle_resource_quick_add(args: argparse.Namespace) -> int:
         expected_revision=args.expect_revision,
         expected_plan=args.expect_plan,
     )
-    if args.json:
-        print(
-            json.dumps(
-                {
-                    "effects": {
-                        "inventory_read": True,
-                        "network_accessed": False,
-                        "provider_or_account_inspected": False,
-                        "resource_run": False,
-                        "writes_performed": True,
-                    },
-                    "format": "atready-resource-quick-apply-v1",
-                    "mapping": mapping,
-                    "receipt": result,
-                    "status": "applied-with-uncertainty" if uncertain else "applied",
-                },
-                indent=2,
-                sort_keys=True,
-            )
-        )
-        return 4 if uncertain else 0
-    return _print_inventory_add_receipt(result, resource=parsed.resource, uncertain=uncertain)
+    payload = {
+        "effects": {
+            "inventory_read": True,
+            "network_accessed": False,
+            "provider_or_account_inspected": False,
+            "resource_run": False,
+            "writes_performed": True,
+        },
+        "format": "atready-resource-quick-apply-v1",
+        "mapping": mapping,
+        "receipt": result,
+        "status": "applied-with-uncertainty" if uncertain else "applied",
+    }
+    if uncertain:
+        payload["recovery"] = {
+            "instruction": (
+                "Do not retry this apply. Inspect receipt.target and receipt.backup_path before "
+                "another update."
+            ),
+            "retry_safe": False,
+        }
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 4 if uncertain else 0
 
 
 def _quick_setup_human_preview(facts: QuickSetupFacts, *, profile_id: str) -> str:

@@ -221,6 +221,12 @@ def test_deterministic_agent_presentations_preserve_the_cross_surface_contract(
 
     support = render_agent_summary(_route_fixture("degraded", "inventory-degraded.yaml"), width=120)
     assert support.count("Synthetic Reviewer") == 1
+    support_flattened = " ".join(support.split())
+    assert "Why: Each other primary above is the best eligible match" in support_flattened
+    assert (
+        "Not eligible: Synthetic Exhausted Fast Coder has no declared quota remaining"
+        in support_flattened
+    )
     assert "Synthetic Exhausted Fast Coder has no declared quota remaining" in " ".join(
         support.split()
     )
@@ -228,7 +234,7 @@ def test_deterministic_agent_presentations_preserve_the_cross_surface_contract(
     assert "Synthetic Public Architect is blocked by the project's data-class rule" in " ".join(
         support.split()
     )
-    assert "Why: Each primary above" not in support
+    assert "Why: Each other primary above" in support
 
     alternate = render_agent_summary(_route_fixture("alternate"), width=120)
     assert alternate.count("Synthetic Verifier B") == 1

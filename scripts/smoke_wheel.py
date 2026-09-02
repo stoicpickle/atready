@@ -965,12 +965,14 @@ def main_smoke() -> None:
         output_contract = (installed_skill_root / "references" / "output-contract.md").read_text(
             encoding="utf-8"
         )
+        normalized_output_contract = " ".join(output_contract.split())
         if (
-            "`--max-words N` and `--max-lines N`" not in output_contract
+            "`--max-words N` and `--max-lines N`" not in normalized_output_contract
             or "`route --project-json-line --format agent-summary --width 120`"
-            not in output_contract
-            or "documented gap exit `3`" not in output_contract
-            or "No routed project resources were contacted or run." not in output_contract
+            not in normalized_output_contract
+            or "documented gap exit `3`" not in normalized_output_contract
+            or "No routed project resources were contacted or run."
+            not in normalized_output_contract
         ):
             raise AssertionError("installed wheel bundled a stale planning output contract")
 
@@ -1093,14 +1095,13 @@ def main_smoke() -> None:
             "Route: 1 step assigned.\n"
             "Synthetic Local Coding Agent: Core implementation. Why: Best eligible match\n"
             "after applying the project constraints.\n"
-            "Uncertainty: This uses a demo inventory. Its contents are not verified as\n"
-            "resources you can use.\n"
+            "Uncertainty: This uses an unverified demo inventory.\n"
             "Next: Use this fit in Codex's plan; separately authorize implementation.\n"
             "No routed project resources were contacted or run.\n"
         )
         expected_conflict_summary = (
             "Presentation limit conflict.\n"
-            "Requested maximum: 1 word. Complete route summary requires 64 words.\n"
+            "Requested maximum: 1 word. Complete route summary requires 55 words.\n"
             "Rerun without --max-words to receive the complete route summary.\n"
             "No routed project resources were contacted or run.\n"
         )
@@ -1111,7 +1112,7 @@ def main_smoke() -> None:
             or ready_payload.get("summary") != expected_ready_summary
             or agent_summary_text != expected_ready_summary
             or ready_payload.get("limits", {}).get("requested") != {"lines": 50, "words": 500}
-            or ready_payload.get("limits", {}).get("required") != {"lines": 8, "words": 64}
+            or ready_payload.get("limits", {}).get("required") != {"lines": 7, "words": 55}
         ):
             raise AssertionError("installed wheel did not expose a complete ready presentation")
         if (
@@ -1120,7 +1121,7 @@ def main_smoke() -> None:
             or conflict_payload.get("route") != route_payload
             or conflict_payload.get("summary") != expected_conflict_summary
             or conflict_payload.get("limits", {}).get("requested") != {"lines": None, "words": 1}
-            or conflict_payload.get("limits", {}).get("required") != {"lines": 8, "words": 64}
+            or conflict_payload.get("limits", {}).get("required") != {"lines": 7, "words": 55}
         ):
             raise AssertionError(
                 "installed wheel did not expose a complete limit-conflict presentation"

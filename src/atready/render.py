@@ -151,7 +151,7 @@ def _selected_unverified_warning(warning: str) -> tuple[str, str, str, list[str]
 
 def _plain_warning(warning: str) -> str:
     if warning.startswith("[demo-inventory]"):
-        return "This uses a demo inventory. Its contents are not verified as resources you can use."
+        return "This uses an unverified demo inventory."
     if warning.startswith("[resource-state]"):
         return warning.removeprefix("[resource-state] ").capitalize() + "."
     unverified = _selected_unverified_warning(warning)
@@ -181,14 +181,13 @@ _MATERIAL_PRIMARY_GATE_REASONS = (
 )
 
 
-def _material_primary_gate_reason(
+def _primary_gate_context(
     assignment: RouteAssignment, selected_resource_ids: set[str]
 ) -> str | None:
-    """Return one plain, route-proven gate that materially qualifies a primary selection.
+    """Return one plain, route-proven gate affecting an unselected option.
 
-    Only a candidate with exactly one hard gate can supply this compact reason. That keeps the
-    response from implying that one constraint decided a route when another gate also excluded
-    the candidate.
+    This is context about eligibility, not a claim that the gate changed the selected resource's
+    ranking. Only a candidate with exactly one hard gate can supply the compact explanation.
     """
 
     for gate, explanation in _MATERIAL_PRIMARY_GATE_REASONS:
@@ -609,12 +608,14 @@ def _render_complete_agent_summary(
         if (
             not has_continuity
             and _plain_selection_reason(selection.reason) == generic_primary_reason
-            and not any(
-                _material_primary_gate_reason(assignment, selected_resource_ids)
-                for assignment in assignments
-            )
         ):
             generic_primary_resources.add(resource_id)
+
+    gate_contexts: list[str] = []
+    for assignment in plan.assignments:
+        context = _primary_gate_context(assignment, selected_resource_ids)
+        if context is not None and context not in gate_contexts:
+            gate_contexts.append(context)
 
     for resource_id in resource_order:
         name = resource_names[resource_id]
@@ -629,17 +630,7 @@ def _render_complete_agent_summary(
             clauses.append(steps)
             selection = primary_assignments[0].primary
             assert selection is not None
-            material_reason = next(
-                (
-                    reason
-                    for assignment in primary_assignments
-                    if (reason := _material_primary_gate_reason(assignment, selected_resource_ids))
-                ),
-                None,
-            )
-            reason = _untrusted_presentation_text(
-                material_reason or _plain_selection_reason(selection.reason)
-            )
+            reason = _untrusted_presentation_text(_plain_selection_reason(selection.reason))
             has_continuity = any(
                 adjustment.code == "same-primary-continuity"
                 for assignment in primary_assignments
@@ -694,6 +685,14 @@ def _render_complete_agent_summary(
         _append_wrapped(
             lines,
             f"Why: {subject} is the best eligible match after applying the project constraints.",
+            width=width,
+        )
+
+    if gate_contexts:
+        context = "; ".join(item.rstrip(".") for item in gate_contexts) + "."
+        _append_wrapped(
+            lines,
+            f"Not eligible: {_untrusted_presentation_text(context)}",
             width=width,
         )
 
