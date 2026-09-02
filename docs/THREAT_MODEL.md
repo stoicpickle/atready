@@ -26,6 +26,12 @@ not add scanning, provider contact, account inspection, credential access, or ne
 If the selected roster is missing, creating one empty roster requires its own exact path approval;
 the resource-add request does not authorize initialization.
 
+The v0.1 boundary also permits one explicitly named, adapter-neutral resource-state file for one
+route. It may supply session, quota, and capacity evidence for resource IDs already in the selected
+inventory. AtReady validates and overlays that evidence on a copied in-memory inventory, then
+discards it; this is not provider status, account inspection, a refresh mechanism, or persisted
+inventory state.
+
 ## System boundary
 
 The relevant data flow is:
@@ -44,9 +50,11 @@ The relevant data flow is:
    after reviewing the resolved path and fixed arguments, they may separately authorize optional
    version execution. They then confirm or reject any proposal-only evidence.
 5. The user supplies a project request and any project context they choose.
-6. An AI host may load that material into a selected model.
-7. AtReady produces a plan and copy-ready handoffs for human review.
-8. No project-work request or handoff is sent to an inventoried resource or executed by AtReady.
+6. The user may explicitly name one local resource-state file. AtReady validates its bounded,
+   provider-neutral observations and applies them only to this route.
+7. An AI host may load that material into a selected model.
+8. AtReady produces a plan and copy-ready handoffs for human review.
+9. No project-work request or handoff is sent to an inventoried resource or executed by AtReady.
 
 The AI host and model provider are outside the AtReady product boundary.
 They are still part of the user's end-to-end privacy decision because hosted
@@ -63,12 +71,21 @@ expected SHA-256, and gives only that staged path to `uv`. After installation, i
 Python socket paths for every exercised AtReady command. This process-scoped guard is not an
 operating-system network sandbox and the receipt does not claim that it is.
 
+The developer-only decision-change scorer is also outside the installed product runtime. An operator
+explicitly names one packet with `--packet`; optional `--report` separately authorizes one new report
+at the resolved path, which may be outside the repository. The scorer reads only that packet, its
+contained relative fixtures, committed benchmark/version sources, and local checkout provenance. It
+runs fixed, read-only `git rev-parse HEAD` and `git status --porcelain` subprocesses without a shell
+and with bounded time. Host/model response capture is separate operator work. The scorer makes no
+provider, model, account, network, or inventoried-resource contact and executes no handoff.
+
 ## Assets
 
 - Capability inventory, access state, cost, quota, and suitability notes.
 - Project goals, constraints, excerpts, and private identifiers.
 - Preferences, routing policy, and any observed-use history.
 - Generated plans, commands, URLs, and handoff packets.
+- Operator-captured decision-change packets, response excerpts, coding judgments, and local reports.
 - Local filesystem paths and user account information.
 - The distributed skill, helper code, dependencies, and release pipeline.
 
@@ -120,6 +137,9 @@ to secure or audit that provider.
   permission. It may fetch dependencies only during its explicitly invoked install phase, uses
   disposable state, installs only a private descriptor-verified wheel copy bound by digest, and
   reports the narrower process-scoped socket guard used after installation.
+- Decision-change scoring never turns an explicit packet read into host/model execution authority.
+  `--report` authorizes only one new local report, never overwrite or deletion. The scorer leaves
+  packet and report retention, protection, and removal to the operator.
 - Dated model-routing catalog entries are unverified suggestions, not provider observations,
   benchmarks, scores, defaults, or hidden router rules. They do not inspect provider configuration
   or model availability. A user may confirm model-specific resources separately; shared-capacity
@@ -140,6 +160,14 @@ to secure or audit that provider.
 - Fresh personal inventories contain one undisclosed CSPRNG-generated revision
   privacy nonce. It is carried through exact bytes but excluded from normal output,
   routing snapshots/fingerprints, supported CLI/loader diagnostics, and reprs.
+- Resource-state overlays are untrusted evidence: they are bounded, exact-ID matched,
+  one-route, in-memory inputs. Source labels, timestamps, confidence, and expiry do not
+  establish provider authenticity or truth. Stale manual snapshots, snapshots past `valid_until`,
+  estimated or unknown-confidence state, future-relative observations, and mismatched IDs fail
+  closed before the overlay is applied. Capacity expiry or reset inside an otherwise valid snapshot
+  is carried into routing as exact-demand gate evidence rather than making the snapshot invalid.
+  Sensitive field names and unknown fields are rejected, but allowed values are not secret-scanned;
+  users must not put credentials or other sensitive values in `source` or any other allowed field.
 
 ## Threats and controls
 
@@ -186,10 +214,18 @@ to secure or audit that provider.
 | Resource name or path manipulates terminal output | Clipboard theft or display spoofing | User-facing resource, workstream, and project names reject control and Unicode format characters before storage or rendering; human-readable CLI paths, warnings, and expected errors escape non-printing characters |
 | Demo-labeled data is mistaken for observed user access or verified synthetic content | Misleading routing or public claim | Personal initialization is empty; demo-labeled data is read-only, refused by default at routing, and visibly warned as user-controlled and unverified when explicitly allowed |
 | Compromised dependency or release package | Code execution on user machines | Keep runtime dependencies minimal and bounded; lock the development/release test environment; exact-pin and hash-constrain the build backend; allowlist sdist/wheel content; repeat the private candidate build; and use restricted workflow permissions. Candidate checksums and the receipt are explicitly unsigned and do not prove publisher identity. An immutable reviewed commit, explicit trusted dependency index, and verified wheel/sdist attestations remain general-availability gates rather than current public-release claims |
-| A substituted or stale installed plugin validator executes during review | Developer-machine code execution or false validation evidence | The repository wrapper requires an explicit system-skills directory, resolves only its expected validator path, rejects symlinks and oversized files, and requires the reviewed SHA-256 before compiling the already verified bytes. POSIX rejects group/world-writable validator files; Windows retains the selected directory's ACL as a developer-controlled trust boundary. The wrapper rechecks the installed file after validation and forgives only the exact legacy `policy.products` error for a locally validated current-policy skill. Any OpenAI validator update requires an explicit reviewed digest change; host capability or a new field never expands this allowlist automatically |
+| A substituted or stale installed plugin validator executes during review | Developer-machine code execution or false validation evidence | The repository wrapper requires an explicit system-skills directory, resolves only its expected validator and current identifier-helper paths, rejects symlinks and oversized files, and requires reviewed SHA-256 values before compiling the verified bytes. The helper is preloaded from those bytes rather than resolved through an uncontrolled import. POSIX rejects group/world-writable files; Windows retains the selected directory's ACL as a developer-controlled trust boundary. The wrapper rechecks both files after validation and forgives only the exact legacy `policy.products` error for a locally validated current-policy skill. Any OpenAI validator update requires an explicit reviewed source and digest change; host capability or a new field never expands this allowlist automatically |
 | Plugin resolves the wrong, spoofed, or incompatible local runtime | Incompatible behavior or code execution under the host's existing permissions | Resolve the already-required trusted `uv` by exact name, query only its absolute tool-bin directory offline and without config files, select the platform's exact `atready` executable there, and invoke it without a shell. Before every delegation, run one fixed `doctor` argument vector and accept only a bounded, strict JSON report with the required product, contract version, complete feature set, and explicit no-inventory-read/no-network/no-write effects. Fail closed on malformed lookup, missing file, nonzero output, duplicate or unexpected fields, contract/feature mismatch, or verification failure. Other `atready` commands on `PATH` are ignored. The caller-controlled uv executable, uv environment, and same-account tool bin remain trusted; compatibility is not publisher provenance |
+| Decision-change scoring reads or writes an unintended path | Disclosure of local evaluation material or overwrite of an existing file | Require an explicit packet path; case fixture paths must be relative and resolve inside that packet. Other reads are fixed committed benchmark/version files plus bounded local Git provenance. `--report` is optional and separately authorizes one resolved destination, including outside the repository; exclusive new-file creation refuses an existing target and does not create a missing parent |
+| Decision-change scoring is mistaken for authority to run host/model work or contact a resource | Unapproved disclosure, cost, provider activity, or project execution | Host/model response capture remains separate operator work. The scorer performs only local parsing, deterministic in-process routing, and the two fixed read-only Git provenance subprocesses. It makes no provider, model, account, network, or inventoried-resource contact and executes no handoff |
+| A private decision-change packet or report is retained unexpectedly | Local disclosure through files, stdout, terminal capture, or host logs | The scorer never uploads or deletes either artifact and has no automatic retention policy. The operator chooses packet/report locations and owns their local protection, review, retention, and removal |
 | Markdown or URL output causes an automatic network request | Tracking or data exfiltration | Outputs are text; consumers must not auto-fetch remote images or open links without user action |
 | Stale access, quota, cost, or measured-capacity data drives a poor recommendation | Unexpected cost or misleading subscription advice | Preserve amount, unit, scope, source, reset, and verification date; never compare unlike units; represent unknown values honestly; do not perform purchases or cancellations |
+| A resource-state snapshot is stale, past `valid_until`, estimated, future-dated, or has unknown confidence | A route appears current or authoritative when its dynamic facts are not trustworthy | Require timezone-aware observation metadata and an explicit aware route-evaluation instant; capture that instant's fixed UTC offset in route evidence and use it for every calendar-date projection; require `valid_until` for live/cached modes; reject state newer than project `as_of` or evaluation time, any snapshot past a supplied `valid_until`, estimated state, unknown confidence, and stale manual state before applying the overlay. Freshness and confidence are evidence metadata, not provider truth |
+| Capacity expires or resets inside an otherwise valid resource-state snapshot | Expired or reset capacity appears usable for exact project demand | Preserve the valid snapshot but carry the capacity status into routing. Capacity expired at or before the evaluation instant produces an explicit `capacity-expired` exact-demand gate; capacity reset at or before that instant produces `capacity-reset-unknown`. A future reset or expiry can only break a tie between otherwise equal eligible resources and cannot override safety, fit, or score |
+| State evidence is applied to the wrong or multiple resources | Incorrect session, quota, or capacity routing | Require one unique bounded snapshot per exact resource ID already in the selected inventory; reject unknown or duplicate IDs and account/provider ID fields |
+| A route-only overlay is mistaken for a roster update | Unexpected persistence, backup, or durable state change | Apply only to a copied in-memory inventory for one route; never write inventory, preferences, backups, manifests, or the source file, and expose a resource-state fingerprint/source summary in route evidence |
+| Resource-state file path or contents are substituted or oversized | Disclosure, denial of service, or routing from unintended input | Read only one explicitly named bounded regular file through the identity-checked loader; reject symlinks, unstable reads, malformed/unknown fields, credentials, account IDs, and unsupported state shapes. Field-name rejection is not content scanning: allowed strings may still contain sensitive text, so users must keep secrets out of every allowed field |
 
 ## Local file requirements
 
@@ -208,6 +244,11 @@ AtReady-owned local storage within this boundary must:
   `0600` source, use a nonblocking descriptor open to refuse special-file
   substitution, require two bounded descriptor reads to match exactly, and
   recheck descriptor/path identity, same-domain metadata, and macOS ACL state;
+- read one explicitly named resource-state file through the bounded identity-checked
+  loader, without copying, modifying, deleting, or retaining it; reject unknown
+  fields, credential and account/provider ID fields, duplicate or absent resource IDs, and
+  state that fails freshness or confidence validation. This rejects sensitive field names,
+  not secret-like text inside allowed values; users must not put sensitive values in those fields;
 - reject a symlinked final parent or file target for sensitive writes;
 - create new files exclusively; bind updates to a reviewed operation, canonical
   physical target, inspected target/parent identities, exact-byte revision, and

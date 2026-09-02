@@ -647,7 +647,8 @@ def main_smoke() -> None:
             raise AssertionError("installed wheel skill differs from the canonical plugin skill")
         skill_contract_text = installed_skill.read_text(encoding="utf-8")
         required_planning_contract = (
-            "Use AtReady for two jobs",
+            "AtReady handles intake and fit",
+            "Codex owns planning",
             "Ask at most one consolidated clarification",
             "authorizes only the bounded, read-only inventory checks",
             "do not precede it with `config path` or a separate validation call",

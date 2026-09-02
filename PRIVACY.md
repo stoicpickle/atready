@@ -28,6 +28,8 @@ Depending on what the user supplies, a planning session may handle:
 
 - a capability inventory, including resource names, access state, costs,
   qualitative quota, optional measured capacity, suitability notes, and verification dates;
+- optional adapter-neutral resource-state evidence containing session, quota, or unit-scoped
+  capacity observations plus source, timestamp, confidence, and expiry metadata;
 - an optional local discovery result containing one allowlisted executable name, its resolved
   local path, and one bounded version line if separately requested;
 - planning preferences and routing constraints;
@@ -37,6 +39,12 @@ Depending on what the user supplies, a planning session may handle:
 This information can reveal commercial relationships, project strategy,
 budgets, private work, and installed tooling. Treat it as sensitive even when
 it contains no credentials.
+
+Resource-state evidence is user-supplied local input, not a live provider response. AtReady reads
+one explicitly named state file for one route, overlays the validated dynamic fields on a copied
+in-memory inventory, and discards the overlay after routing. It does not discover resources, contact
+providers, access credentials or account IDs, refresh the source, or persist the state. Source labels,
+timestamps, confidence, and expiry are evidence metadata only; they do not prove provider truth.
 
 AtReady's inventory is not a credential store. Do not put passwords,
 API keys, session cookies, OAuth tokens, private keys, recovery codes, or other
@@ -49,7 +57,7 @@ service exists in v0.1. The user's operating system, sync software, backup tools
 model provider, or other software may still copy, retain, or process those files independently.
 
 The CLI reads bounded answers entered after explicit TTY-only `atready add`; the inventory,
-project, resource-declaration, and inventory-annotation-declaration paths the user names; explicit
+project, resource-declaration, inventory-annotation-declaration, and resource-state paths the user names; explicit
 non-interactive resource or inventory-annotation stdin; plus the resolved default inventory path
 when no inventory path is supplied. `resource profiles` and `resource profile` read only the
 bundled offline proposal catalog. An explicit `resource discover` either checks one user-supplied
@@ -147,6 +155,13 @@ blinding, not encryption, authentication, or access control. Revisions still rev
 whether exact hidden state is equal or changed. Anyone who reads a raw inventory or
 backup learns both its nonce and its private notes; a leaked note-free raw inventory
 also exposes the nonce that would blind later notes.
+
+Routing inventory and route-only resource-state fingerprints are different. They are
+unsalted content-derived identifiers over routing-visible facts and can verify guesses
+about low-entropy values such as session, quota, or small capacity counts. They provide
+reproducibility evidence, not confidentiality. Route output already exposes the material
+facts and decisions those fingerprints bind; do not put secret values in either input.
+The value-free `state validate --json` receipt omits a content fingerprint entirely.
 
 Private notes are therefore valid only in an inventory carrying a syntactically
 valid revision privacy nonce. Legacy unblinded inventories remain valid only while

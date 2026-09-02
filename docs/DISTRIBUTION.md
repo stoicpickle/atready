@@ -1,8 +1,9 @@
 # Distribution Contract
 
-AtReady is a CLI-first open-source product. The Python package contains the deterministic engine
-and the `atready` command. The repository also carries an optional Codex skill that can guide the
-same workflow conversationally; it does not replace the CLI or broaden its permissions.
+AtReady is an open-source resource-fit companion for Codex. The Codex skill is the intended
+conversational experience; the Python package and `atready` command are its deterministic local
+engine and standalone fallback. Codex owns project planning. AtReady contributes resource intake
+and resource-fit evidence without broadening the CLI's permissions.
 
 ## Artifact split
 
@@ -12,7 +13,7 @@ same workflow conversationally; it does not replace the CLI or broaden its permi
 | Optional Codex skill package | `atready` | `.codex-plugin/plugin.json` and the canonical `project-atready` skill | The Python package, hooks, apps, MCP servers, connectors, telemetry, or an implicit installer |
 
 The CLI runtime currently uses product version `0.1.9`, while the optional Codex plugin uses
-product version `0.1.10`, but product-version equality is no longer the compatibility boundary. The plugin
+product version `0.1.11`, but product-version equality is no longer the compatibility boundary. The plugin
 declares runtime contract version `1` and its required stable
 feature IDs. Its launcher resolves the already-required `uv` executable through the caller's
 `PATH`, asks it offline and with configuration files disabled for the absolute tool-bin directory,

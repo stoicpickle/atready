@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import os
 import re
 import stat
+import sys
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -16,13 +18,21 @@ import yaml
 
 OFFICIAL_REFERENCE = (
     "https://raw.githubusercontent.com/openai/codex/"
-    "d32cb2c6aca2626d1b1d05c4537a5b6c2eec20f2/"
+    "5ee6baee2fcc0b6ffd413d9611f5538dad40d0f2/"
     "codex-rs/skills/src/assets/samples/plugin-creator/scripts/validate_plugin.py"
+)
+OFFICIAL_IDENTIFIER_REFERENCE = (
+    "https://raw.githubusercontent.com/openai/codex/"
+    "5ee6baee2fcc0b6ffd413d9611f5538dad40d0f2/"
+    "codex-rs/skills/src/assets/samples/plugin-creator/scripts/identifier_validation.py"
 )
 CURRENT_POLICY_SCHEMA = "https://developers.openai.com/plugins/deploy/submission-errors"
 ALLOWED_PRODUCTS = {"CHAT", "CODEX"}
 TRUSTED_UPSTREAM_VALIDATOR_SHA256 = (
-    "a4712ddc7c02211edf009b4ef22728f2e4c47650b9ff5696b6b36596dc29fa4a"
+    "6ff4bc1cc8ca94827c30c8299951efdac900ff38a5069c03e9a6554fc194a723"
+)
+TRUSTED_IDENTIFIER_VALIDATION_SHA256 = (
+    "a6d51ce4a9a7e8f85626ff5808a467a67574e7f8cdf1167ffb467c5f67e57223"
 )
 MAX_AGENT_BYTES = 64_000
 MAX_SKILLS = 100
@@ -69,25 +79,79 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _load_upstream_validator(path: Path, trusted_sha256: str) -> ModuleType:
+def _read_reviewed_python(path: Path, trusted_sha256: str, *, label: str) -> bytes:
     if path.is_symlink() or not path.is_file():
-        raise ValueError(f"OpenAI plugin validator not found at {path}")
+        raise ValueError(f"{label} not found at {path}")
     file_stat = path.stat()
     if file_stat.st_size > MAX_UPSTREAM_BYTES:
-        raise ValueError(f"OpenAI plugin validator exceeds {MAX_UPSTREAM_BYTES} bytes")
+        raise ValueError(f"{label} exceeds {MAX_UPSTREAM_BYTES} bytes")
     if os.name == "posix" and file_stat.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
-        raise ValueError("OpenAI plugin validator must not be group- or world-writable")
+        raise ValueError(f"{label} must not be group- or world-writable")
     source_bytes = path.read_bytes()
     expected_hash = hashlib.sha256(source_bytes).hexdigest()
     if expected_hash != trusted_sha256:
-        raise ValueError("OpenAI plugin validator does not match the repository's reviewed SHA-256")
-    module = ModuleType("atready_openai_plugin_validator")
-    module.__file__ = str(path)
-    code = compile(source_bytes, str(path), "exec", dont_inherit=True)
-    exec(code, module.__dict__)  # noqa: S102 - executes only repository-pinned verified bytes
+        raise ValueError(f"{label} does not match the repository's reviewed SHA-256")
+    return source_bytes
+
+
+def _load_upstream_validator(
+    path: Path,
+    trusted_sha256: str,
+    trusted_identifier_sha256: str,
+) -> tuple[ModuleType, tuple[tuple[Path, str], ...]]:
+    # Keep this check on the caller-supplied path. Resolving first would let a
+    # same-directory symlink evade the reviewed-file boundary.
+    if path.is_symlink():
+        raise ValueError(f"OpenAI plugin validator not found at {path}")
+    source_bytes = _read_reviewed_python(
+        path,
+        trusted_sha256,
+        label="OpenAI plugin validator",
+    )
+    parsed = ast.parse(source_bytes, filename=str(path))
+    needs_identifier = any(
+        isinstance(node, ast.ImportFrom) and node.module == "identifier_validation"
+        for node in ast.walk(parsed)
+    )
+    dependencies: list[tuple[Path, str]] = []
+    previous_identifier = sys.modules.get("identifier_validation")
+    original_sys_path = list(sys.path)
+    try:
+        if needs_identifier:
+            identifier_path = path.with_name("identifier_validation.py")
+            if identifier_path.is_symlink():
+                raise ValueError(
+                    f"OpenAI plugin validator identifier dependency not found at {identifier_path}"
+                )
+            identifier_bytes = _read_reviewed_python(
+                identifier_path,
+                trusted_identifier_sha256,
+                label="OpenAI plugin validator identifier dependency",
+            )
+            identifier_module = ModuleType("identifier_validation")
+            identifier_module.__file__ = str(identifier_path)
+            identifier_code = compile(
+                identifier_bytes,
+                str(identifier_path),
+                "exec",
+                dont_inherit=True,
+            )
+            exec(identifier_code, identifier_module.__dict__)  # noqa: S102 - reviewed exact bytes
+            sys.modules["identifier_validation"] = identifier_module
+            dependencies.append((identifier_path, trusted_identifier_sha256))
+        module = ModuleType("atready_openai_plugin_validator")
+        module.__file__ = str(path)
+        code = compile(source_bytes, str(path), "exec", dont_inherit=True)
+        exec(code, module.__dict__)  # noqa: S102 - executes only repository-pinned verified bytes
+    finally:
+        sys.path[:] = original_sys_path
+        if previous_identifier is None:
+            sys.modules.pop("identifier_validation", None)
+        else:
+            sys.modules["identifier_validation"] = previous_identifier
     if not callable(getattr(module, "validate_plugin", None)):
         raise ValueError("OpenAI plugin validator does not expose validate_plugin")
-    return module
+    return module, tuple(dependencies)
 
 
 class _BoundedSafeLoader(yaml.SafeLoader):
@@ -204,30 +268,54 @@ def validate(
     system_skills_dir: Path,
     *,
     trusted_upstream_sha256: str | None = None,
+    trusted_identifier_sha256: str | None = None,
 ) -> list[str]:
     if trusted_upstream_sha256 is None:
         trusted_upstream_sha256 = TRUSTED_UPSTREAM_VALIDATOR_SHA256
+    if trusted_identifier_sha256 is None:
+        trusted_identifier_sha256 = TRUSTED_IDENTIFIER_VALIDATION_SHA256
     plugin_root = plugin_root.expanduser().resolve()
     valid_product_skills, errors = _official_products(plugin_root)
     if errors:
         return errors
 
     upstream_path = system_skills_dir / "plugin-creator" / "scripts" / "validate_plugin.py"
+    if upstream_path.is_symlink():
+        return [f"OpenAI plugin validator not found at {upstream_path}"]
     resolved_upstream = upstream_path.resolve()
     if not resolved_upstream.is_relative_to(system_skills_dir):
         return ["OpenAI plugin validator must stay inside the declared system skills directory"]
     try:
-        upstream = _load_upstream_validator(resolved_upstream, trusted_upstream_sha256)
+        upstream, dependencies = _load_upstream_validator(
+            upstream_path,
+            trusted_upstream_sha256,
+            trusted_identifier_sha256,
+        )
     except ValueError as exc:
         return [str(exc)]
 
-    upstream_errors = upstream.validate_plugin(plugin_root)
+    original_sys_path = list(sys.path)
     try:
-        current_upstream_hash = hashlib.sha256(resolved_upstream.read_bytes()).hexdigest()
+        upstream_errors = upstream.validate_plugin(plugin_root)
+    finally:
+        sys.path[:] = original_sys_path
+    try:
+        if upstream_path.is_symlink():
+            return ["OpenAI plugin validator changed while validation was running"]
+        current_upstream_hash = hashlib.sha256(upstream_path.read_bytes()).hexdigest()
     except OSError:
         return ["OpenAI plugin validator changed while validation was running"]
     if current_upstream_hash != trusted_upstream_sha256:
         return ["OpenAI plugin validator changed while validation was running"]
+    for dependency_path, trusted_dependency_hash in dependencies:
+        try:
+            if dependency_path.is_symlink():
+                return ["OpenAI plugin validator dependency changed while validation was running"]
+            current_dependency_hash = hashlib.sha256(dependency_path.read_bytes()).hexdigest()
+        except OSError:
+            return ["OpenAI plugin validator dependency changed while validation was running"]
+        if current_dependency_hash != trusted_dependency_hash:
+            return ["OpenAI plugin validator dependency changed while validation was running"]
     for error in upstream_errors:
         match = LEGACY_PRODUCTS_ERROR.fullmatch(error)
         if match and match.group("skill") in valid_product_skills:
@@ -248,6 +336,7 @@ def main() -> None:
         raise SystemExit(1)
     print(f"Plugin validation passed: {plugin_root}")
     print(f"Reviewed OpenAI validator: {OFFICIAL_REFERENCE}")
+    print(f"Reviewed identifier dependency: {OFFICIAL_IDENTIFIER_REFERENCE}")
     print(f"Current policy schema: {CURRENT_POLICY_SCHEMA}")
 
 

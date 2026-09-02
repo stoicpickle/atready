@@ -26,6 +26,7 @@ RESOURCE_LOCATION_FIELDS = frozenset(
         "context_switch_cost",
         "current_session",
         "economics",
+        "expires_on",
         "handoff",
         "id",
         "instructions",

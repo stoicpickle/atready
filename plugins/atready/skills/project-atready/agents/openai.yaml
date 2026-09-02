@@ -1,6 +1,6 @@
 interface:
   display_name: "AtReady"
-  short_description: "Plan with what's at the ready"
+  short_description: "Bring resource fit to the plan"
   default_prompt: "I have a rough project idea. Use AtReady before implementation to suggest where my saved resources fit."
 policy:
   allow_implicit_invocation: false

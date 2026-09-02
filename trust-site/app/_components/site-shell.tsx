@@ -46,7 +46,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
           <div>
             <strong>AtReady</strong>
             <p>
-              A local-first planning companion that helps fit user-declared resources to a
+              A local-first resource-fit companion that brings user-declared resources into a
               project plan. This trust site is a pre-publication working copy.
             </p>
           </div>

@@ -1,11 +1,12 @@
 # AtReady private beta: start here
 
-AtReady is a small planning companion for Codex. Once you know what you want to make, bring it a
-goal, rough plan, or written plan before implementation begins. It compactly shapes only
-the workstreams it needs and suggests where your saved tools, services, subscriptions, and agents
-fit. It recommends and prepares; it does not log in to, contact, or run saved resources for project
-work. The optional, separately authorized version check does execute one exact external CLI with
-fixed arguments; its side effects are not evaluated.
+AtReady is a small resource-fit companion for Codex. Once you know what you want to make, bring it a
+goal, rough plan, or written plan before implementation begins. It matches your declared resources
+to planner-provided work, explains material constraints and gaps, and returns evidence Codex can use
+while refining the plan. Codex owns project planning. AtReady recommends and prepares; it does not
+log in to, contact, or run saved resources for project work. The optional, separately authorized
+version check does execute one exact external CLI with fixed arguments; its side effects are not
+evaluated.
 
 This beta is for invited developers. Use synthetic information for the first run. Never paste API
 keys, tokens, cookies, passwords, private notes, client data, or an existing personal inventory into
@@ -110,7 +111,7 @@ Show my AtReady resource roster and explain what is still unknown. Do not change
 Then explicitly bring the roster into a loose plan before implementation:
 
 ```text
-I have a loose plan for a small synthetic logging feature: add structured logs, tests, and an independent review. Use AtReady before implementation to turn it into the minimum useful workstreams and suggest where my saved resources fit. Keep the resource recommendation brief and do not contact or run anything.
+I have a loose plan for a small synthetic logging feature: add structured logs, tests, and an independent review. Use AtReady before implementation to show where my saved resources fit across those steps. Keep the resource recommendation brief and do not contact or run anything.
 ```
 
 You should not have to write a formal AtReady brief or YAML. The project plan should remain

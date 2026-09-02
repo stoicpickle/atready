@@ -32,10 +32,12 @@ state; it never grants permission.
 | Recover a missing or invalid personal inventory | Explicit preview, then explicit apply | Exact backup ID only; accepts no valid/demo/insecure active target, binds the missing/invalid state and source identities, refuses to overwrite a target that appears during missing-target commit, quarantines invalid displaced bytes, preserves the source, and restores exact bytes |
 | Delete one backup | Explicit irreversible preview, then explicit apply | Exact validated ID only; no bulk/automatic mode; deleting the last valid backup also requires `--allow-no-backups` in preview and apply |
 | Read project context | User/host supplied only | AtReady does not independently crawl repositories or unrelated files |
+| Read one route-only resource-state file | Explicit `--resource-state PATH` or `state validate PATH` | Reads one explicitly named, bounded YAML/JSON file through the bounded identity-checked loader. The adapter-neutral evidence may overlay only declared session, quota, and capacity for one route in memory; it never changes the selected inventory, writes state, creates backups, or reads a default/discovered state path. Unknown/duplicate IDs, snapshots past `valid_until`, stale manual state, estimated state, unknown confidence, credentials, account/provider IDs, and unknown fields fail closed; expired capacity remains an explicit exact-demand gate. Field-name checks do not scan allowed text for secrets, so users must not put sensitive values in `source` or other allowed fields |
 | Write workspace files | No implicit access | Plans are returned visibly; saving one is a separate explicit user action |
 | Resolve the required AtReady local runtime | Explicit skill invocation only | The bundled launcher resolves the already-required trusted `uv` by exact name, asks it offline and without configuration files for one absolute tool-bin directory, and considers only that directory's platform-specific `atready` executable. Before delegation it runs a fixed, read-only `doctor` request and requires the declared runtime contract plus every feature used by the plugin. Product versions are informational and may differ. The launcher never enumerates, installs, or updates tools and ignores other `atready` commands on `PATH`; the trusted uv/startup environment remains the installer authority, and a compatible report is not publisher provenance |
-| Run plugin validation during development or release review | Explicit repository command with an exact system-skills directory | The repository wrapper loads only the expected OpenAI validator path beneath that directory, requires a reviewed SHA-256, bounded size, and no symlink, and rejects drift before execution. POSIX also rejects group- or world-writable validator files; Windows relies on the selected system-skills directory's user-controlled ACL. It adds compatibility only for the current documented `policy.products` field and preserves every unrelated upstream error. Updating the trusted digest is a reviewed code change, not an automatic capability expansion |
+| Run plugin validation during development or release review | Explicit repository command with an exact system-skills directory | The repository wrapper loads only the expected OpenAI validator and its current identifier helper beneath that directory, requires reviewed SHA-256 values, bounded size, and no symlinks, and rejects drift before or during execution. POSIX also rejects group- or world-writable files; Windows relies on the selected system-skills directory's user-controlled ACL. It adds compatibility only for the current documented `policy.products` field and preserves every unrelated upstream error. Updating trusted source or a digest is a reviewed code change, not an automatic capability expansion |
 | Run the repository hardening gate | Explicit developer command or reviewed CI workflow step | The developer-only gate launches fixed local scorecard and clean-install scripts with no shell. It creates disposable AtReady, legacy, Codex, home, and `uv` tool roots. The install phase may use normal `uv` package-index access; invoking the gate or the checked-in CI step authorizes only that bounded dependency installation. The wheel lane rejects symlinks, copies descriptor-verified bytes to a private staged artifact, verifies its SHA-256, and gives only that staged path to `uv`. After installation, common Python socket paths are blocked for every exercised AtReady command. The gate uses synthetic fixtures and must not read a real roster or Codex state. It is validation infrastructure, not a product runtime capability. |
+| Score a decision-change benchmark packet | Explicit developer `--packet PATH`; optional `--report PATH` separately authorizes one report | The developer-only scorer reads the named packet, packet-contained relative fixtures, and committed benchmark/version sources. For local provenance it runs fixed, read-only `git rev-parse HEAD` and `git status --porcelain` subprocesses with no shell and bounded time. Without `--report` it writes no file. With `--report`, it may create one new file at the resolved operator path, including outside the repository, and refuses an existing destination. Scoring does not authorize host/model work, provider or network access, resource contact, or packet/report removal. |
 | Broadly discover installed CLIs or applications | Not available | No PATH enumeration, package-manager query, application scan, recursive search, or arbitrary command; the optional local check is limited to one authorized profile's exact executable/version probe |
 | Inspect environment variables | Not available | Neither names nor values are enumerated |
 | Inspect MCP/app configuration or authentication | Not available | The local check reports no configuration, account, authentication, or credential state |
@@ -57,6 +59,36 @@ show the resolved absolute path and fixed arguments, disclose unevaluated extern
 and obtain a second authorization. Installation and version observations do not evaluate or prove
 account, authentication, subscription, billing, quota, capacity, availability, or authorization. Declining
 either check leaves conversation-only Assisted Setup available.
+
+The `state validate` command validates only the schema of one explicit adapter-neutral
+resource-state file without reading an inventory, contacting a provider, or writing anything; its
+value-free receipt is labeled `schema-only`. The `route --resource-state PATH`
+flag reads that file for one route only and overlays its declared session, quota, and capacity on a
+copied in-memory inventory. It does not discover resources, refresh a source, contact a provider, use
+credential or account fields, or persist the overlay. Source labels, timestamps, confidence, and
+expiry are evidence metadata, not provider truth. State observed after the project `as_of` date or
+the route's captured evaluation instant, snapshots past a supplied `valid_until`, stale manual
+state, estimated state, or unknown confidence are rejected before routing. Expired capacity is
+retained only as an explicit exact-demand gate. The contract rejects
+sensitive field names, but does not inspect the contents of allowed strings such as `source`; users must
+not put credentials or other sensitive values in any resource-state field.
+
+The decision-change scorer is developer evaluation infrastructure, not an installed-product
+capability. Running it with `--packet PATH` authorizes local scoring of that explicitly named JSON
+packet. Case inventory and project paths must be relative and resolve inside the packet; the scorer
+also reads its committed manifest, synthetic source fixtures, plugin manifest, and project metadata.
+To bind the report to the current checkout, it resolves the local `git` executable through `PATH`
+and runs only `git rev-parse HEAD` and `git status --porcelain` in the repository, without a shell
+and with five-second timeouts. It retains only the commit plus clean/dirty state as provenance.
+
+Capturing baseline and treatment responses in host/model tasks requires separate operator action;
+running the scorer does not authorize those tasks. The scorer contacts no model, provider, account,
+network service, or inventoried resource, and it executes no handoff. By default it prints the report
+to stdout and creates no file. Supplying `--report PATH` separately authorizes exactly one new report
+at that resolved path, including a path outside the repository. The writer requests owner-only mode,
+uses exclusive create and no-follow where the platform provides it, refuses overwrite, and does not
+create a missing parent. The scorer never deletes the packet or report. The operator owns their local
+retention, protection, and removal, including any copy retained in terminal or host logs.
 
 The bundled coding-agent checks currently allow the exact canonical executable names `agy`
 (Google Antigravity), `claude` (Claude Code), and `copilot` (GitHub Copilot CLI), in addition to
@@ -128,6 +160,10 @@ rechecks path/descriptor identity, metadata, and macOS ACL state, and reads at m
 Windows ACL limitation applies. Explicit stdin is non-interactive, incremental,
 and bounded to the same size. Annotation values have no typed-argument input path. Neither
 transport is read unless its corresponding flag is present.
+
+Resource-state files use the same bounded, identity-checked read boundary, but are not AtReady-owned
+storage. Their contents are read for one route and discarded; the source path, terminal, logs, host,
+and model remain separate disclosure surfaces.
 
 Structured input removes declaration contents from AtReady's process
 arguments only. The source path, shell redirection or producer, invoking host,

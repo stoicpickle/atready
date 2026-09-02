@@ -56,6 +56,18 @@ AtReady expands trust only after the preceding local boundary is proven.
 - Explicit metadata semantics: billing and best/avoid remain non-routing descriptions, while a
   resource's declared approval prerequisite is preserved in every selected handoff without
   granting execution authority.
+- Optional adapter-neutral resource-state evidence may be supplied through one explicitly named
+  local file for one route. It overlays session, quota, and capacity in memory only, leaves the
+  stable roster unchanged, and fails closed on unknown/duplicate IDs, stale manual snapshots,
+  snapshots past `valid_until`, estimated state, unknown confidence, or state newer than the project
+  date or captured evaluation instant. Source labels, timestamps, confidence, and expiry remain
+  evidence metadata rather than provider truth; there is no discovery, network, credential/account
+  access, background refresh, persistence, or spending.
+- Capacity expiry or reset inside an otherwise valid snapshot does not invalidate that snapshot.
+  Capacity expired at or before evaluation becomes an explicit `capacity-expired` exact-demand gate;
+  capacity reset at or before evaluation becomes `capacity-reset-unknown`. A future same-unit reset
+  or expiry may act only as a late tie-break between otherwise tied eligible resources. It cannot
+  add work or override safety, fit, or the weighted score.
 
 ## v0.2: observed outcomes
 
@@ -63,10 +75,13 @@ AtReady expands trust only after the preceding local boundary is proven.
 - Bounded performance adjustments and staleness warnings.
 - Subscription review candidates only after a documented evidence threshold.
 - Export, clear, correction, and migration paths for the local ledger.
+- Evaluate a small local status view only after route-only state inputs prove repeated value. Do not
+  build a large desktop application around a manually maintained ledger.
 
 ## Open-source beta gate
 
-- Keep the CLI as the public product and the Codex skill as an optional conversational adapter.
+- Keep the CLI as the public engine and standalone fallback. Treat the Codex skill as the intended
+  conversational experience that contributes resource context to the planner.
 - Give a new user one short source install, one safe synthetic demo, and one understandable path to
   their first personal route.
 - Keep the public README focused on the idea, first use, trust boundary, and feedback. Preserve the
@@ -92,6 +107,8 @@ AtReady expands trust only after the preceding local boundary is proven.
 
 - Named-provider inspection of authentication, live quota/capacity, and availability only after a
   provider-specific permission and threat review.
+- The v0.1 local state overlay is not provider discovery or live quota/capacity access; it does not
+  advance this milestone.
 - CodeRabbit authentication observation remains deferred until an exact supported CLI version has
   reviewed synthetic and separately authorized live fixtures for its undocumented
   `auth status --agent` JSON shape, failure modes, redaction, and possible auto-update/network/write

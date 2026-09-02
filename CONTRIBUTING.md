@@ -51,9 +51,10 @@ python3 "$CODEX_SYSTEM_SKILLS_DIR/skill-creator/scripts/quick_validate.py" \
 Set `CODEX_SYSTEM_SKILLS_DIR` to the system-skill directory in the Codex installation being used
 for validation. The repository wrapper delegates to OpenAI's installed plugin validator and adds
 the current documented `policy.products` rule when an older local validator has not learned that
-field yet. It executes only validator bytes matching the repository's reviewed SHA-256 and does not
-suppress any other error. A validator update therefore requires a reviewed digest change. CI also
-checks the plugin and skill's portable structural contracts.
+field yet. It executes only validator and local identifier-helper bytes matching the repository's
+reviewed SHA-256 values and does not suppress any other error. An upstream update therefore
+requires a reviewed source and digest change. CI also checks the plugin and skill's portable
+structural contracts.
 
 ## Change rules
 

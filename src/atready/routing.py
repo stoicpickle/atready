@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
 
 from atready.catalog import InventoryCatalog
@@ -29,6 +30,7 @@ from atready.models import (
     UnresolvedRouteGap,
     Workstream,
 )
+from atready.resource_state import ResourceStateCollection, apply_resource_state
 
 _UNAVAILABLE_GATES = {"access-inactive", "session-unavailable", "quota-exhausted"}
 _UNVERIFIED_GATES = {
@@ -60,12 +62,15 @@ _REQUIRED_ALTERNATE_GAP_REASON = (
 _ALTERNATE_ACTIVATION_CONDITION = (
     "Re-check eligibility and obtain separate authorization if the primary cannot proceed."
 )
+_MAX_CAPACITY_PRESSURE_DAYS = 36_600
 
 
 @dataclass(frozen=True)
 class _RoutingState:
     previous_primary: str | None
     used_primaries: frozenset[str]
+    capacity_expired_resource_ids: frozenset[str]
+    capacity_reset_resource_ids: frozenset[str]
 
 
 def _basis_points(value: float) -> int:
@@ -99,6 +104,8 @@ def _gate_resource(
     workstream: Workstream,
     *,
     allowed_below_minimum: frozenset[str] = frozenset(),
+    capacity_expired_resource_ids: frozenset[str] = frozenset(),
+    capacity_reset_resource_ids: frozenset[str] = frozenset(),
 ) -> tuple[list[str], list[str]]:
     gates: list[str] = []
     notes: list[str] = []
@@ -142,11 +149,30 @@ def _gate_resource(
                 f"[capacity-unit-mismatch] demand {demand.amount} {demand.unit}; declared "
                 f"capacity uses {capacity.unit}; units were not converted"
             )
+        elif resource.id in capacity_expired_resource_ids:
+            gates.append("capacity-expired")
+            notes.append(
+                f"[capacity-expired] demand {demand.amount} {demand.unit}; exact state capacity "
+                "expired at the resource-state evaluation time; remaining was not inferred"
+            )
+        elif resource.id in capacity_reset_resource_ids:
+            gates.append("capacity-reset-unknown")
+            notes.append(
+                f"[capacity-reset-unknown] demand {demand.amount} {demand.unit}; exact state "
+                "capacity reset by the resource-state evaluation time; post-reset remaining was "
+                "not inferred"
+            )
         elif capacity.last_verified > project.as_of:
             gates.append("capacity-unknown")
             notes.append(
                 f"[capacity-unknown] demand {demand.amount} {demand.unit}; declared capacity "
                 f"was verified after project as_of ({capacity.last_verified.isoformat()})"
+            )
+        elif capacity.expires_on is not None and capacity.expires_on < project.as_of:
+            gates.append("capacity-expired")
+            notes.append(
+                f"[capacity-expired] demand {demand.amount} {demand.unit}; declared capacity "
+                f"expired on {capacity.expires_on.isoformat()}"
             )
         elif (
             capacity.resets_on is not None
@@ -222,6 +248,8 @@ def _evaluate_resource(
         project,
         workstream,
         allowed_below_minimum=allowed_below_minimum,
+        capacity_expired_resource_ids=state.capacity_expired_resource_ids,
+        capacity_reset_resource_ids=state.capacity_reset_resource_ids,
     )
     last_verified = resource.provenance.last_verified
     stale = bool(
@@ -281,6 +309,20 @@ def _evaluate_resource(
         elif resource.id in state.used_primaries:
             adjustments.append(ScoreAdjustment(code="used-primary-continuity", basis_points=200))
     adjusted = max(0, min(10_000, base + sum(item.basis_points for item in adjustments)))
+    capacity_pressure_days: int | None = None
+    demand = workstream.capacity_demand
+    capacity = resource.economics.capacity
+    if demand is not None and capacity is not None and capacity.unit == demand.unit:
+        pressure_dates = [
+            value
+            for value in (capacity.expires_on, capacity.resets_on)
+            if value is not None and value >= project.as_of
+        ]
+        if pressure_dates:
+            capacity_pressure_days = min(
+                (min(pressure_dates) - project.as_of).days,
+                _MAX_CAPACITY_PRESSURE_DAYS,
+            )
     return CandidateEvaluation(
         role=role,
         resource_id=resource.id,
@@ -290,13 +332,17 @@ def _evaluate_resource(
         base_score_bp=base,
         adjustments=adjustments,
         adjusted_score_bp=adjusted,
+        capacity_pressure_days=capacity_pressure_days,
         notes=notes,
     )
 
 
-def _rank_key(candidate: CandidateEvaluation) -> tuple[int, int, int, int, int, int, str]:
+def _rank_key(
+    candidate: CandidateEvaluation,
+) -> tuple[int, int, int, int, int, int, int, int, str]:
     if not candidate.eligible_for_role or candidate.adjusted_score_bp is None:
-        return (1, 0, 0, 0, 0, 0, candidate.resource_id)
+        return (1, 0, 0, 0, 0, 0, 1, 0, candidate.resource_id)
+    pressure_days = candidate.capacity_pressure_days
     return (
         0,
         -candidate.adjusted_score_bp,
@@ -304,6 +350,8 @@ def _rank_key(candidate: CandidateEvaluation) -> tuple[int, int, int, int, int, 
         -candidate.components_bp["confidence"],
         -candidate.components_bp["cost-efficiency"],
         -candidate.components_bp["low-integration-friction"],
+        0 if pressure_days is not None else 1,
+        pressure_days or 0,
         candidate.resource_id,
     )
 
@@ -529,8 +577,24 @@ def route(
     project: ProjectBrief,
     *,
     allow_demo: bool = False,
+    resource_state: ResourceStateCollection | None = None,
+    resource_state_evaluated_at: datetime | None = None,
 ) -> RoutePlan:
     """Return a deterministic, complete route plan with no I/O or network access."""
+
+    state_application = None
+    if resource_state is not None:
+        if resource_state_evaluated_at is None:
+            raise ConfigurationError("resource state requires an aware resource_state_evaluated_at")
+        state_application = apply_resource_state(
+            inventory,
+            resource_state,
+            as_of=project.as_of,
+            evaluated_at=resource_state_evaluated_at,
+        )
+        inventory = state_application.inventory
+    elif resource_state_evaluated_at is not None:
+        raise ConfigurationError("resource_state_evaluated_at requires resource state")
 
     if inventory.inventory_kind is InventoryKind.DEMO and not allow_demo:
         raise ConfigurationError(
@@ -548,7 +612,7 @@ def route(
     assignments: list[RouteAssignment] = []
     used_primaries: set[str] = set()
     previous_primary: str | None = None
-    warnings: list[str] = []
+    warnings: list[str] = list(state_application.warnings) if state_application else []
     if inventory.inventory_kind is InventoryKind.DEMO:
         warnings.append(
             "[demo-inventory] this inventory is labeled demo; its user-controlled contents are "
@@ -556,7 +620,16 @@ def route(
         )
 
     for workstream in project.workstreams:
-        state = _RoutingState(previous_primary, frozenset(used_primaries))
+        state = _RoutingState(
+            previous_primary,
+            frozenset(used_primaries),
+            frozenset(state_application.capacity_expired_resource_ids)
+            if state_application
+            else frozenset(),
+            frozenset(state_application.capacity_reset_resource_ids)
+            if state_application
+            else frozenset(),
+        )
         support_enabled = bool(
             workstream.support.allowed and inventory.preferences.maximum_supporting_resources == 1
         )
@@ -813,6 +886,12 @@ def route(
         project_name=project.name,
         as_of=project.as_of,
         inventory_fingerprint="sha256:" + catalog.fingerprint(),
+        resource_state_fingerprint=(state_application.fingerprint if state_application else None),
+        resource_state_evaluated_at=(state_application.evaluated_at if state_application else None),
+        resource_state_sources=(list(state_application.sources) if state_application else []),
+        resource_state_resources=(
+            list(state_application.resource_ids) if state_application else []
+        ),
         assignments=assignments,
         dispositions=dispositions,
         warnings=warnings,

@@ -95,6 +95,7 @@ _UNVERIFIED_ISSUE_LABELS = {
     "unknown-session": "current availability is unknown",
 }
 _CAPACITY_GATE_CODES = {
+    "capacity-expired",
     "capacity-insufficient",
     "capacity-reset-unknown",
     "capacity-unit-mismatch",
@@ -151,6 +152,8 @@ def _selected_unverified_warning(warning: str) -> tuple[str, str, str, list[str]
 def _plain_warning(warning: str) -> str:
     if warning.startswith("[demo-inventory]"):
         return "This uses a demo inventory. Its contents are not verified as resources you can use."
+    if warning.startswith("[resource-state]"):
+        return warning.removeprefix("[resource-state] ").capitalize() + "."
     unverified = _selected_unverified_warning(warning)
     if unverified:
         workstream, role, resource, issues = unverified
@@ -797,6 +800,8 @@ def _runner_up(
             -candidate.components_bp["confidence"],
             -candidate.components_bp["cost-efficiency"],
             -candidate.components_bp["low-integration-friction"],
+            0 if candidate.capacity_pressure_days is not None else 1,
+            candidate.capacity_pressure_days or 0,
             candidate.resource_id,
         ),
     )[0]
@@ -830,6 +835,37 @@ def _primary_trace(assignment: RouteAssignment) -> str:
         f"Adjusted score {_score(selected.adjusted_score_bp)} versus runner-up "
         f"{runner_up.resource_name} at {_score(runner_up.adjusted_score_bp)}."
     )
+    selected_rank_prefix = (
+        selected.adjusted_score_bp,
+        selected.components_bp["capability-fit"],
+        selected.components_bp["confidence"],
+        selected.components_bp["cost-efficiency"],
+        selected.components_bp["low-integration-friction"],
+    )
+    runner_rank_prefix = (
+        runner_up.adjusted_score_bp,
+        runner_up.components_bp["capability-fit"],
+        runner_up.components_bp["confidence"],
+        runner_up.components_bp["cost-efficiency"],
+        runner_up.components_bp["low-integration-friction"],
+    )
+    if (
+        selected_rank_prefix == runner_rank_prefix
+        and selected.capacity_pressure_days is not None
+        and (
+            runner_up.capacity_pressure_days is None
+            or selected.capacity_pressure_days < runner_up.capacity_pressure_days
+        )
+    ):
+        runner_pressure = (
+            "no dated pressure"
+            if runner_up.capacity_pressure_days is None
+            else f"{runner_up.capacity_pressure_days} days"
+        )
+        return (
+            f"{assignment.primary.reason} {comparison} Declared same-unit capacity becomes "
+            f"perishable sooner: {selected.capacity_pressure_days} days versus {runner_pressure}."
+        )
     if selected.adjusted_score_bp == runner_up.adjusted_score_bp:
         comparison += " The deterministic component/resource-ID tie-break chain resolved the tie."
     if positive_edge is None:

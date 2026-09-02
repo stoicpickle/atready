@@ -9,7 +9,7 @@ import os
 import re
 import sys
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, datetime
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
@@ -83,6 +83,7 @@ from atready.resource_input import (
     parse_resource_mapping,
     resource_intake_review,
 )
+from atready.resource_state import ResourceStateCollection, resource_state_from_path
 from atready.routing import route
 from atready.runtime_contract import doctor_payload, runtime_contract_payload
 from atready.templates import demo_inventory, starter_inventory, starter_project
@@ -159,7 +160,7 @@ More:
   help --all           See every top-level command
 
 Advanced command names:
-  doctor  runtime  config  resource  skill  schema
+  doctor  runtime  config  resource  state  skill  schema
 
 options:
   -h, --help  show this help message and exit
@@ -871,6 +872,15 @@ def build_parser() -> argparse.ArgumentParser:
     route_parser.add_argument("--project", required=True, type=Path)
     route_parser.add_argument("--inventory", type=Path, help="Defaults to user config")
     route_parser.add_argument(
+        "--resource-state",
+        type=Path,
+        help=(
+            "Explicit local state file applied in memory to this route only; CLI captures one "
+            "local evaluation time and preserves its fixed UTC offset in route evidence; never "
+            "refreshes or writes provider or inventory state"
+        ),
+    )
+    route_parser.add_argument(
         "--format",
         choices=("summary", "agent-summary", "markdown", "json", "presentation"),
         default="summary",
@@ -906,6 +916,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--allow-demo", action="store_true", help="Explicitly permit synthetic demo resources"
     )
     route_parser.set_defaults(handler=_handle_route)
+
+    state_parser = commands.add_parser(
+        "state",
+        help="Validate adapter-neutral resource-state evidence",
+        description=(
+            "Validate one explicit local state file without contacting a provider, reading an "
+            "inventory, or writing anything."
+        ),
+    )
+    state_commands = state_parser.add_subparsers(dest="state_command", required=True)
+    state_validate_parser = state_commands.add_parser(
+        "validate", help="Validate a bounded resource-state file"
+    )
+    state_validate_parser.add_argument("path", type=Path)
+    state_validate_parser.add_argument(
+        "--json", action="store_true", help="Emit a value-free machine-readable receipt"
+    )
+    state_validate_parser.set_defaults(handler=_handle_resource_state_validate)
 
     compare_parser = commands.add_parser(
         "compare",
@@ -993,6 +1021,7 @@ def build_parser() -> argparse.ArgumentParser:
             "inventory-annotation-declaration",
             "project",
             "resource-declaration",
+            "resource-state",
             "route-plan",
         ),
     )
@@ -3613,7 +3642,20 @@ def _handle_route(args: argparse.Namespace) -> int:
         if "configuration file does not exist" in str(exc):
             exc.add_note("Create your roster first with: atready init")
         raise
-    plan = route(catalog.inventory, project, allow_demo=args.allow_demo)
+    resource_state = (
+        resource_state_from_path(args.resource_state) if args.resource_state is not None else None
+    )
+    if resource_state is None:
+        plan = route(catalog.inventory, project, allow_demo=args.allow_demo)
+    else:
+        evaluated_at = datetime.now().astimezone()
+        plan = route(
+            catalog.inventory,
+            project,
+            allow_demo=args.allow_demo,
+            resource_state=resource_state,
+            resource_state_evaluated_at=evaluated_at,
+        )
     width = args.width or 80
     if args.width is None and args.format == "presentation" and args.max_lines is not None:
         default_presentation = render_agent_presentation(
@@ -3633,6 +3675,26 @@ def _handle_route(args: argparse.Namespace) -> int:
         max_words=args.max_words,
         max_lines=args.max_lines,
     )
+
+
+def _handle_resource_state_validate(args: argparse.Namespace) -> int:
+    state = resource_state_from_path(args.path)
+    result = {
+        "resources": len(state.snapshots),
+        "schema_version": state.schema_version,
+        "source_count": len({snapshot.source for snapshot in state.snapshots}),
+        "scope": "schema-only",
+        "valid": True,
+    }
+    if args.json:
+        print(json.dumps(result, sort_keys=True))
+    else:
+        print(
+            f"Resource-state file schema is valid: {result['resources']} resource snapshots. "
+            "Routing separately checks roster, evaluation time, mode, and confidence."
+        )
+        print("No inventory was read or changed, and no provider was contacted.")
+    return 0
 
 
 def _handle_compare(args: argparse.Namespace) -> int:
@@ -3840,6 +3902,9 @@ def _handle_schema(args: argparse.Namespace) -> int:
         return 0
     if args.kind == "resource-declaration":
         print(json.dumps(ResourceDeclaration.model_json_schema(), indent=2, sort_keys=True))
+        return 0
+    if args.kind == "resource-state":
+        print(json.dumps(ResourceStateCollection.model_json_schema(), indent=2, sort_keys=True))
         return 0
     if args.kind == "route-plan":
         from atready.models import RoutePlan
