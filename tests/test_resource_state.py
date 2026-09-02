@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+from datetime import UTC, date, datetime, timedelta, timezone, tzinfo
 
 import pytest
 from pydantic import ValidationError
@@ -18,6 +17,30 @@ from atready.routing import route
 
 OBSERVED_AT = datetime(2026, 9, 1, 12, 0, tzinfo=UTC)
 EVALUATED_AT = OBSERVED_AT + timedelta(minutes=1)
+
+
+class _SeasonalPacificTimezone(tzinfo):
+    """Small test timezone whose offset changes without requiring host tzdata."""
+
+    def utcoffset(self, value: datetime | None) -> timedelta | None:
+        if value is None:
+            return None
+        local_value = value.replace(tzinfo=None)
+        if local_value >= datetime(2026, 3, 8, 2, 0):
+            return timedelta(hours=-7)
+        return timedelta(hours=-8)
+
+    def dst(self, value: datetime | None) -> timedelta | None:
+        offset = self.utcoffset(value)
+        if offset is None:
+            return None
+        return offset - timedelta(hours=-8)
+
+    def tzname(self, value: datetime | None) -> str | None:
+        offset = self.utcoffset(value)
+        if offset is None:
+            return None
+        return "PDT" if offset == timedelta(hours=-7) else "PST"
 
 
 def _snapshot(**overrides: object) -> ResourceStateSnapshot:
@@ -448,7 +471,7 @@ def test_state_rejects_future_observation_and_missing_or_naive_evaluation_time()
 
 
 def test_project_date_comparison_preserves_the_evaluation_offset_as_route_evidence() -> None:
-    evaluated_at = datetime(2026, 8, 5, 17, 30, tzinfo=ZoneInfo("America/Los_Angeles"))
+    evaluated_at = datetime(2026, 8, 5, 17, 30, tzinfo=timezone(timedelta(hours=-7)))
     observed_at = datetime(2026, 8, 6, 0, 15, tzinfo=UTC)
     state = ResourceStateCollection(
         snapshots=[
@@ -468,7 +491,7 @@ def test_project_date_comparison_preserves_the_evaluation_offset_as_route_eviden
 
 
 def test_western_evaluation_timezone_controls_capacity_calendar_dates() -> None:
-    evaluation_timezone = ZoneInfo("America/Los_Angeles")
+    evaluation_timezone = timezone(timedelta(hours=-7))
     observed_at = datetime(2026, 9, 2, 2, 30, tzinfo=UTC)
     evaluated_at = datetime(2026, 9, 1, 19, 45, tzinfo=evaluation_timezone)
     state = ResourceStateCollection(
@@ -498,7 +521,7 @@ def test_western_evaluation_timezone_controls_capacity_calendar_dates() -> None:
 
 
 def test_eastern_evaluation_timezone_controls_validity_calendar_boundary() -> None:
-    evaluation_timezone = ZoneInfo("Pacific/Kiritimati")
+    evaluation_timezone = timezone(timedelta(hours=14))
     state = ResourceStateCollection(
         snapshots=[
             _snapshot(
@@ -519,8 +542,53 @@ def test_eastern_evaluation_timezone_controls_validity_calendar_boundary() -> No
     assert application.resource_ids == ("synthetic-seat",)
 
 
+def test_route_evaluation_date_validates_capacity_independently_of_the_host_date() -> None:
+    evaluation_timezone = timezone(timedelta(hours=14))
+    evaluation_date = date.today() + timedelta(days=1)
+    evaluated_at = datetime.combine(
+        evaluation_date, datetime.min.time(), tzinfo=evaluation_timezone
+    ) + timedelta(minutes=30)
+    observed_at = evaluated_at - timedelta(minutes=15)
+    state = ResourceStateCollection(
+        snapshots=[
+            _snapshot(
+                observed_at=observed_at,
+                valid_until=evaluated_at + timedelta(minutes=30),
+                capacity={
+                    "unit": "review-request",
+                    "remaining": 5,
+                    "expires_at": evaluated_at + timedelta(days=1),
+                },
+            )
+        ]
+    )
+
+    application = apply_resource_state(
+        _inventory(), state, as_of=evaluation_date, evaluated_at=evaluated_at
+    )
+
+    capacity = application.inventory.resources[0].economics.capacity
+    assert capacity is not None
+    assert capacity.last_verified == evaluation_date
+
+
+def test_public_validation_context_cannot_override_the_capacity_clock() -> None:
+    future_date = date.today() + timedelta(days=1)
+
+    with pytest.raises(ValidationError, match="last_verified cannot be in the future"):
+        Capacity.model_validate(
+            {
+                "unit": "review-request",
+                "remaining": 5,
+                "basis": "observed",
+                "last_verified": future_date,
+            },
+            context={"today": future_date},
+        )
+
+
 def test_manual_state_age_uses_evaluation_timezone_calendar_dates() -> None:
-    evaluation_timezone = ZoneInfo("America/Los_Angeles")
+    evaluation_timezone = timezone(timedelta(hours=-7))
     state = ResourceStateCollection(
         snapshots=[
             _snapshot(
@@ -568,8 +636,8 @@ def test_manual_state_ages_against_evaluated_at_not_project_as_of() -> None:
         apply_resource_state(_inventory(), state, as_of=date(2026, 9, 1), evaluated_at=EVALUATED_AT)
 
 
-def test_zoneinfo_is_canonicalized_to_its_evaluation_time_fixed_offset_across_dst() -> None:
-    evaluation_timezone = ZoneInfo("America/Los_Angeles")
+def test_dynamic_timezone_is_canonicalized_to_its_evaluation_time_fixed_offset() -> None:
+    evaluation_timezone = _SeasonalPacificTimezone()
     evaluated_at = datetime(2026, 3, 8, 0, 30, tzinfo=evaluation_timezone)
     state = ResourceStateCollection(
         snapshots=[

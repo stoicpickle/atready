@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from atready.cli import main as cli_main
+
 ROOT = Path(__file__).parents[1]
 LANE = ROOT / "evals" / "decision_change"
 PREPARE = LANE / "prepare.py"
@@ -141,6 +143,31 @@ def test_all_treatment_fixtures_route_to_the_expected_synthetic_resources() -> N
     ).inventory
     degraded_plan = score_module.route(degraded_inventory, degraded_project, allow_demo=True)
     assert degraded_plan.assignments[1].support.resource_id == "reviewer"
+
+
+def test_expected_summary_matches_the_cli_default_width(capsys: pytest.CaptureFixture[str]) -> None:
+    manifest = json.loads((LANE / "manifest.json").read_text(encoding="utf-8"))
+    case = manifest["cases"][0]
+    project_path = (LANE / case["project_file"]).resolve()
+    inventory_path = (LANE / case["inventory_file"]).resolve()
+    assert (
+        cli_main(
+            [
+                "route",
+                "--project",
+                str(project_path),
+                "--inventory",
+                str(inventory_path),
+                "--allow-demo",
+                "--format",
+                "agent-summary",
+            ]
+        )
+        == 0
+    )
+    cli_width_summary = capsys.readouterr().out
+
+    assert score_module._expected_summary(inventory_path, project_path) == cli_width_summary
 
 
 def test_prepare_creates_private_exact_packet_with_sequential_prompts(tmp_path: Path) -> None:
@@ -327,7 +354,6 @@ def test_baseline_quality_requires_explicit_operator_booleans(tmp_path: Path) ->
         ("source_revision", "deadbeef (clean)", "current-source-revision"),
         ("skill_version", "atready plugin 999.0.0", "current-skill-version"),
         ("cli_version", "atready 999.0.0", "current-cli-version"),
-        ("evaluation_date", "2000-01-01", "current-evaluation-date"),
     ],
 )
 def test_stale_or_mismatched_provenance_fails_contract(
@@ -346,6 +372,52 @@ def test_stale_or_mismatched_provenance_fails_contract(
     assert report["decision_change_target_met"] is False
     assert report["decision_value_observed_by_operator"] is False
     assert report["scorer_provenance"][field] != replacement
+
+
+@pytest.mark.parametrize(
+    ("evaluation_date", "passes"),
+    [("2026-09-01", True), ("2026-09-02", True), ("2026-09-03", False)],
+)
+def test_evaluation_date_accepts_delayed_scoring_but_rejects_the_future(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    evaluation_date: str,
+    passes: bool,
+) -> None:
+    packet_path = _prepared_packet(tmp_path)
+    packet = _complete_packet(packet_path)
+    scorer_provenance = score_module._current_provenance()
+    scorer_provenance["evaluation_date"] = "2026-09-02"
+    packet["metadata"].update(
+        {
+            field: scorer_provenance[field]
+            for field in ("source_revision", "skill_version", "cli_version")
+        }
+    )
+    packet["metadata"]["evaluation_date"] = evaluation_date
+    packet_path.write_text(json.dumps(packet), encoding="utf-8")
+    monkeypatch.setattr(score_module, "_current_provenance", lambda: scorer_provenance)
+
+    report = score_module.score(packet_path)
+
+    date_check = next(
+        check for check in report["metadata_checks"] if check["name"] == "current-evaluation-date"
+    )
+    assert date_check["passed"] is passes
+    assert report["scored_packet_passed"] is passes
+    assert report["decision_change_target_met"] is passes
+    assert report["decision_value_observed_by_operator"] is passes
+
+
+@pytest.mark.parametrize("evaluation_date", ["20260901", "not-a-date"])
+def test_evaluation_date_requires_canonical_iso_text(tmp_path: Path, evaluation_date: str) -> None:
+    packet_path = _prepared_packet(tmp_path)
+    packet = _complete_packet(packet_path)
+    packet["metadata"]["evaluation_date"] = evaluation_date
+    packet_path.write_text(json.dumps(packet), encoding="utf-8")
+
+    with pytest.raises(score_module.ScoreError, match="canonical ISO date"):
+        score_module.score(packet_path)
 
 
 def test_decision_value_observation_requires_a_useful_contract_valid_case(tmp_path: Path) -> None:
@@ -378,6 +450,22 @@ def test_decision_change_target_uses_the_configured_minimum(
     assert report["scored_packet_passed"] is True
     assert report["useful_understandable_actionable_changes"] == useful_changes
     assert report["decision_change_target_met"] is target_met
+
+
+def test_unchanged_cases_cannot_satisfy_the_decision_change_target(tmp_path: Path) -> None:
+    packet_path = _prepared_packet(tmp_path)
+    packet = _complete_packet(packet_path)
+    for case in packet["cases"][:3]:
+        case["operator_coding"]["decision_changed"] = False
+        case["operator_coding"]["change_types"] = ["no-change"]
+    packet_path.write_text(json.dumps(packet), encoding="utf-8")
+
+    report = score_module.score(packet_path)
+
+    assert report["scored_packet_passed"] is True
+    assert report["decisions_changed"] == 2
+    assert report["useful_understandable_actionable_changes"] == 2
+    assert report["decision_change_target_met"] is False
 
 
 def test_packet_paths_cannot_escape_private_root(tmp_path: Path) -> None:

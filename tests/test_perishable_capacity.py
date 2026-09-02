@@ -84,6 +84,45 @@ def test_perishable_capacity_is_only_a_late_exact_demand_tie_break() -> None:
     assert "perishable sooner: 4 days versus 19 days" in render_markdown(plan)
 
 
+def test_reset_only_capacity_uses_the_same_late_tie_break() -> None:
+    later, sooner = _inventory().resources
+    later_capacity = later.economics.capacity
+    sooner_capacity = sooner.economics.capacity
+    assert later_capacity is not None
+    assert sooner_capacity is not None
+    later = later.model_copy(
+        update={
+            "economics": later.economics.model_copy(
+                update={
+                    "capacity": later_capacity.model_copy(
+                        update={"expires_on": None, "resets_on": date(2026, 9, 20)}
+                    )
+                }
+            )
+        }
+    )
+    sooner = sooner.model_copy(
+        update={
+            "economics": sooner.economics.model_copy(
+                update={
+                    "capacity": sooner_capacity.model_copy(
+                        update={"expires_on": None, "resets_on": date(2026, 9, 5)}
+                    )
+                }
+            )
+        }
+    )
+    inventory = Inventory(inventory_kind="personal", resources=[later, sooner])
+
+    plan = route(inventory, _project(demand=CapacityDemand(unit="request", amount=1)))
+
+    assert plan.assignments[0].primary is not None
+    assert plan.assignments[0].primary.resource_id == "zeta-sooner"
+    candidates = {item.resource_id: item for item in plan.assignments[0].candidates}
+    assert candidates["zeta-sooner"].capacity_pressure_days == 4
+    assert candidates["alpha-later"].capacity_pressure_days == 19
+
+
 def test_capacity_expiry_never_changes_a_route_without_exact_demand() -> None:
     plan = route(_inventory(), _project())
 

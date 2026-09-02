@@ -17,6 +17,7 @@ from pydantic import (
     Field,
     SerializerFunctionWrapHandler,
     StringConstraints,
+    ValidationInfo,
     WithJsonSchema,
     field_validator,
     model_serializer,
@@ -223,6 +224,15 @@ class Access(StrictModel):
     current_session: SessionAvailability = SessionAvailability.UNKNOWN
 
 
+_CAPACITY_REFERENCE_DATE = object()
+
+
+def _trusted_capacity_validation_context(reference_date: date) -> dict[object, date]:
+    """Return the opaque internal context used by route-state validation."""
+
+    return {_CAPACITY_REFERENCE_DATE: reference_date}
+
+
 class Capacity(StrictModel):
     """One exact, unit-scoped capacity declaration without implicit conversion."""
 
@@ -245,10 +255,15 @@ class Capacity(StrictModel):
         return value
 
     @model_validator(mode="after")
-    def validate_exact_capacity(self) -> Capacity:
+    def validate_exact_capacity(self, info: ValidationInfo) -> Capacity:
+        validation_date = date.today()
+        if isinstance(info.context, Mapping):
+            context_date = info.context.get(_CAPACITY_REFERENCE_DATE)
+            if type(context_date) is date:
+                validation_date = context_date
         if self.basis is ConfidenceBasis.UNKNOWN:
             raise ValueError("exact capacity requires a non-unknown basis")
-        if self.last_verified > date.today():
+        if self.last_verified > validation_date:
             raise ValueError("capacity last_verified cannot be in the future")
         if self.resets_on is not None and self.resets_on < self.last_verified:
             raise ValueError("capacity resets_on cannot be earlier than last_verified")

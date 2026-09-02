@@ -37,6 +37,7 @@ from atready.models import (
     SessionAvailability,
     Slug,
     StrictModel,
+    _trusted_capacity_validation_context,
 )
 from atready.yamlio import load_yaml, loads_yaml
 
@@ -305,6 +306,7 @@ def apply_resource_state(
     replacements: dict[str, Resource] = {}
     capacity_expired_resource_ids: set[str] = set()
     capacity_reset_resource_ids: set[str] = set()
+    validation_context = _trusted_capacity_validation_context(evaluation_date)
     for snapshot in state.snapshots:
         if snapshot.observed_at > evaluated_at:
             raise ConfigurationError("resource state observation is later than evaluated_at")
@@ -353,23 +355,26 @@ def apply_resource_state(
         try:
             if snapshot.capacity is not None:
                 capacity = snapshot.capacity
-                economics_data["capacity"] = Capacity(
-                    unit=capacity.unit,
-                    remaining=capacity.remaining,
-                    limit=capacity.limit,
-                    project_limit=capacity.project_limit,
-                    resets_on=(
-                        capacity.resets_at.astimezone(evaluation_timezone).date()
-                        if capacity.resets_at
-                        else None
-                    ),
-                    expires_on=(
-                        capacity.expires_at.astimezone(evaluation_timezone).date()
-                        if capacity.expires_at
-                        else None
-                    ),
-                    basis=snapshot.confidence,
-                    last_verified=observed_on,
+                economics_data["capacity"] = Capacity.model_validate(
+                    {
+                        "unit": capacity.unit,
+                        "remaining": capacity.remaining,
+                        "limit": capacity.limit,
+                        "project_limit": capacity.project_limit,
+                        "resets_on": (
+                            capacity.resets_at.astimezone(evaluation_timezone).date()
+                            if capacity.resets_at
+                            else None
+                        ),
+                        "expires_on": (
+                            capacity.expires_at.astimezone(evaluation_timezone).date()
+                            if capacity.expires_at
+                            else None
+                        ),
+                        "basis": snapshot.confidence,
+                        "last_verified": observed_on,
+                    },
+                    context=validation_context,
                 )
                 if capacity.expires_at is not None and capacity.expires_at <= evaluated_at:
                     capacity_expired_resource_ids.add(resource.id)
@@ -377,7 +382,9 @@ def apply_resource_state(
                     capacity_reset_resource_ids.add(resource.id)
             resource_data["access"] = access_data
             resource_data["economics"] = economics_data
-            replacements[resource.id] = Resource.model_validate(resource_data)
+            replacements[resource.id] = Resource.model_validate(
+                resource_data, context=validation_context
+            )
         except ValidationError as exc:
             raise validation_configuration_error(
                 exc,
@@ -392,7 +399,9 @@ def apply_resource_state(
         }
     )
     try:
-        effective = Inventory.model_validate(candidate.model_dump(mode="python"))
+        effective = Inventory.model_validate(
+            candidate.model_dump(mode="python"), context=validation_context
+        )
     except ValidationError as exc:
         raise validation_configuration_error(
             exc,

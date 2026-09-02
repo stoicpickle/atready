@@ -132,7 +132,7 @@ def _expected_summary(inventory_path: Path, project_path: Path) -> str:
     project = project_from_path(project_path)
     inventory = InventoryCatalog.from_path(inventory_path, today=project.as_of).inventory
     plan = route(inventory, project, allow_demo=True)
-    return render_agent_summary(plan, goal=project.goal)
+    return render_agent_summary(plan, goal=project.goal, width=80)
 
 
 def _baseline_prompt(brief: str) -> str:
@@ -184,13 +184,27 @@ def _metadata_checks(metadata: object) -> list[dict[str, Any]]:
         "evidence remains explicitly operator-attested",
     )
     current = _current_provenance()
-    for field in ("source_revision", "skill_version", "cli_version", "evaluation_date"):
+    for field in ("source_revision", "skill_version", "cli_version"):
         _check(
             checks,
             f"current-{field.replace('_', '-')}",
             metadata.get(field) == current[field],
             f"{field} matches the scorer's current checkout",
         )
+    evaluation_date_text = _text(metadata.get("evaluation_date"), label="metadata.evaluation_date")
+    try:
+        evaluation_date = date.fromisoformat(evaluation_date_text)
+    except ValueError:
+        raise ScoreError("metadata.evaluation_date must be one canonical ISO date") from None
+    if evaluation_date.isoformat() != evaluation_date_text:
+        raise ScoreError("metadata.evaluation_date must be one canonical ISO date")
+    scorer_date = date.fromisoformat(current["evaluation_date"])
+    _check(
+        checks,
+        "current-evaluation-date",
+        evaluation_date <= scorer_date,
+        "evaluation_date is canonical ISO text and not in the future",
+    )
     return checks
 
 
