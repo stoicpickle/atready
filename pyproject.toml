@@ -77,7 +77,6 @@ include = [
 addopts = "--strict-config --strict-markers"
 testpaths = ["tests"]
 timeout = 30
-session_timeout = 180
 
 [tool.mutmut]
 source_paths = ["src/atready/"]

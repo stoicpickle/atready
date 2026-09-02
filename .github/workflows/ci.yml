@@ -51,10 +51,16 @@ jobs:
         run: uv run --no-sync ruff format --check .
 
       - name: Test
-        if: runner.os != 'Linux'
+        if: runner.os == 'macOS'
         env:
           PYTHONPATH: src
         run: uv run --no-sync pytest
+
+      - name: Test files in isolated processes
+        if: runner.os == 'Windows'
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync python scripts/run_test_files.py
 
       - name: Test with branch coverage
         if: runner.os == 'Linux'
