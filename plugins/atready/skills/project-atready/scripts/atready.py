@@ -15,7 +15,7 @@ import threading
 import time
 from pathlib import Path
 
-PLUGIN_VERSION = "0.1.10"
+PLUGIN_VERSION = "0.1.11"
 REVIEWED_RUNTIME_VERSION = "0.1.9"
 PUBLIC_RUNTIME_SOURCE = "git+https://github.com/stoicpickle/atready.git@main"
 REQUIRED_RUNTIME_CONTRACT_VERSION = 1
@@ -29,6 +29,7 @@ REQUIRED_RUNTIME_FEATURE_IDS = (
     "routing.compare.v1",
     "routing.plan-only.v1",
     "routing.presentation-bundle.v1",
+    "routing.resource-state.v1",
     "schema.declarations.v1",
 )
 _HANDSHAKE_TIMEOUT_SECONDS = 10

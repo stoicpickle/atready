@@ -1,0 +1,49 @@
+schema_version: 1
+id: synthetic-pixel-game
+name: Synthetic Pixel Game
+goal: Build a tiny pixel game, create its art, and review the code independently.
+as_of: 2026-08-12
+constraints:
+  data_class: public
+  max_marginal_cost: 0.40
+  allowed_interactions: [codex-callable, external-agent]
+  network_allowed: true
+  allow_unverified: false
+  forbidden_resources: []
+workstreams:
+  - id: implementation
+    name: Game implementation
+    objective: Build the small playable game and its tests.
+    required_capabilities: [{id: code-implementation, importance: 1.0, minimum: 0.70}]
+    inputs: [Synthetic game brief]
+    allowed_scope: [Game source, tests]
+    exclusions: [Publishing]
+    deliverable: A small tested playable build.
+    acceptance_criteria: [The core loop is playable and tests pass]
+    verification: [Run the project tests and play the core loop]
+    stop_conditions: [The brief requires a larger production scope]
+    next_owner: Pixel art workstream
+  - id: pixel-art
+    name: Pixel art
+    objective: Create a small coherent set of pixel-game assets.
+    required_capabilities: [{id: pixel-art, importance: 1.0, minimum: 0.70}]
+    inputs: [Art direction, target sprite sizes]
+    allowed_scope: [Synthetic pixel assets]
+    exclusions: [Unlicensed source material]
+    deliverable: A coherent small asset set.
+    acceptance_criteria: [Assets remain readable at native scale]
+    verification: [Inspect the assets at native scale]
+    stop_conditions: [No visual direction passes readability review]
+    next_owner: Independent review workstream
+  - id: review
+    name: Independent code review
+    objective: Review the implementation for correctness and regression risk.
+    required_capabilities: [{id: code-review, importance: 1.0, minimum: 0.70}]
+    inputs: [Implementation diff, test results]
+    allowed_scope: [Review comments]
+    exclusions: [Automatic fixes, merges]
+    deliverable: Evidence-backed review findings.
+    acceptance_criteria: [Every finding identifies a concrete risk and location]
+    verification: [Reconcile findings against the diff]
+    stop_conditions: [The implementation changes during review]
+    next_owner: Human maintainer

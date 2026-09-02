@@ -100,6 +100,7 @@ def _runtime_payload(
         "routing.compare.v1",
         "routing.plan-only.v1",
         "routing.presentation-bundle.v1",
+        "routing.resource-state.v1",
         "schema.declarations.v1",
     ]
     if missing_feature:
@@ -123,7 +124,7 @@ def _runtime_payload(
 def _invoke_staged_wrapper(
     root: Path,
     *,
-    plugin_version: str = "0.1.10",
+    plugin_version: str = "0.1.11",
     runtime_version: str = "9.9.9",
     legacy_doctor: bool = False,
     missing_feature: bool = False,

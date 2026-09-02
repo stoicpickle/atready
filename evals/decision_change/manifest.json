@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "minimum_useful_changes": 3,
+  "cases": [
+    {
+      "id": "godot",
+      "brief": "A deterministic Godot battle-report feature needs architecture, implementation with tests, and independent review.",
+      "inventory_file": "../fixtures/inventory.yaml",
+      "project_file": "../fixtures/project-godot.yaml"
+    },
+    {
+      "id": "web",
+      "brief": "A small model-backed web product needs implementation, a model gateway, managed persistence, and deployment.",
+      "inventory_file": "../fixtures/inventory.yaml",
+      "project_file": "../fixtures/project-web.yaml"
+    },
+    {
+      "id": "art",
+      "brief": "A pixel-art pipeline needs concept exploration, a coherent asset family, and final pixel cleanup and export.",
+      "inventory_file": "../fixtures/inventory.yaml",
+      "project_file": "../fixtures/project-art.yaml"
+    },
+    {
+      "id": "degraded",
+      "brief": "A private offline project needs quota-aware implementation, complementary build and review, and private-compatible architecture.",
+      "inventory_file": "../fixtures/inventory-degraded.yaml",
+      "project_file": "../fixtures/project-degraded.yaml"
+    },
+    {
+      "id": "pixel-game",
+      "brief": "A tiny pixel game needs game implementation, purpose-built pixel art, and independent code review.",
+      "inventory_file": "fixtures/inventory-pixel-game.yaml",
+      "project_file": "fixtures/project-pixel-game.yaml"
+    }
+  ]
+}

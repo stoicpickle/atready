@@ -2,7 +2,8 @@
 
 All public contracts use `schema_version: 1`, reject unknown fields, and can be emitted as JSON
 Schema with `atready schema inventory`, `atready schema project`,
-`atready schema resource-declaration`, and `atready schema route-plan`.
+`atready schema resource-declaration`, `atready schema resource-state`, and
+`atready schema route-plan`.
 
 ## Inventory
 
@@ -184,6 +185,75 @@ Zero remaining capacity requires `quota: exhausted`; positive remaining capacity
 with exhausted quota. A qualitative status never invents an amount; inconsistent declarations
 fail validation.
 
+## Route-only resource-state evidence
+
+An optional `--resource-state PATH` input accepts one adapter-neutral, versioned collection of
+observations for resources already present in the selected inventory. It is route input, not an
+inventory or provider response:
+
+```yaml
+schema_version: 1
+snapshots:
+  - schema_version: 1
+    resource_id: local-tool
+    observed_at: 2026-09-01T12:00:00Z
+    source: local-export
+    source_kind: adapter
+    mode: cached
+    confidence: observed
+    session: available
+    quota: limited
+    capacity:
+      unit: reviews
+      remaining: 12
+      limit: 100
+      project_limit: 12
+      resets_at: 2026-10-01T00:00:00Z
+      expires_at: 2026-09-02T00:00:00Z
+    valid_until: 2026-09-01T13:00:00Z
+```
+
+The collection is bounded to 500 unique snapshots. Each snapshot requires an exact declared
+`resource_id`, timezone-aware `observed_at`, bounded `source` label, `source_kind` (`manual`,
+`local-cache`, or `adapter`), `mode` (`live`, `cached`, `estimated`, or `manual`), and a
+`confidence` basis. It may contain only `session`, `quota`, and unit-scoped `capacity` evidence in
+addition to that metadata. Credential, account/provider ID, inventory identity, capability,
+rating, cost, policy, private-note, and other unknown fields are rejected. `live` and `cached` evidence
+requires `valid_until`; `valid_until`, `resets_at`, and `capacity.expires_at` cannot precede
+`observed_at`. Numeric capacity requires a non-unknown confidence basis and preserves the existing
+same-unit and quota consistency rules.
+
+Field-name rejection is not content scanning: allowed string values such as `source` are not
+inspected for secrets. Users must not put credentials or other sensitive values in any allowed
+resource-state field.
+
+At route time, AtReady applies the validated session, quota, and capacity values to a copied
+in-memory inventory for that route only. The source inventory remains unchanged; the overlay is not
+written to inventory, preferences, backups, or operation history. Unknown or duplicate resource IDs,
+state observed after the project `as_of` date or the route's explicit evaluation instant, state past
+a supplied `valid_until`, estimated state, unknown confidence, and stale manual state fail closed
+with an actionable error. The CLI captures the evaluation instant once in local time and preserves
+its fixed UTC offset in route evidence; API callers must provide an aware timestamp. AtReady uses
+the offset in that timestamp for every project-date, staleness, reset-date, and expiry-date
+projection. It does not infer a geographic timezone or future daylight-saving changes. Equivalent
+instants supplied with different offsets are therefore different complete route inputs. Source
+labels, timestamps, confidence, and expiry are evidence metadata, not provider verification, and a
+successful application carries a resource-state fingerprint and source labels in the route
+evidence. The fingerprint is an unsalted content-derived reproducibility identifier, not a
+confidentiality control; it can verify guesses about low-entropy routing-visible values. The
+value-free standalone validation receipt omits it.
+
+Capacity expiry is field-specific. If a snapshot remains valid but its capacity has expired, exact
+capacity demand receives a `capacity-expired` route gate rather than usable capacity. For otherwise
+tied eligible candidates with exact same-unit demand, the earliest future reset or expiry is a late
+tie-break only; it never overrides hard gates, capability fit, or the weighted score.
+
+`atready state validate PATH` validates only the schema of one explicitly named local file without
+reading an inventory, and emits a value-free receipt labeled `schema-only`. Routing separately checks
+the roster, evaluation time, mode, confidence, and project date. The route flag reads one bounded
+file per invocation; there is no default state path, discovery, network request, background refresh,
+credential access, or persistence.
+
 ## Inventory annotation declaration
 
 Root private-note onboarding uses one strict note-only envelope:
@@ -272,6 +342,8 @@ verification text, stop conditions, next owner, and optional support/alternate p
 The pure router returns:
 
 - a canonical hash-derived plan ID and inventory fingerprint;
+- an optional resource-state fingerprint, source labels, and affected resource IDs when a route-only
+  state overlay was applied;
 - a primary assignment or explicit capability gap for every workstream, plus structured unresolved
   constraints such as a required alternate that is unavailable;
 - candidate gates, score components, adjustments, and stable tie-break evidence;

@@ -47,6 +47,8 @@ The v0.1 boundary is:
   name or exact path and treats installation evidence as unconfirmed; optional version execution
   requires a second authorization and has unevaluated external side effects;
 - it does not inspect credential values;
+- an explicitly named adapter-neutral resource-state file may provide session, quota, and capacity
+  evidence for one route only; it is validated, overlaid in memory, and never persisted;
 - it does not invoke inventoried resources for project work or dispatch handoffs; and
 - generated handoffs and commands are advisory and display-only.
 
@@ -72,7 +74,7 @@ release deliberately changes the product boundary:
    fixture, log, or generated plan.
 5. Generated commands are never passed automatically to a shell or tool.
 6. CLI reads are limited to bounded answers entered after explicit TTY-only `atready add`, explicit
-   inventory/project/resource-declaration paths, explicit non-interactive resource stdin, the
+   inventory/project/resource-declaration/resource-state paths, explicit non-interactive resource stdin, the
    resolved default inventory path, one explicitly requested profile-allowlisted executable check,
    and the adjacent target-scoped backup namespace for explicit backup commands. The host skill may
    read only project-relevant files needed for the
@@ -105,6 +107,18 @@ release deliberately changes the product boundary:
     exact-scope. Optional version inspection requires a second authorization, is shell-free and
     time/output bounded, and reports the external program's network/write side effects as not
     evaluated. No observation becomes a persisted resource fact without user confirmation.
+16. Resource-state evidence is untrusted, provider-neutral input. It is limited to one bounded,
+    explicitly named file, exact resource IDs already in the selected inventory, and session/quota/
+    capacity fields with source, timestamp, confidence, and expiry metadata. Unknown or duplicate
+    IDs, credential/account ID fields, unknown fields, snapshots past a supplied `valid_until`, stale
+    manual or estimated state, unknown confidence, or state newer than the project date or route
+    evaluation instant fail closed. Expired
+    capacity remains an explicit exact-demand gate. The overlay changes only one in-memory route and
+    never grants authority, refreshes, contacts a provider, or persists state. Route fingerprints
+    are unsalted reproducibility identifiers over routing-visible facts, not confidentiality
+    controls; the value-free standalone validation receipt omits them. Field-name rejection is not
+    content scanning: allowed string values, including `source`, are not inspected for secrets.
+    Users must not put credentials or other sensitive values in any allowed resource-state field.
 
 The detailed permission and threat boundaries are documented in
 `docs/PERMISSIONS.md` and `docs/THREAT_MODEL.md`.
@@ -116,6 +130,9 @@ logging, packaging, dependencies, generated commands, permissions, or release
 automation require focused review. Features involving discovery, connectors,
 credential access, network requests, telemetry, or execution require a threat
 model and privacy review before implementation, not only before release.
+Resource-state schema, freshness, overlay precedence, and stale/expiry behavior
+also require focused review; they must not broaden the provider-neutral local
+boundary.
 
 ## User responsibilities
 
@@ -137,6 +154,10 @@ model and privacy review before implementation, not only before release.
 - Treat file/stdin declarations as argv-safe only: protect the source and its
   producer, review hidden notes in that source, and assume routing-visible preview
   output can be retained by the terminal, host, logs, or model context.
+- Treat route-only resource-state files as user-supplied evidence: review the exact
+  resource IDs and source/timestamp/confidence/expiry fields, and do not interpret
+  them as live provider, account, quota, or capacity truth. Field-name validation does not scan
+  allowed values for secrets; do not put sensitive values in `source` or other allowed fields.
 - Treat the revision privacy nonce as undisclosed blinding state, not a public salt
   or credential. Raw inventory/backup access reveals it; if it may have leaked,
   initialize a new inventory rather than editing or inventing a replacement.

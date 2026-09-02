@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "project-atready"
 version = "0.1.9"
-description = "Repeatable assignment planning for declared project resources"
+description = "Resource-fit evidence for plans using declared tools, credits, agents, and people"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "stoicpickle" }]

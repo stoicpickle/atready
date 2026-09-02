@@ -62,6 +62,12 @@ follow-up, hostile text, and exact deterministic summaries without storing a rea
 facts. Its offline scorer remains operator-attested: preparing or scoring a packet does not prove a
 fresh host was isolated or that the model behaved correctly.
 
+The [decision-change benchmark](decision_change/README.md) asks the product question behind those
+contracts: does roster context change a fresh host's proposed resource choices in a useful,
+understandable, actionable way? It pairs a baseline response with an exact AtReady route across five
+synthetic projects. Route fidelity is deterministic; usefulness and task isolation remain explicitly
+operator-attested and are not independent user-value proof.
+
 Routing invariants also have a bounded Hypothesis property and state-machine lane in
 `tests/test_routing_properties.py`. The optional [mutation-testing runbook](../docs/MUTATION_TESTING.md)
 describes a slower, manual routing audit. An interrupted mutation sample is evidence that the lane

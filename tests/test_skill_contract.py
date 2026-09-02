@@ -160,6 +160,10 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     normalized_contract = " ".join(complete_contract.split())
     _, frontmatter, body = text.split("---", 2)
     normalized_body = " ".join(body.split())
+    route_section = body.split("### 4. Route through the CLI", 1)[1].split(
+        "### 5. Explain and stop", 1
+    )[0]
+    normalized_route_section = " ".join(route_section.split())
     metadata = yaml.safe_load(frontmatter)
 
     assert metadata["name"] == "project-atready"
@@ -178,12 +182,22 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "do not run a separate project validation during the normal path" in normalized_body
     assert "--inventory /absolute/path/to/inventory.yaml" in body
     assert "for the default roster, omit `--inventory`" in normalized_body.lower()
+    assert (
+        "For an authorized demo roster, add `--allow-demo` to the explicit-path command. "
+        "Never use it for personal data or without that authorization." in normalized_route_section
+    )
+    assert "--resource-state /absolute/path/to/state.yaml" in route_section
+    assert "user-supplied absolute state path" in normalized_route_section
+    assert "Never discover/default it" in normalized_route_section
+    assert "provider, account, credential, or network access" in normalized_route_section
+    assert "Use it with a demo only when separately authorized" in normalized_route_section
     assert "route" in body
     assert "--project /absolute/path/to/project.yaml" in body
     assert body.count("--format agent-summary") >= 2
     assert "[output-contract.md](references/output-contract.md)" in body
     assert "## Planning workflow" in body
-    assert "Use AtReady for two jobs" in normalized_body
+    assert "AtReady handles intake and fit" in normalized_body
+    assert "Codex owns planning" in normalized_body
     assert "natural-language goal, loose plan, or existing brief" in normalized_body
     assert "A formal project file is not a prerequisite" in normalized_body
     assert "smallest useful ordered steps" in normalized_body
@@ -923,7 +937,7 @@ def test_openai_metadata_matches_skill_name() -> None:
     interface = metadata["interface"]
 
     assert interface["display_name"] == "AtReady"
-    assert interface["short_description"] == "Plan with what's at the ready"
+    assert interface["short_description"] == "Bring resource fit to the plan"
     assert len(interface["short_description"]) <= 30
     assert "$project-atready" not in interface["default_prompt"]
     assert "Use AtReady" in interface["default_prompt"]

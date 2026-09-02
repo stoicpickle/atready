@@ -31,8 +31,7 @@ def test_beta_start_here_is_the_short_tester_entrypoint() -> None:
     assert "`Plan a logging refactor.`" in private_beta
     assert (
         "`I have a rough plan for a logging refactor. Use AtReady before implementation "
-        "to shape the minimum useful workstreams and briefly consider my saved resources.`"
-        in private_beta
+        "to briefly show where my saved resources fit in that plan.`" in private_beta
     )
     assert "without demanding a user-authored formal brief" in private_beta
     assert "fail the quiet-output check" in private_beta
@@ -55,10 +54,11 @@ def test_beta_start_here_is_the_short_tester_entrypoint() -> None:
     ):
         assert helper_contract in text
     assert len(text.splitlines()) < 220
-    assert "small planning companion" in text
+    assert "small resource-fit companion" in text
     assert "before implementation begins" in folded
     assert "goal, rough plan, or written plan" in folded
-    assert "compactly shapes only the workstreams it needs" in folded
+    assert "matches your declared resources to planner-provided work" in folded
+    assert "Codex owns project planning" in folded
     assert "does not log in to, contact, or run saved resources for project work" in folded
     assert "Do not install over an existing AtReady CLI" in folded
     assert "clean-install beta lane" in folded
@@ -115,9 +115,9 @@ def test_beta_start_here_has_uncoached_value_and_recovery_prompts() -> None:
         "Show my AtReady resource roster and explain what is still unknown. "
         "Do not change anything.",
         "I have a loose plan for a small synthetic logging feature: add structured logs, tests, "
-        "and an independent review. Use AtReady before implementation to turn it into the "
-        "minimum useful workstreams and suggest where my saved resources fit. Keep the "
-        "resource recommendation brief and do not contact or run anything.",
+        "and an independent review. Use AtReady before implementation to show where my saved "
+        "resources fit across those steps. Keep the resource recommendation brief and do not "
+        "contact or run anything.",
         "Continue without checking my computer.",
         "Keep unknowns unknown and ask only for information that blocks the preview.",
         "Nothing should be saved yet. Tell me which authorization stage we are at.",

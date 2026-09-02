@@ -189,8 +189,30 @@ human summary of each assignment, result, check, and material gap.
 
 If a workstream includes an exact `capacity_demand`, AtReady compares its amount only with a
 resource capacity declared in the same unit. This is an advisory check against one saved snapshot,
-not a balance refresh or budget: AtReady does not convert units, reserve or subtract capacity,
-inspect providers, or spend anything.
+or against an optional, explicitly named route-only state file. A route-only state file overlays
+declared session, quota, and capacity values in memory for that one route; it does not change the
+saved inventory. This is not a balance refresh or budget: AtReady does not convert units, reserve or
+subtract capacity, inspect providers, or spend anything. State-file source labels, timestamps,
+confidence, and expiry are evidence about the supplied file, not provider verification.
+When otherwise tied eligible resources have exact same-unit demand and capacity, the sooner reset
+or expiry may break the tie. It never overrides safety, capability fit, or the weighted score.
+
+For a one-route state overlay, validate and pass one local file explicitly:
+
+```bash
+atready state validate resource-state.yaml
+atready route --project my-project.yaml --resource-state resource-state.yaml
+```
+
+The state file is adapter-neutral and read-only. AtReady rejects unknown or duplicate resource IDs,
+state observed after the project's `as_of` date or after the route's captured evaluation instant,
+any snapshot past a supplied `valid_until`, stale manual snapshots, estimated state, and unknown
+confidence. An expired capacity value becomes an
+explicit route gap when exact demand needs it; it never improves eligibility. AtReady does not
+discover resources, use the network, request credential or account fields, or persist the overlay.
+Allowed text is not scanned for secrets, so keep sensitive values out of every state field. See
+the [data model](https://github.com/stoicpickle/atready/blob/main/docs/DATA_MODEL.md) for the exact
+contract.
 
 Use the detailed Markdown view when you want scores, exclusions, every resource disposition, and
 the complete inert handoff notes:
@@ -217,7 +239,10 @@ instead when you want to compare two complete project briefs, or `--format json`
 evidence. A comparison does not choose constraints for you; it gives Codex and you a smaller set of
 consequences to review.
 
-The same project and inventory produce the same route. AtReady does not claim the route is globally
+Identical complete inputs produce the same route. With route-only state, determinism also requires
+the same captured evaluation instant and UTC offset. Both are preserved in the evidence and plan ID.
+The fixed offset anchors calendar-date checks to the route's local context without inferring a
+geographic timezone or future daylight-saving changes. AtReady does not claim the route is globally
 optimal or that it can out-plan Codex; it is a consistent, inspectable resource recommendation you
 can accept, edit, or ignore.
 
@@ -227,6 +252,7 @@ can accept, edit, or ignore.
 - It does not execute project work or send handoffs.
 - It does not log in to providers or store credentials.
 - It does not automatically inspect accounts, subscriptions, or billing.
+- It does not treat a route-only state file as live provider, account, quota, or capacity truth.
 - It does not silently change your inventory.
 - It does not treat a catalog suggestion as a verified fact about your setup.
 
@@ -310,7 +336,8 @@ atready inventory replace      Preview a concise full-resource replacement
 atready inventory remove       Preview a concise resource removal
 atready inventory backup       Inspect or restore backups; add --details for full evidence
 atready project template       Print a starter project brief
-atready route                  Match an existing project brief to your roster
+atready route                  Match an existing project brief to your roster; optionally overlay one local state file
+atready state validate         Validate one adapter-neutral local state file without reading inventory
 atready compare                Compare one changed constraint without writing anything
 atready help planning           Show the beginner resource-fit workflow
 atready help --all              Show every advanced command

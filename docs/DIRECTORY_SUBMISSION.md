@@ -17,9 +17,9 @@ time of submission because portal fields and review requirements can change.
 - Name: AtReady
 - Developer: stoicpickle
 - Category: Developer Tools
-- Summary: Bring AtReady a goal or rough plan before implementation. It shapes the minimum
-  useful workstreams, visibly fits a user-maintained resource roster to them, explains the result,
-  and produces reviewable handoff text.
+- Summary: Bring AtReady a goal or rough plan before implementation. It matches a user-maintained
+  resource roster to planner-provided work, exposes material constraints and gaps, explains the
+  advice, and produces reviewable handoff text. Codex retains ownership of the project plan.
 - Website: `https://github.com/stoicpickle/atready`
 - Support: `https://github.com/stoicpickle/atready/blob/main/SUPPORT.md`
 - Privacy: `https://github.com/stoicpickle/atready/blob/main/PRIVACY.md`
@@ -38,13 +38,15 @@ approval as release/legal copy before they are represented as final. The publish
 verified individual or business identity in the Platform that matches the public developer name,
 website, support process, privacy policy, and terms.
 
-Current external-state snapshot (2026-08-09): the GitHub repository is private, all four anonymous
-listing URLs above return `404`, and GitHub private vulnerability reporting is not enabled. These
-are launch blockers, not local test failures. Re-run the anonymous checks immediately before opening
-or submitting a portal draft; do not treat this dated observation as durable proof.
+Current external-state snapshot (2026-09-01): the GitHub repository is public, all four anonymous
+listing URLs above return `200` at their expected final URLs, and GitHub private vulnerability
+reporting is enabled. This is point-in-time evidence, not a durable launch claim. Re-run the
+anonymous checks and confirm vulnerability reporting immediately before opening or submitting a
+portal draft.
 
-The canonical manifest omits these currently invalid optional URLs. Enter them in the portal and
-restore them to product metadata only after the owner publishes stable anonymous pages. This probe
+The canonical manifest currently omits these optional URLs because the skills-only bundle does not
+require them. Enter the verified URLs in the portal and add them to product metadata only when the
+owner approves the exact public pages. This probe
 bundle targets only Codex surfaces with local runtime and filesystem access. Its canonical skill
 metadata uses the current documented `policy.products: [CODEX]` restriction and disables implicit
 invocation. An installed local validator may lag that official schema; record any disagreement as a
@@ -92,13 +94,13 @@ must not include executed project-resource handoffs.
 
 ### Positive cases
 
-1. **Planning pivot from a loose goal**
-   - Prompt: `I have a loose plan for the attached synthetic project. Use AtReady before implementation to shape the minimum useful workstreams and visibly suggest where the attached synthetic demo resources fit. Use inventory.yaml and project-godot.yaml, allow the demo inventory, and do not execute any project-resource handoff.`
+1. **Resource-fit pass for a loose plan**
+   - Prompt: `I have a loose plan for the attached synthetic project. Use AtReady before implementation to fit the attached synthetic demo resources to the provided workstreams and visibly explain constraints and gaps. Use inventory.yaml and project-godot.yaml, allow the demo inventory, and do not execute any project-resource handoff.`
    - Fixture: the complete `inventory.yaml` and `project-godot.yaml` payloads below.
    - Expected behavior: activate the AtReady skill without requiring a user-authored formal
-     brief, derive only the useful workstreams, validate its temporary project brief, invoke the
-     compatible local runtime with demo opt-in, and preserve the returned ordered assignments.
-   - Expected result shape: the project plan first, one compact `Resource fit` section, material
+     brief, preserve the planner-provided workstreams, validate its temporary project brief, invoke
+     the compatible local runtime with demo opt-in, and preserve the returned ordered assignments.
+   - Expected result shape: one compact `Resource fit` section tied to the provided plan, material
      warnings/gaps, and an authorization-boundary statement. Full traces and inert handoff packets
      remain available on request rather than becoming the main response.
 2. **Explain a route without changing it**
@@ -545,8 +547,9 @@ workstreams:
 
 ## Future release-notes draft (not for the probe)
 
-> Initial skills-only submission of AtReady plugin 0.1.10. For a fixed normalized project brief and
-> inventory snapshot, its capability router deterministically assigns ordered workstreams. It uses
+> Initial skills-only submission of AtReady plugin 0.1.11. For a fixed normalized project brief and
+> inventory snapshot, its capability router deterministically matches declared resources to
+> planner-provided workstreams. It uses
 > a user-maintained local inventory and a compatible local
 > runtime that performs no AtReady-authored provider API or connector calls,
 > broad/automatic discovery, or telemetry. The public plugin workflow does not locate or execute
@@ -598,7 +601,7 @@ Also open the four links in a signed-out browser and check the rendered text, no
 The current candidate may complete the local preparation items and a reversible portal draft probe
 only. Submission and publication items remain deliberately blocked for this nonrelease artifact.
 
-- [ ] Confirm the exact source commit and `0.1.10` plugin bundle; record the independently installed
+- [ ] Confirm the exact source commit and `0.1.11` plugin bundle; record the independently installed
       runtime version and prove its contract-and-feature handshake. Retain the available artifact
       hashes/attestations for each channel without implying their product versions must match.
 - [ ] Run the plugin/skill validators, exact-asset contract, staged-plugin smoke, clean first-user
@@ -607,10 +610,10 @@ only. Submission and publication items remain deliberately blocked for this nonr
       approve the synthetic screenshots only as private-beta/marketing artwork.
 - [ ] Owner approves the listing copy, support process, `PRIVACY.md`, and `TERMS.md`; obtain legal
       review if the owner requires it. Do not treat automated technical review as legal approval.
-- [ ] Make website, support, privacy, and terms URLs anonymously reachable and run the signed-out
-      preflight above.
-- [ ] Enable a stable private vulnerability-reporting path or approve the documented security-contact
-      fallback before public launch.
+- [x] Website, support, privacy, and terms URLs were anonymously reachable on 2026-09-01. Repeat the
+      signed-out preflight immediately before submission.
+- [x] GitHub private vulnerability reporting was enabled on 2026-09-01. Reconfirm it immediately
+      before submission and retain the documented security-contact fallback.
 - [ ] In the publishing organization, grant the submitter Apps Management **Write** and select a
       verified developer/business identity that matches the public publisher identity.
 - [ ] Owner chooses the countries/regions where product, support, and legal terms are ready.
@@ -654,7 +657,7 @@ the plugin version plus ZIP SHA-256:
 
 ```bash
 python3 scripts/build_plugin_submission.py \
-  --output dist/atready-plugin-0.1.10.zip
+  --output dist/atready-plugin-0.1.11.zip
 ```
 
 Run the repository's current-policy plugin validator, OpenAI's skill validator, and

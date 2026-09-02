@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 import runpy
+import sys
 from pathlib import Path
 
 import pytest
@@ -78,11 +79,19 @@ def test_current_products_field_can_bridge_one_legacy_validator_error(tmp_path: 
 def test_production_validator_digest_is_bound_to_an_immutable_official_artifact() -> None:
     assert VALIDATOR_NAMESPACE["OFFICIAL_REFERENCE"] == (
         "https://raw.githubusercontent.com/openai/codex/"
-        "d32cb2c6aca2626d1b1d05c4537a5b6c2eec20f2/"
+        "5ee6baee2fcc0b6ffd413d9611f5538dad40d0f2/"
         "codex-rs/skills/src/assets/samples/plugin-creator/scripts/validate_plugin.py"
     )
     assert VALIDATOR_NAMESPACE["TRUSTED_UPSTREAM_VALIDATOR_SHA256"] == (
-        "a4712ddc7c02211edf009b4ef22728f2e4c47650b9ff5696b6b36596dc29fa4a"
+        "6ff4bc1cc8ca94827c30c8299951efdac900ff38a5069c03e9a6554fc194a723"
+    )
+    assert VALIDATOR_NAMESPACE["OFFICIAL_IDENTIFIER_REFERENCE"] == (
+        "https://raw.githubusercontent.com/openai/codex/"
+        "5ee6baee2fcc0b6ffd413d9611f5538dad40d0f2/"
+        "codex-rs/skills/src/assets/samples/plugin-creator/scripts/identifier_validation.py"
+    )
+    assert VALIDATOR_NAMESPACE["TRUSTED_IDENTIFIER_VALIDATION_SHA256"] == (
+        "a6d51ce4a9a7e8f85626ff5808a467a67574e7f8cdf1167ffb467c5f67e57223"
     )
 
 
@@ -159,6 +168,173 @@ def test_unreviewed_upstream_validator_is_rejected_before_execution(tmp_path: Pa
 
     assert errors == ["OpenAI plugin validator does not match the repository's reviewed SHA-256"]
     assert not marker.exists()
+
+
+def test_symlinked_upstream_validator_is_rejected_before_resolution(tmp_path: Path) -> None:
+    plugin = _write_candidate(tmp_path, ["CODEX"])
+    system_skills = _write_upstream_source(
+        tmp_path,
+        "def validate_plugin(plugin_root):\n    return []\n",
+    )
+    scripts = system_skills / "plugin-creator" / "scripts"
+    upstream = scripts / "validate_plugin.py"
+    reviewed = scripts / "reviewed-validator.py"
+    reviewed.write_bytes(upstream.read_bytes())
+    upstream.unlink()
+    upstream.symlink_to(reviewed)
+
+    errors = validate(
+        plugin,
+        system_skills,
+        trusted_upstream_sha256=hashlib.sha256(reviewed.read_bytes()).hexdigest(),
+    )
+
+    assert errors == [f"OpenAI plugin validator not found at {upstream}"]
+
+
+def test_unreviewed_upstream_dependency_is_rejected_before_execution(tmp_path: Path) -> None:
+    plugin = _write_candidate(tmp_path, ["CODEX"])
+    marker = tmp_path / "dependency-marker"
+    source = (
+        "from identifier_validation import validate_plugin_identifier\n"
+        "def validate_plugin(plugin_root):\n"
+        "    validate_plugin_identifier('atready')\n"
+        "    return []\n"
+    )
+    system_skills = _write_upstream_source(tmp_path, source)
+    dependency = system_skills / "plugin-creator" / "scripts" / "identifier_validation.py"
+    dependency.write_text(
+        "from pathlib import Path\n"
+        f"Path({str(marker)!r}).write_text('executed', encoding='utf-8')\n"
+        "def validate_plugin_identifier(value):\n"
+        "    return None\n",
+        encoding="utf-8",
+    )
+    upstream = system_skills / "plugin-creator" / "scripts" / "validate_plugin.py"
+
+    errors = validate(
+        plugin,
+        system_skills,
+        trusted_upstream_sha256=hashlib.sha256(upstream.read_bytes()).hexdigest(),
+        trusted_identifier_sha256="0" * 64,
+    )
+
+    assert errors == [
+        "OpenAI plugin validator identifier dependency does not match the repository's reviewed "
+        "SHA-256"
+    ]
+    assert not marker.exists()
+
+
+def test_symlinked_upstream_dependency_is_rejected_before_resolution(tmp_path: Path) -> None:
+    plugin = _write_candidate(tmp_path, ["CODEX"])
+    source = (
+        "from identifier_validation import validate_plugin_identifier\n"
+        "def validate_plugin(plugin_root):\n"
+        "    validate_plugin_identifier('atready')\n"
+        "    return []\n"
+    )
+    system_skills = _write_upstream_source(tmp_path, source)
+    scripts = system_skills / "plugin-creator" / "scripts"
+    dependency = scripts / "identifier_validation.py"
+    reviewed = scripts / "reviewed-identifier.py"
+    reviewed.write_text(
+        "def validate_plugin_identifier(value):\n    return None\n",
+        encoding="utf-8",
+    )
+    dependency.symlink_to(reviewed)
+    upstream = scripts / "validate_plugin.py"
+
+    errors = validate(
+        plugin,
+        system_skills,
+        trusted_upstream_sha256=hashlib.sha256(upstream.read_bytes()).hexdigest(),
+        trusted_identifier_sha256=hashlib.sha256(reviewed.read_bytes()).hexdigest(),
+    )
+
+    assert errors == [f"OpenAI plugin validator identifier dependency not found at {dependency}"]
+
+
+def test_reviewed_upstream_dependency_is_loaded_from_verified_bytes(tmp_path: Path) -> None:
+    plugin = _write_candidate(tmp_path, ["CODEX"])
+    source = (
+        "from identifier_validation import validate_plugin_identifier\n"
+        "def validate_plugin(plugin_root):\n"
+        "    validate_plugin_identifier('atready')\n"
+        "    return []\n"
+    )
+    system_skills = _write_upstream_source(tmp_path, source)
+    dependency = system_skills / "plugin-creator" / "scripts" / "identifier_validation.py"
+    dependency.write_text(
+        "def validate_plugin_identifier(value):\n"
+        "    if value != 'atready':\n"
+        "        raise ValueError('unexpected')\n",
+        encoding="utf-8",
+    )
+    upstream = system_skills / "plugin-creator" / "scripts" / "validate_plugin.py"
+
+    errors = validate(
+        plugin,
+        system_skills,
+        trusted_upstream_sha256=hashlib.sha256(upstream.read_bytes()).hexdigest(),
+        trusted_identifier_sha256=hashlib.sha256(dependency.read_bytes()).hexdigest(),
+    )
+
+    assert errors == []
+
+
+def test_validator_sys_path_is_restored_when_helper_execution_raises(
+    tmp_path: Path,
+) -> None:
+    plugin = _write_candidate(tmp_path, ["CODEX"])
+    source = (
+        "from identifier_validation import validate_plugin_identifier\n"
+        "def validate_plugin(plugin_root):\n"
+        "    validate_plugin_identifier('atready')\n"
+        "    return []\n"
+    )
+    system_skills = _write_upstream_source(tmp_path, source)
+    dependency = system_skills / "plugin-creator" / "scripts" / "identifier_validation.py"
+    dependency.write_text(
+        "import sys\nsys.path.insert(0, 'helper-leak')\nraise RuntimeError('helper failed')\n",
+        encoding="utf-8",
+    )
+    upstream = system_skills / "plugin-creator" / "scripts" / "validate_plugin.py"
+    before = list(sys.path)
+
+    with pytest.raises(RuntimeError, match="helper failed"):
+        validate(
+            plugin,
+            system_skills,
+            trusted_upstream_sha256=hashlib.sha256(upstream.read_bytes()).hexdigest(),
+            trusted_identifier_sha256=hashlib.sha256(dependency.read_bytes()).hexdigest(),
+        )
+
+    assert sys.path == before
+
+
+def test_validator_sys_path_is_restored_when_validator_execution_raises(
+    tmp_path: Path,
+) -> None:
+    plugin = _write_candidate(tmp_path, ["CODEX"])
+    system_skills = _write_upstream_source(
+        tmp_path,
+        "import sys\n"
+        "def validate_plugin(plugin_root):\n"
+        "    sys.path.append('validator-leak')\n"
+        "    raise RuntimeError('validator failed')\n",
+    )
+    upstream = system_skills / "plugin-creator" / "scripts" / "validate_plugin.py"
+    before = list(sys.path)
+
+    with pytest.raises(RuntimeError, match="validator failed"):
+        validate(
+            plugin,
+            system_skills,
+            trusted_upstream_sha256=hashlib.sha256(upstream.read_bytes()).hexdigest(),
+        )
+
+    assert sys.path == before
 
 
 def test_upstream_validator_that_changes_its_file_is_rejected(tmp_path: Path) -> None:

@@ -19,6 +19,7 @@ SUPPORTED_RUNTIME_FEATURE_IDS = (
     "routing.compare.v1",
     "routing.plan-only.v1",
     "routing.presentation-bundle.v1",
+    "routing.resource-state.v1",
     "schema.declarations.v1",
 )
 

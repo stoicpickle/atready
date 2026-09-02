@@ -433,7 +433,7 @@ def test_help_is_progressive_and_complete_help_remains_available(capsys) -> None
     assert "Get started:" in beginner
     assert "plan      Check resource fit" in beginner
     assert "Advanced command names:" in beginner
-    assert "doctor  runtime  config  resource  skill  schema" in beginner
+    assert "doctor  runtime  config  resource  state  skill  schema" in beginner
     assert "demo      Run a complete synthetic resource fit example" in beginner
 
     headings = {"Get started:", "Manage:", "More:", "Advanced command names:"}

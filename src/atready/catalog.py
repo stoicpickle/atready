@@ -165,6 +165,8 @@ def _inventory_warnings(inventory: Inventory, *, today: date | None = None) -> l
                 warnings.append(
                     f"{prefix} exact capacity reset date has passed; re-check the balance"
                 )
+            if capacity.expires_on is not None and current_date > capacity.expires_on:
+                warnings.append(f"{prefix} exact capacity has expired; re-check the balance")
         if resource.provenance.basis is ConfidenceBasis.UNKNOWN:
             warnings.append(f"{prefix} has unknown confidence basis")
         if resource.provenance.last_verified is None:

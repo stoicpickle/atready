@@ -6,7 +6,7 @@ import { DocumentKicker, SiteShell } from "../_components/site-shell";
 export const metadata: Metadata = {
   title: "Product",
   description:
-    "Meet AtReady, a local-first planning companion for fitting user-declared resources to project work.",
+    "Meet AtReady, a local-first resource-fit companion that brings user-declared resources into Codex plans.",
 };
 
 const routeSteps = [
@@ -19,8 +19,8 @@ const routeSteps = [
   {
     number: "02",
     label: "Bring a rough plan",
-    title: "Shape the work",
-    copy: "AtReady identifies the minimum useful workstreams and checks the constraints that matter before implementation begins.",
+    title: "Add resource context",
+    copy: "AtReady matches declared resources to planner-provided work and checks the constraints that matter before implementation begins.",
   },
   {
     number: "03",
@@ -37,12 +37,12 @@ export default function AtReadyPage() {
         <DocumentKicker code="product document 01" />
         <section className="hero">
           <div>
-            <p className="eyebrow">Planning pivot / before implementation</p>
+            <p className="eyebrow">Resource fit / before implementation</p>
             <h1>
               Bring a plan. <em>See your resource fit.</em>
             </h1>
             <p className="hero-copy">
-              AtReady is a small planning companion for Codex. It considers the resources
+              AtReady is a small resource-fit companion for Codex. It considers the resources
               you chose to declare, suggests where they fit, explains why, and prepares handoff
               text for review without contacting or running those resources.
             </p>
@@ -89,8 +89,8 @@ export default function AtReadyPage() {
             <div>
               <h2>A little structure at the useful moment</h2>
               <p>
-                AtReady is not the project manager and not the implementation agent. Its
-                narrow job is to make a plan resource-aware before work begins.
+                AtReady is not the project manager and not the implementation agent. Codex owns
+                the plan; AtReady adds inspectable resource context before work begins.
               </p>
             </div>
           </div>
@@ -112,7 +112,7 @@ export default function AtReadyPage() {
           <div className="section-head">
             <p className="eyebrow">Clear boundaries</p>
             <div>
-              <h2>Planning help, not hidden automation</h2>
+              <h2>Resource-fit advice, not hidden automation</h2>
               <p>
                 The current product boundary keeps recommendation, authorization, credential
                 access, and execution as separate states.
@@ -164,13 +164,13 @@ export default function AtReadyPage() {
           <figure className="artifact-frame">
             <Image
               src="/brand/route-overview.png"
-              alt="Synthetic AtReady route document showing three ordered workstreams and no authorized execution"
+              alt="Synthetic AtReady resource-fit document showing three planner-provided workstreams and no authorized execution"
               width={1440}
               height={900}
             />
             <figcaption>
               <span>Route document / synthetic example</span>
-              <span>Planning output only</span>
+              <span>Resource-fit output only</span>
             </figcaption>
           </figure>
         </section>

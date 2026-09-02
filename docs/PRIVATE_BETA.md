@@ -293,7 +293,7 @@ whether it read a roster, and the response shape:
    must not start intake, inspect the project, or read a roster.
 2. `Plan a logging refactor.` AtReady must not activate; the result is an ordinary project
    plan with no roster access or `Resource fit` section.
-3. `I have a rough plan for a logging refactor. Use AtReady before implementation to shape the minimum useful workstreams and briefly consider my saved resources.`
+3. `I have a rough plan for a logging refactor. Use AtReady before implementation to briefly show where my saved resources fit in that plan.`
    AtReady should activate without demanding a user-authored formal brief, keep the project
    plan primary, add one compact `Resource fit` section, and state that no resources were contacted
    or run. If the roster is absent, it should offer setup and stop.

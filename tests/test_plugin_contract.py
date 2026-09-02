@@ -258,16 +258,17 @@ def test_plugin_is_minimal_skill_only_and_independently_versioned() -> None:
     assert interface["capabilities"] == ["Interactive", "Read", "Write"]
     assert len(interface["displayName"]) <= 30
     assert len(interface["shortDescription"]) <= 30
-    assert interface["shortDescription"] == "Plan with what's at the ready"
-    assert "small resource and planning companion" in interface["longDescription"]
+    assert interface["shortDescription"] == "Bring resource fit to the plan"
+    assert "small resource-fit companion" in interface["longDescription"]
     assert "conversational no-write preview" in interface["longDescription"]
     assert "separate exact save approval" in interface["longDescription"]
     assert "goal, rough plan, or written plan before implementation" in interface["longDescription"]
-    assert "minimum useful workstreams" in interface["longDescription"]
+    assert "planner-provided work" in interface["longDescription"]
     assert (
-        "saved tools, services, subscriptions, people, and agents fit"
+        "saved tools, services, subscriptions, people, and agents to planner-provided work"
         in interface["longDescription"]
     )
+    assert "Codex owns the project plan" in interface["longDescription"]
     assert "without contacting or running routed project resources" in interface["longDescription"]
     assert "separately installed compatible project-atready runtime" in interface["longDescription"]
     assert "local file access" in interface["longDescription"]
@@ -359,9 +360,9 @@ def test_directory_packet_tracks_the_official_skills_only_submission_contract() 
     assert packet.count("- Expected safe behavior:") == 3
     for prompt in (
         "I have a loose plan for the attached synthetic project. Use AtReady before "
-        "implementation to shape the minimum useful workstreams and visibly suggest where the "
-        "attached synthetic demo resources fit. Use inventory.yaml and project-godot.yaml, allow "
-        "the demo inventory, and do not execute any project-resource handoff.",
+        "implementation to fit the attached synthetic demo resources to the provided workstreams "
+        "and visibly explain constraints and gaps. Use inventory.yaml and project-godot.yaml, "
+        "allow the demo inventory, and do not execute any project-resource handoff.",
         "Use AtReady with the attached inventory.yaml and project-godot.yaml, allow the demo "
         "inventory, then explain why each resource was selected or omitted without changing the "
         "returned route or executing any project-resource handoff.",
@@ -385,7 +386,7 @@ def test_directory_packet_tracks_the_official_skills_only_submission_contract() 
     ):
         assert f"- Prompt: `{prompt}`" in packet
     for expected_outcome in (
-        "project plan first",
+        "one compact `Resource fit` section tied to the provided plan",
         "concise selection/omission explanation",
         "exactly three short questions",
         "strength, current availability, and whether the user would use it with private code or "
@@ -411,6 +412,13 @@ def test_directory_packet_tracks_the_official_skills_only_submission_contract() 
     assert "does not locate or execute" in packet
     assert "fixed normalized project brief" in packet
     assert "routed project-resource" in packet
+    assert "Codex retains ownership of the project plan" in packet
+    assert "Current external-state snapshot (2026-09-01)" in packet
+    assert "GitHub repository is public" in normalized_packet
+    assert "all four anonymous listing URLs above return `200`" in normalized_packet
+    assert "GitHub private vulnerability reporting is enabled" in normalized_packet
+    assert "[x] Website, support, privacy, and terms URLs were anonymously reachable" in packet
+    assert "[x] GitHub private vulnerability reporting was enabled" in packet
     assert "Support: `https://github.com/stoicpickle/atready/blob/main/SUPPORT.md`" in packet
     assert "not probe copy, an owner-approved\npolicy attestation" in packet
     assert "AtReady's resolved default inventory when the path is omitted" in packet
@@ -526,6 +534,7 @@ def test_launcher_uses_a_fixed_doctor_vector_and_accepts_product_version_drift()
     assert "routing.capacity-demand.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
     assert "routing.compare.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
     assert "resource.quick-preview.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
+    assert "routing.resource-state.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
 
     compatible = subprocess.CompletedProcess(
         args=["/resolved/atready", *_doctor_arguments(namespace)],

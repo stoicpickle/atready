@@ -686,8 +686,8 @@ def test_distribution_uses_current_source_bound_release_and_submission_channels(
     assert "Apps Management write permission" in text
     assert "explicitly authorize the external submission" in prose
     for distribution_boundary in (
-        "AtReady is a CLI-first open-source product",
-        "reviewed public source beta -> optional PyPI package",
+        "AtReady is an open-source resource-fit companion for Codex",
+        "private development -> reviewed public source beta -> optional PyPI package",
         "received its first clean source snapshot and was anonymously verified as public",
         "runtime contract version `1`",
         "product-version equality is no longer the compatibility boundary",

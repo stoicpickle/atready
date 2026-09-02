@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 from math import isfinite
 from typing import Annotated, Literal
@@ -15,9 +15,11 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    SerializerFunctionWrapHandler,
     StringConstraints,
     WithJsonSchema,
     field_validator,
+    model_serializer,
     model_validator,
 )
 
@@ -229,6 +231,7 @@ class Capacity(StrictModel):
     limit: CapacityNumber | None = None
     project_limit: CapacityNumber | None = None
     resets_on: date | None = None
+    expires_on: date | None = None
     basis: ConfidenceBasis
     last_verified: date
 
@@ -249,6 +252,8 @@ class Capacity(StrictModel):
             raise ValueError("capacity last_verified cannot be in the future")
         if self.resets_on is not None and self.resets_on < self.last_verified:
             raise ValueError("capacity resets_on cannot be earlier than last_verified")
+        if self.expires_on is not None and self.expires_on < self.last_verified:
+            raise ValueError("capacity expires_on cannot be earlier than last_verified")
         if self.limit is not None and self.limit == 0:
             raise ValueError("capacity limit must be greater than zero")
         if self.limit is not None and self.remaining > self.limit:
@@ -256,6 +261,13 @@ class Capacity(StrictModel):
         if self.project_limit is not None and self.project_limit > self.remaining:
             raise ValueError("capacity project_limit cannot exceed remaining")
         return self
+
+    @model_serializer(mode="wrap")
+    def omit_absent_expiry(self, handler: SerializerFunctionWrapHandler) -> dict[str, object]:
+        value = handler(self)
+        if self.expires_on is None:
+            value.pop("expires_on", None)
+        return value
 
 
 class CapacityDemand(StrictModel):
@@ -579,9 +591,23 @@ class CandidateEvaluation(StrictModel):
     base_score_bp: int | None = None
     adjustments: list[ScoreAdjustment] = Field(default_factory=list)
     adjusted_score_bp: int | None = None
+    capacity_pressure_days: int | None = Field(
+        default=None,
+        ge=0,
+        le=36_600,
+    )
     combined_fit_bp: int | None = None
     fit_gain_bp: int | None = None
     covered_capability_gaps: list[Slug] = Field(default_factory=list)
+
+    @model_serializer(mode="wrap")
+    def omit_absent_capacity_pressure(
+        self, handler: SerializerFunctionWrapHandler
+    ) -> dict[str, object]:
+        value = handler(self)
+        if self.capacity_pressure_days is None:
+            value.pop("capacity_pressure_days", None)
+        return value
 
 
 class ResourceSelection(StrictModel):
@@ -755,6 +781,10 @@ class RoutePlan(StrictModel):
     project_name: str
     as_of: date
     inventory_fingerprint: str
+    resource_state_fingerprint: str | None = None
+    resource_state_evaluated_at: datetime | None = None
+    resource_state_sources: list[Slug] = Field(default_factory=list)
+    resource_state_resources: list[Slug] = Field(default_factory=list)
     assignments: list[RouteAssignment]
     dispositions: list[ResourceDisposition]
     warnings: list[str] = Field(default_factory=list)
@@ -767,4 +797,37 @@ class RoutePlan(StrictModel):
         workstream_ids = [item.workstream_id for item in self.assignments]
         if len(workstream_ids) != len(set(workstream_ids)):
             raise ValueError("each workstream must have exactly one assignment")
+        if len(self.resource_state_sources) != len(set(self.resource_state_sources)):
+            raise ValueError("resource_state_sources must not contain duplicates")
+        if len(self.resource_state_resources) != len(set(self.resource_state_resources)):
+            raise ValueError("resource_state_resources must not contain duplicates")
+        if self.resource_state_evaluated_at is not None and (
+            self.resource_state_evaluated_at.tzinfo is None
+            or self.resource_state_evaluated_at.utcoffset() is None
+        ):
+            raise ValueError("resource_state_evaluated_at must be timezone-aware")
+        if self.resource_state_fingerprint is None and (
+            self.resource_state_evaluated_at is not None
+            or self.resource_state_sources
+            or self.resource_state_resources
+        ):
+            raise ValueError("resource state metadata requires resource_state_fingerprint")
+        if self.resource_state_fingerprint is not None and self.resource_state_evaluated_at is None:
+            raise ValueError("resource state metadata requires resource_state_evaluated_at")
+        if self.resource_state_fingerprint is not None and (
+            not self.resource_state_sources or not self.resource_state_resources
+        ):
+            raise ValueError("resource state metadata requires sources and affected resources")
         return self
+
+    @model_serializer(mode="wrap")
+    def omit_absent_resource_state(
+        self, handler: SerializerFunctionWrapHandler
+    ) -> dict[str, object]:
+        value = handler(self)
+        if self.resource_state_fingerprint is None:
+            value.pop("resource_state_fingerprint", None)
+            value.pop("resource_state_evaluated_at", None)
+            value.pop("resource_state_sources", None)
+            value.pop("resource_state_resources", None)
+        return value
