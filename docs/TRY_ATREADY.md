@@ -85,7 +85,8 @@ and answer these five questions:
 2. What plan did you bring, and what resource fit did AtReady suggest?
 3. Where did you slow down or feel unsure?
 4. How easy was the resource recommendation to understand?
-5. Did it change how you would use your resources, and what one improvement would help most?
+5. Would you use AtReady again? Tell us whether the recommendation changed or clarified how you
+   would use your resources, and what one improvement would help most.
 
 Please describe rather than paste sensitive material. Do not attach your inventory, terminal
 history, credentials, private notes, local file paths, account details, or a proprietary plan.

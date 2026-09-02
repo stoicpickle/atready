@@ -37,7 +37,7 @@ def test_first_use_form_collects_five_answers_and_requires_privacy_check() -> No
         "progress",
         "goal_and_result",
         "friction",
-        "plan_clarity",
+        "recommendation_clarity",
         "impact_and_improvement",
     ]
     assert fields["privacy_check"]["attributes"]["options"][0]["required"] is True
@@ -47,9 +47,15 @@ def test_first_use_form_collects_five_answers_and_requires_privacy_check() -> No
             "progress",
             "goal_and_result",
             "friction",
-            "plan_clarity",
+            "recommendation_clarity",
             "impact_and_improvement",
         )
+    )
+    assert (
+        "resource recommendation" in fields["recommendation_clarity"]["attributes"]["label"].lower()
+    )
+    assert fields["impact_and_improvement"]["attributes"]["label"] == (
+        "5. Would you use AtReady again?"
     )
 
 
