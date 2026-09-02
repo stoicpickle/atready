@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "project-atready"
-version = "0.1.9"
+version = "0.1.10"
 description = "Resource-fit evidence for plans using declared tools, credits, agents, and people"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -48,6 +48,7 @@ dev = [
   "pillow==12.3.0",
   "pytest>=8.3,<10",
   "pytest-cov>=6,<8",
+  "pytest-timeout>=2.4,<3",
   "ruff>=0.9,<1",
 ]
 elevated = [
@@ -75,6 +76,7 @@ include = [
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers"
 testpaths = ["tests"]
+timeout = 30
 
 [tool.mutmut]
 source_paths = ["src/atready/"]

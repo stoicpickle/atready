@@ -86,6 +86,9 @@ def test_public_copy_positions_atready_as_codex_resource_context() -> None:
     assert "AtReady contributes resource context" in readme
     assert "The Codex skill is the intended conversational experience." in readme
     assert "The CLI is its local engine and a\nstandalone fallback" in readme
+    assert readme.index("## Use AtReady with Codex") < readme.index(
+        "## Reusable and scripted workflows"
+    )
     assert "AtReady is a small, local-first planning tool" not in readme
     assert "The CLI is the product" not in readme
     assert "It does not create the complete project plan." in guide

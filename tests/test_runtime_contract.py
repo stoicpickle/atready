@@ -95,6 +95,9 @@ def test_runtime_contract_is_deterministic_value_free_and_side_effect_free(capsy
     assert "routing.capacity-demand.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
     assert "routing.compare.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
     assert "resource.quick-preview.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
+    assert "resource.quick-setup-json-line.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
+    assert "routing.project-stdin.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
+    assert "routing.project-json-line.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
     assert "routing.resource-state.v1" in SUPPORTED_RUNTIME_FEATURE_IDS
 
     assert main(["runtime", "contract", "--json"]) == 0

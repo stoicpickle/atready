@@ -48,13 +48,16 @@ def test_elevated_install_matrix_passes_inside_a_disposable_root(tmp_path: Path)
     assert receipt["duplicate_probe"]["content_mismatch"] is True
     assert not list(tmp_path.rglob("private-state-must-not-exist"))
 
-    payload = _namespace()["_runtime_payload"](plugin_version="0.1.11")
-    assert payload["plugin_version"] == "0.1.11"
+    payload = _namespace()["_runtime_payload"](plugin_version="0.1.12")
+    assert payload["plugin_version"] == "0.1.12"
     assert "routing.presentation-bundle.v1" in payload["runtime_features"]
     assert "routing.agent-summary.v1" in payload["runtime_features"]
     assert "routing.capacity-demand.v1" in payload["runtime_features"]
     assert "routing.compare.v1" in payload["runtime_features"]
+    assert "routing.project-stdin.v1" in payload["runtime_features"]
+    assert "routing.project-json-line.v1" in payload["runtime_features"]
     assert "resource.quick-preview.v1" in payload["runtime_features"]
+    assert "resource.quick-setup-json-line.v1" in payload["runtime_features"]
 
 
 def test_skill_precedence_probe_distinguishes_missing_incomplete_and_matching_duplicates(

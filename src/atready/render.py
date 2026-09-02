@@ -151,7 +151,7 @@ def _selected_unverified_warning(warning: str) -> tuple[str, str, str, list[str]
 
 def _plain_warning(warning: str) -> str:
     if warning.startswith("[demo-inventory]"):
-        return "This uses a demo inventory. Its contents are not verified as resources you can use."
+        return "This uses an unverified demo inventory."
     if warning.startswith("[resource-state]"):
         return warning.removeprefix("[resource-state] ").capitalize() + "."
     unverified = _selected_unverified_warning(warning)
@@ -173,6 +173,37 @@ def _plain_warning(warning: str) -> str:
 
 def _primary_handoff(assignment: RouteAssignment):
     return next((handoff for handoff in assignment.handoffs if handoff.role == "primary"), None)
+
+
+_MATERIAL_PRIMARY_GATE_REASONS = (
+    ("quota-exhausted", "has no declared quota remaining"),
+    ("data-class-disallowed", "is blocked by the project's data-class rule"),
+)
+
+
+def _primary_gate_context(
+    assignment: RouteAssignment, selected_resource_ids: set[str]
+) -> str | None:
+    """Return one plain, route-proven gate affecting an unselected option.
+
+    This is context about eligibility, not a claim that the gate changed the selected resource's
+    ranking. Only a candidate with exactly one hard gate can supply the compact explanation.
+    """
+
+    for gate, explanation in _MATERIAL_PRIMARY_GATE_REASONS:
+        excluded = sorted(
+            (
+                candidate
+                for candidate in assignment.candidates
+                if candidate.resource_id not in selected_resource_ids
+                and not candidate.eligible_for_role
+                and candidate.gate_codes == [gate]
+            ),
+            key=lambda candidate: (candidate.resource_id, candidate.resource_name),
+        )
+        if excluded:
+            return f"{excluded[0].resource_name} {explanation}."
+    return None
 
 
 def _next_action(plan: RoutePlan, *, has_gaps: bool) -> str:
@@ -560,6 +591,8 @@ def _render_complete_agent_summary(
             if selection.resource_id not in resource_order:
                 resource_order.append(selection.resource_id)
 
+    selected_resource_ids = set(resource_order)
+
     generic_primary_reason = "Best eligible match after applying the project constraints."
     generic_primary_resources: set[str] = set()
     for resource_id, assignments in primary_groups.items():
@@ -577,6 +610,12 @@ def _render_complete_agent_summary(
             and _plain_selection_reason(selection.reason) == generic_primary_reason
         ):
             generic_primary_resources.add(resource_id)
+
+    gate_contexts: list[str] = []
+    for assignment in plan.assignments:
+        context = _primary_gate_context(assignment, selected_resource_ids)
+        if context is not None and context not in gate_contexts:
+            gate_contexts.append(context)
 
     for resource_id in resource_order:
         name = resource_names[resource_id]
@@ -604,7 +643,10 @@ def _render_complete_agent_summary(
                     "Best eligible match after project constraints; continuity kept related "
                     "steps together."
                 )
-            if resource_id not in generic_primary_resources or len(generic_primary_resources) == 1:
+            if resource_id not in generic_primary_resources or (
+                len(generic_primary_resources) == 1
+                and not any(assignment.support for assignment in primary_assignments)
+            ):
                 clauses.append(f"Why: {reason.rstrip('.')}")
         if support_assignments:
             steps = ", ".join(
@@ -635,10 +677,22 @@ def _render_complete_agent_summary(
         _append_wrapped(lines, text, width=width)
 
     if len(generic_primary_resources) > 1:
+        subject = (
+            "Each primary above"
+            if len(generic_primary_resources) == len(primary_groups)
+            else "Each other primary above"
+        )
         _append_wrapped(
             lines,
-            "Why: Each primary above is the best eligible match after applying the project "
-            "constraints.",
+            f"Why: {subject} is the best eligible match after applying the project constraints.",
+            width=width,
+        )
+
+    if gate_contexts:
+        context = "; ".join(item.rstrip(".") for item in gate_contexts) + "."
+        _append_wrapped(
+            lines,
+            f"Not eligible: {_untrusted_presentation_text(context)}",
             width=width,
         )
 
@@ -684,7 +738,7 @@ def _render_complete_agent_summary(
     elif unresolved_count:
         next_action = "Resolve the open gaps before separately authorizing implementation."
     else:
-        next_action = "Review the assignments before separately authorizing implementation."
+        next_action = "Use this fit in Codex's plan; separately authorize implementation."
     _append_wrapped(
         lines,
         _untrusted_presentation_text(next_action),

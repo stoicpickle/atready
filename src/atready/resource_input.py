@@ -28,7 +28,7 @@ from atready.models import (
     ResourceDeclaration,
     SessionAvailability,
 )
-from atready.yamlio import MAX_FILE_BYTES, loads_yaml
+from atready.yamlio import MAX_FILE_BYTES, load_yaml_stdin, loads_yaml
 
 _READ_CHUNK_BYTES = 64 * 1024
 _INVENTORY_ANNOTATION_LOCATION_FIELDS = frozenset({"private_notes", "schema_version"})
@@ -305,13 +305,7 @@ def _load_declaration_stdin(
     subject: str,
     parser: Callable[[Any], _ParsedDeclaration],
 ) -> _ParsedDeclaration:
-    isatty = getattr(stream, "isatty", None)
-    if callable(isatty) and isatty():
-        raise ConfigurationError(
-            f"{option} requires piped or redirected input; interactive input is refused"
-        )
-    raw = _read_bounded_stream(stream, subject=subject)
-    return _decode_and_parse(raw, subject=subject, parser=parser)
+    return parser(load_yaml_stdin(stream, option=option, subject=subject))
 
 
 def load_resource_declaration_stdin(stream: BinaryIO) -> ParsedResourceDeclaration:

@@ -53,7 +53,7 @@ def _passing_transcript() -> dict:
         "metadata": {
             "source_revision": "0123456789abcdef (dirty evaluation checkout)",
             "skill_version": "project-atready fixture under test",
-            "cli_version": "atready 0.1.9",
+            "cli_version": "atready 0.1.10",
             "host": "Codex CLI 0.135.0 ephemeral task",
             "model": "synthetic-test-host",
             "evaluation_date": "2026-08-12",
@@ -302,8 +302,8 @@ def test_prepare_creates_one_private_prompt_complete_packet(tmp_path: Path) -> N
         _prompt("hostile-project-text"),
     ]
     assert transcript["metadata"]["source_revision"].endswith(("(clean)", "(dirty)"))
-    assert transcript["metadata"]["skill_version"] == "atready plugin 0.1.11"
-    assert transcript["metadata"]["cli_version"] == "atready 0.1.9"
+    assert transcript["metadata"]["skill_version"] == "atready plugin 0.1.12"
+    assert transcript["metadata"]["cli_version"] == "atready 0.1.10"
     if os.name == "posix":
         assert root.stat().st_mode & 0o777 == 0o700
         assert transcript_path.stat().st_mode & 0o777 == 0o600

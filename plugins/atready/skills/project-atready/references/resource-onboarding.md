@@ -621,9 +621,9 @@ Only when the user explicitly asks to test the new entry, offer a separate synth
 Explain that, for one fixed normalized project brief and inventory snapshot, it tests schema and
 deterministic routing wiring with a made-up public project and
 creates inert handoff text for review without contacting the resource, sending it data, dispatching
-the handoff, or executing routed project work. Do not create the temporary project or invoke `route` without
-that separate, explicit route authorization. If authorized, follow the main skill's protected
-temporary-project and cleanup rules. Describe the result only as a check of schema and fixed-input
+the handoff, or executing routed project work. Do not build or submit the project brief or invoke
+`route` without that separate, explicit route authorization. If authorized, follow the main skill's
+direct project JSON-line session rules. Describe the result only as a check of schema and fixed-input
 deterministic routing wiring, never as proof of conversational interpretation, real-world
 usefulness, access, or fitness.
 

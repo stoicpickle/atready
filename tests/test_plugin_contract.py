@@ -534,6 +534,9 @@ def test_launcher_uses_a_fixed_doctor_vector_and_accepts_product_version_drift()
     assert "routing.capacity-demand.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
     assert "routing.compare.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
     assert "resource.quick-preview.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
+    assert "resource.quick-setup-json-line.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
+    assert "routing.project-stdin.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
+    assert "routing.project-json-line.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
     assert "routing.resource-state.v1" in namespace["REQUIRED_RUNTIME_FEATURE_IDS"]
 
     compatible = subprocess.CompletedProcess(

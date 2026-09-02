@@ -93,6 +93,15 @@ labels remain editable proposals. The terminal conversation is not persisted sep
 exact `save <resource-id>` phrase authorizes only the complete preview already displayed in that
 process.
 
+Conversational Quick Setup uses the same candidate and commit engine through
+`resource quick-add --facts-json-line`. Its versioned facts envelope contains only the resource
+name, strength, current availability, and permission for private project work. On POSIX, AtReady
+verifies terminal echo and canonical mode are off before emitting
+`ATREADY_FACTS_JSON_LINE_READY`, accepts exactly one newline-terminated JSON record within 30
+seconds, and caps it at 4 KiB. It then restores the exact prior terminal state or fails closed.
+The protected channel changes only transport; preview and apply still require separate approvals
+and the apply remains bound to the preview revision and plan token.
+
 ## Resource profiles and local observations
 
 `atready resource profiles` and `atready resource profile PROFILE_ID` expose the
@@ -333,6 +342,17 @@ deletes them.
 A project contains an explicit `as_of` date, data/cost/interaction/network constraints, forbidden
 resources, and ordered workstreams. Workstream order matters because a small documented continuity
 bonus discourages unnecessary tool switching.
+
+`atready route` accepts this same direct `ProjectBrief` document from an explicit file, from
+non-interactive YAML/JSON stdin, or as one newline-terminated JSON record through
+`--project-json-line`. The JSON-line form is bounded to 1 MiB and requires one complete record
+within 30 seconds. On POSIX, AtReady verifies terminal echo and canonical mode are off before
+emitting `ATREADY_PROJECT_JSON_LINE_READY`; it reads only through the first newline, drains immediately
+queued input while echo remains off, flushes queued input during restoration, and fails unless the exact
+prior terminal state is restored. The record then passes through duplicate-key, secret-field, tree,
+and strict schema checks. The host must send the line once and no later bytes; the bounded drain is
+not sender-completion proof. Native Windows terminal handshakes remain unsupported pending
+equivalent ConPTY proof. Transport does not change routing results.
 
 Each workstream owns capability requirements, scope, exclusions, deliverable, acceptance criteria,
 verification text, stop conditions, next owner, and optional support/alternate policy.

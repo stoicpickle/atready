@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+import json
 import os
 from pathlib import Path
 
@@ -7,7 +9,12 @@ import pytest
 
 import atready.yamlio as yamlio
 from atready.errors import ConfigurationError
-from atready.project import project_from_path, project_from_text
+from atready.project import (
+    project_from_json_line,
+    project_from_path,
+    project_from_stdin,
+    project_from_text,
+)
 from atready.templates import starter_project
 
 
@@ -42,6 +49,55 @@ def test_project_schema_version_requires_exact_native_integer(version: str) -> N
 
     with pytest.raises(ConfigurationError, match="native YAML/JSON integer"):
         project_from_text(invalid)
+
+
+def test_project_stdin_loads_one_bounded_brief() -> None:
+    project = project_from_stdin(io.BytesIO(starter_project().encode("utf-8")))
+
+    assert project.id == "synthetic-cli-release"
+
+
+class _InteractiveProjectInput(io.BytesIO):
+    def isatty(self) -> bool:
+        return True
+
+
+def test_project_stdin_refuses_interactive_input() -> None:
+    with pytest.raises(ConfigurationError, match="interactive input is refused"):
+        project_from_stdin(_InteractiveProjectInput(starter_project().encode("utf-8")))
+
+
+def test_project_json_line_loads_one_bounded_brief() -> None:
+    expected = project_from_text(starter_project())
+    payload = json.dumps(expected.model_dump(mode="json")).encode("utf-8") + b"\n"
+
+    assert project_from_json_line(io.BytesIO(payload)) == expected
+
+
+def test_project_json_line_requires_a_terminating_newline() -> None:
+    expected = project_from_text(starter_project())
+    payload = json.dumps(expected.model_dump(mode="json")).encode("utf-8")
+
+    with pytest.raises(ConfigurationError, match="must end with one newline"):
+        project_from_json_line(io.BytesIO(payload))
+
+
+def test_project_stdin_is_bounded() -> None:
+    oversized = b"x" * (yamlio.MAX_FILE_BYTES + 1)
+
+    with pytest.raises(ConfigurationError, match="project brief exceeds"):
+        project_from_stdin(io.BytesIO(oversized))
+
+
+def test_project_stdin_errors_do_not_echo_input() -> None:
+    sentinel = "confidential-project-stdin-sentinel"
+    malformed = f"schema_version: 1\n{sentinel}: [\n".encode()
+
+    with pytest.raises(ConfigurationError) as caught:
+        project_from_stdin(io.BytesIO(malformed))
+
+    assert sentinel not in str(caught.value)
+    assert sentinel not in repr(caught.value)
 
 
 def test_project_custom_validator_does_not_echo_unknown_capability_gap() -> None:

@@ -26,7 +26,7 @@ body:
       description: Pick the closest match. Stopping early is useful feedback too.
       options:
         - I installed AtReady and completed the demo
-        - I added a resource and routed a project
+        - I added a resource and completed a resource-fit check
         - I completed only part of the journey
         - I could not get started
     validations:
@@ -76,4 +76,4 @@ body:
     attributes:
       label: AtReady version or commit (optional)
       description: Run `atready --version`, or paste the short commit identifier if you installed from source.
-      placeholder: atready 0.1.9 or abc1234
+      placeholder: atready 0.1.10 or abc1234

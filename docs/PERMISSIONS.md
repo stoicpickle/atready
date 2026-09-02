@@ -157,9 +157,23 @@ the reader requires a current-user-owned, singly linked, regular `0600` file,
 opens it without following the final symlink where the platform supports that,
 uses a nonblocking open to refuse special-file substitution before reading,
 rechecks path/descriptor identity, metadata, and macOS ACL state, and reads at most 1 MiB. The same
-Windows ACL limitation applies. Explicit stdin is non-interactive, incremental,
-and bounded to the same size. Annotation values have no typed-argument input path. Neither
-transport is read unless its corresponding flag is present.
+Windows ACL limitation applies. EOF-delimited explicit stdin is non-interactive, incremental, and
+bounded to the same size.
+
+The two agent-terminal transports are separately flagged and bounded. Quick Setup
+`--facts-json-line` accepts one 4 KiB facts record after `ATREADY_FACTS_JSON_LINE_READY`; project
+`--project-json-line` accepts one 1 MiB brief after `ATREADY_PROJECT_JSON_LINE_READY`. Both are
+POSIX-only, require one newline-terminated record within 30 seconds, verify echo and canonical mode
+are off before signaling readiness, and parse no bytes beyond the accepted newline. They consume
+and discard immediately queued trailing input until a bounded quiet period, flush queued input
+during restoration, require exact terminal-state restoration, and fail closed when protection,
+input idleness, or restoration cannot be confirmed. The host contract permits one complete write
+and no later bytes; the bounded drain is not sender-completion proof. The Codex workflow replaces
+its static launcher shell with the runtime so a parent shell cannot resume after the protected
+read. Native Windows terminal handshakes remain unsupported until equivalent ConPTY behavior is
+implemented and tested.
+Annotation values have no typed-argument input path. No transport is read unless its corresponding
+flag is present.
 
 Resource-state files use the same bounded, identity-checked read boundary, but are not AtReady-owned
 storage. Their contents are read for one route and discarded; the source path, terminal, logs, host,

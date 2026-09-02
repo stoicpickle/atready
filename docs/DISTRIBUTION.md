@@ -12,8 +12,8 @@ and resource-fit evidence without broadening the CLI's permissions.
 | Python package and CLI | `project-atready` / `atready` | The deterministic command, schemas, routing logic, and a bundled copy of the optional skill | Telemetry, connectors, provider execution, or automatic handoff execution |
 | Optional Codex skill package | `atready` | `.codex-plugin/plugin.json` and the canonical `project-atready` skill | The Python package, hooks, apps, MCP servers, connectors, telemetry, or an implicit installer |
 
-The CLI runtime currently uses product version `0.1.9`, while the optional Codex plugin uses
-product version `0.1.11`, but product-version equality is no longer the compatibility boundary. The plugin
+The CLI runtime currently uses product version `0.1.10`, while the optional Codex plugin uses
+product version `0.1.12`, but product-version equality is no longer the compatibility boundary. The plugin
 declares runtime contract version `1` and its required stable
 feature IDs. Its launcher resolves the already-required `uv` executable through the caller's
 `PATH`, asks it offline and with configuration files disabled for the absolute tool-bin directory,
@@ -32,8 +32,9 @@ artifacts from intended release channels.
 
 The plugin manifest's `Read`, `Write`, and `Interactive` capability labels describe the host
 workflow candidly. They are not grants. The skill's narrower contract still limits reads to
-approved project/inventory inputs, uses only private temporary project-brief writes, and keeps every
-inventory mutation preview-first and separately authorized.
+approved project and inventory inputs, supplies its normal project brief as one bounded JSON line
+only after an echo-suppressed terminal readiness marker, and keeps every inventory mutation
+preview-first and separately authorized.
 
 ## Channel topology
 

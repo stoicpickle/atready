@@ -65,9 +65,15 @@ atready plan
    `atready plan --mode detailed` for private data or the full one-to-three-step interview,
    then suggests where your saved resources fit. It does not create the complete project plan.
 
+For an easy first check, add a resource you use for code review. Then plan `Review a small public
+README change` and choose the review capability you declared when AtReady asks what the work needs.
+Use your own answers about availability, strength, and data access; the example is only a prompt,
+not a claim about your resource.
+
 During `atready add`, AtReady shows a no-write preview first. Nothing is saved until you separately
 type the exact save confirmation it gives you. The inventory remains on your computer; do not
-upload it or paste its contents into the feedback form.
+upload it or paste its contents into the feedback form. Type `cancel` at any prompt to leave without
+saving.
 
 A useful result should make the assignment, reasoning, deliverable, check, and any gap easy to
 understand. It is resource advice, not an executed workflow or a replacement for Codex's planning:

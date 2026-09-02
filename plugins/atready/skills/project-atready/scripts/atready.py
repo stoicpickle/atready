@@ -15,8 +15,8 @@ import threading
 import time
 from pathlib import Path
 
-PLUGIN_VERSION = "0.1.11"
-REVIEWED_RUNTIME_VERSION = "0.1.9"
+PLUGIN_VERSION = "0.1.12"
+REVIEWED_RUNTIME_VERSION = "0.1.10"
 PUBLIC_RUNTIME_SOURCE = "git+https://github.com/stoicpickle/atready.git@main"
 REQUIRED_RUNTIME_CONTRACT_VERSION = 1
 REQUIRED_RUNTIME_FEATURE_IDS = (
@@ -24,11 +24,14 @@ REQUIRED_RUNTIME_FEATURE_IDS = (
     "inventory.read.v1",
     "resource.profiles.v1",
     "resource.quick-preview.v1",
+    "resource.quick-setup-json-line.v1",
     "routing.agent-summary.v1",
     "routing.capacity-demand.v1",
     "routing.compare.v1",
     "routing.plan-only.v1",
     "routing.presentation-bundle.v1",
+    "routing.project-json-line.v1",
+    "routing.project-stdin.v1",
     "routing.resource-state.v1",
     "schema.declarations.v1",
 )
