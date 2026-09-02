@@ -93,6 +93,7 @@ def test_stdin_loader_refuses_tty_before_reading() -> None:
         (b'{"value":1,"value":2}\n', "duplicate JSON mapping key"),
         (b'{"token":"forbidden"}\n', "secret-bearing field"),
     ],
+    ids=["missing-newline", "oversized", "invalid-utf8", "duplicate-key", "secret-key"],
 )
 def test_json_line_stdin_preserves_framing_and_tree_guards(payload: bytes, message: str) -> None:
     with pytest.raises(ConfigurationError, match=message):
@@ -470,6 +471,7 @@ def test_json_line_tty_reports_cancel_and_restores_terminal(
         (b"value: &anchor safe\n", "anchors and aliases"),
         (b"token: forbidden\n", "secret-bearing field"),
     ],
+    ids=["oversized", "invalid-utf8", "empty", "duplicate-key", "alias", "secret-key"],
 )
 def test_stdin_loader_preserves_bounded_yaml_guards(payload: bytes, message: str) -> None:
     with pytest.raises(ConfigurationError, match=message):
