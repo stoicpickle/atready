@@ -56,11 +56,114 @@ jobs:
           PYTHONPATH: src
         run: uv run --no-sync pytest
 
-      - name: Test files in isolated processes
+      - name: Windows tests 1 of 7
         if: runner.os == 'Windows'
+        timeout-minutes: 4
         env:
           PYTHONPATH: src
-        run: uv run --no-sync python scripts/run_test_files.py
+        run: >-
+          uv run --no-sync pytest
+          tests/test_beta_setup.py
+          tests/test_beta_start_here.py
+          tests/test_bundled_kernel_spike.py
+          tests/test_capacity_routing.py
+          tests/test_catalog.py
+          tests/test_clean_first_use.py
+          tests/test_cli.py
+          tests/test_cli_screenshot.py
+
+      - name: Windows tests 2 of 7
+        if: runner.os == 'Windows'
+        timeout-minutes: 4
+        env:
+          PYTHONPATH: src
+        run: >-
+          uv run --no-sync pytest
+          tests/test_conversation_hardening_scorecard.py
+          tests/test_decision_change_benchmark.py
+          tests/test_demo_flow_cli.py
+          tests/test_elevated_install_matrix.py
+          tests/test_evals.py
+          tests/test_first_user_acceptance.py
+          tests/test_fresh_host_conversation_matrix.py
+          tests/test_fsprivacy.py
+
+      - name: Windows tests 3 of 7
+        if: runner.os == 'Windows'
+        timeout-minutes: 4
+        env:
+          PYTHONPATH: src
+        run: >-
+          uv run --no-sync pytest
+          tests/test_guided_plan_cli.py
+          tests/test_hardening_gate.py
+          tests/test_intake.py
+          tests/test_inventory_edit.py
+          tests/test_issue_forms.py
+          tests/test_local_state_adversarial.py
+          tests/test_model_behavior_scorecard.py
+          tests/test_nonce_clone_contract.py
+
+      - name: Windows tests 4 of 7
+        if: runner.os == 'Windows'
+        timeout-minutes: 4
+        env:
+          PYTHONPATH: src
+        run: >-
+          uv run --no-sync pytest
+          tests/test_paths.py
+          tests/test_perishable_capacity.py
+          tests/test_plan_communication_eval_contract.py
+          tests/test_plugin_contract.py
+          tests/test_plugin_submission_bundle.py
+          tests/test_plugin_surface_probe.py
+          tests/test_plugin_validator_contract.py
+          tests/test_project.py
+
+      - name: Windows tests 5 of 7
+        if: runner.os == 'Windows'
+        timeout-minutes: 4
+        env:
+          PYTHONPATH: src
+        run: >-
+          uv run --no-sync pytest
+          tests/test_project_json_line_pty.py
+          tests/test_public_copy_style.py
+          tests/test_public_hardening_coverage.py
+          tests/test_public_onboarding_copy.py
+          tests/test_quick_setup.py
+          tests/test_readme_rendering.py
+          tests/test_release_artifacts.py
+          tests/test_release_bundle.py
+
+      - name: Windows tests 6 of 7
+        if: runner.os == 'Windows'
+        timeout-minutes: 4
+        env:
+          PYTHONPATH: src
+        run: >-
+          uv run --no-sync pytest
+          tests/test_release_workflow.py
+          tests/test_render.py
+          tests/test_resource_input.py
+          tests/test_resource_intake_eval_contract.py
+          tests/test_resource_state.py
+          tests/test_resource_state_cli_integration.py
+          tests/test_route_comparison.py
+          tests/test_routing.py
+
+      - name: Windows tests 7 of 7
+        if: runner.os == 'Windows'
+        timeout-minutes: 4
+        env:
+          PYTHONPATH: src
+        run: >-
+          uv run --no-sync pytest
+          tests/test_routing_properties.py
+          tests/test_routing_stress.py
+          tests/test_runtime_contract.py
+          tests/test_skill_contract.py
+          tests/test_yamlio.py
 
       - name: Test with branch coverage
         if: runner.os == 'Linux'
