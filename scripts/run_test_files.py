@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Run each pytest file in a separate bounded process.
+"""Run pytest files in small, separately bounded processes.
 
 GitHub's Windows runners can remain attached to a pytest process after an
-individual test leaks or retains an operating-system handle.  Running one file
-per process makes the responsible file visible in the log and keeps the CI job
-bounded without changing the normal Linux and macOS suite.
+individual test leaks or retains an operating-system handle. Running small
+batches makes the responsible group visible in the log and keeps the CI job
+bounded without paying for a fresh interpreter for every file.
 """
 
 from __future__ import annotations
@@ -15,7 +15,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
-FILE_TIMEOUT_SECONDS = 90
+BATCH_SIZE = 8
+BATCH_TIMEOUT_SECONDS = 180
 
 
 def main() -> int:
@@ -24,19 +25,20 @@ def main() -> int:
         print("No test files found.", file=sys.stderr)
         return 2
 
-    for test_file in test_files:
-        relative = test_file.relative_to(ROOT)
-        print(f"Running {relative}", flush=True)
+    for offset in range(0, len(test_files), BATCH_SIZE):
+        batch = [path.relative_to(ROOT) for path in test_files[offset : offset + BATCH_SIZE]]
+        names = ", ".join(str(path) for path in batch)
+        print(f"Running batch: {names}", flush=True)
         try:
             result = subprocess.run(  # noqa: S603 - fixed interpreter and repository tests
-                [sys.executable, "-m", "pytest", "-q", str(relative)],
+                [sys.executable, "-m", "pytest", "-q", *(str(path) for path in batch)],
                 cwd=ROOT,
                 check=False,
-                timeout=FILE_TIMEOUT_SECONDS,
+                timeout=BATCH_TIMEOUT_SECONDS,
             )
         except subprocess.TimeoutExpired:
             print(
-                f"Timed out after {FILE_TIMEOUT_SECONDS}s: {relative}",
+                f"Timed out after {BATCH_TIMEOUT_SECONDS}s: {names}",
                 file=sys.stderr,
                 flush=True,
             )
