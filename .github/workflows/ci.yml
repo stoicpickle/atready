@@ -54,7 +54,7 @@ jobs:
         if: runner.os != 'Linux'
         env:
           PYTHONPATH: src
-        run: uv run --no-sync pytest -vv
+        run: uv run --no-sync pytest
 
       - name: Test with branch coverage
         if: runner.os == 'Linux'
