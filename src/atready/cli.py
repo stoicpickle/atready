@@ -20,6 +20,7 @@ from atready.catalog import InventoryCatalog
 from atready.comparison import compare_routes, render_route_comparison
 from atready.errors import AtReadyError, ConfigurationError
 from atready.intake import (
+    CatalogSuggestion,
     IntakeError,
     LocalDiscoveryRequest,
     discover_local_resource,
@@ -62,8 +63,15 @@ from atready.models import (
     SessionAvailability,
 )
 from atready.paths import create_private_file, resolve_paths
-from atready.project import project_from_path, project_from_text
+from atready.project import (
+    project_from_json_line,
+    project_from_path,
+    project_from_stdin,
+    project_from_text,
+)
 from atready.quick_setup import (
+    QuickSetupFacts,
+    load_quick_setup_facts_json_line,
     load_quick_setup_facts_stdin,
     quick_setup_mapping_summary,
     resource_from_quick_setup,
@@ -141,10 +149,10 @@ class _AtReadyArgumentParser(argparse.ArgumentParser):
 Show where your resources fit a project plan.
 
 Get started:
+  demo      Run a complete synthetic resource fit example
   init      Create your local resource roster
   add       Add one resource with guided, preview-first setup
   plan      Check resource fit through a guided conversation
-  demo      Run a complete synthetic resource fit example
 
 Manage:
   inventory Inspect or maintain your roster
@@ -235,9 +243,10 @@ def _welcome_text(*, color: bool, block_art: bool) -> str:
             "A resource is a tool, agent, service, app, or person AtReady may consider.",
             "",
             "GET STARTED",
+            "  Try the safe demo   atready demo",
             "  Create your roster  atready init",
             "  Add a resource      atready add",
-            "  Try the safe demo   atready demo",
+            "  Check resource fit  atready plan",
             "  See every command   atready --help",
         ]
     )
@@ -527,20 +536,29 @@ def build_parser() -> argparse.ArgumentParser:
         "quick-add",
         help="Preview or apply one approved Quick Setup fact set",
         description=(
-            "Read one strict, versioned JSON Quick Setup fact set from non-interactive stdin, "
-            "map it through one bundled profile, and delegate to the existing inventory-add "
-            "preview/apply contract. This does not inspect providers or accounts, contact the "
-            "resource, or run it. Custom resources require detailed inventory add setup."
+            "Read one strict, versioned JSON Quick Setup fact set through an explicit stdin "
+            "transport, map it through one bundled profile, and delegate to the existing "
+            "inventory-add preview/apply contract. This does not inspect providers or accounts, "
+            "contact the resource, or run it. Custom resources require detailed inventory add "
+            "setup."
         ),
     )
     quick_add_parser.add_argument("--path", type=Path, help="Defaults to user config")
-    quick_add_parser.add_argument(
+    quick_facts_source = quick_add_parser.add_mutually_exclusive_group(required=True)
+    quick_facts_source.add_argument(
         "--facts-stdin",
         action="store_true",
-        required=True,
         help=(
             "Read exactly schema_version, name, strength, available_now, and private_work "
             "from the first bounded, newline-terminated JSON line on non-interactive stdin"
+        ),
+    )
+    quick_facts_source.add_argument(
+        "--facts-json-line",
+        action="store_true",
+        help=(
+            "Read the same bounded JSON facts line from an agent terminal after the readiness "
+            "marker confirms terminal echo is disabled"
         ),
     )
     quick_add_parser.add_argument("--apply", action="store_true")
@@ -869,7 +887,21 @@ def build_parser() -> argparse.ArgumentParser:
     route_parser = commands.add_parser(
         "route", help="Deterministically choose resources and render inert handoffs"
     )
-    route_parser.add_argument("--project", required=True, type=Path)
+    route_project = route_parser.add_mutually_exclusive_group(required=True)
+    route_project.add_argument("--project", type=Path)
+    route_project.add_argument(
+        "--project-stdin",
+        action="store_true",
+        help="Read one bounded YAML/JSON project brief from non-interactive stdin",
+    )
+    route_project.add_argument(
+        "--project-json-line",
+        action="store_true",
+        help=(
+            "Read one bounded newline-terminated JSON project brief from an agent terminal "
+            "session without echo"
+        ),
+    )
     route_parser.add_argument("--inventory", type=Path, help="Defaults to user config")
     route_parser.add_argument(
         "--resource-state",
@@ -1471,6 +1503,10 @@ class _GuidedAddCancelledError(Exception):
     """Internal control flow for an intentional pre-commit cancellation."""
 
 
+class _GuidedCancelledError(Exception):
+    """Internal control flow for a textual cancellation at any guided prompt."""
+
+
 class _GuidedPlanCancelledError(Exception):
     """Internal control flow for an intentional guided-plan cancellation."""
 
@@ -1489,6 +1525,8 @@ def _guided_read(prompt: str, *, default: str | None = None) -> str:
     if len(value.rstrip("\r\n")) > _MAX_GUIDED_INPUT_CHARACTERS:
         raise ConfigurationError("guided answer is too long; nothing was saved")
     value = value.rstrip("\r\n").strip()
+    if value.casefold() == "cancel":
+        raise _GuidedCancelledError
     return default if not value and default is not None else value
 
 
@@ -1950,6 +1988,8 @@ def _handle_runtime_contract(args: argparse.Namespace) -> int:
 
 
 _NO_EXECUTION_BOUNDARY = "No routed project resources were contacted or run."
+_FACTS_JSON_LINE_READY = "ATREADY_FACTS_JSON_LINE_READY"
+_PROJECT_JSON_LINE_READY = "ATREADY_PROJECT_JSON_LINE_READY"
 
 
 def _handle_demo_route(args: argparse.Namespace) -> int:
@@ -2122,8 +2162,16 @@ def _handle_resource_quick_add(args: argparse.Namespace) -> int:
     _require_preview_apply_contract(args, subject="quick setup addition")
     stream = getattr(sys.stdin, "buffer", None)
     if stream is None:
-        raise ConfigurationError("--facts-stdin requires binary standard input")
-    facts = load_quick_setup_facts_stdin(stream)
+        option = "--facts-json-line" if args.facts_json_line else "--facts-stdin"
+        raise ConfigurationError(f"{option} requires binary standard input")
+    facts = (
+        load_quick_setup_facts_json_line(
+            stream,
+            on_ready=lambda: print(_FACTS_JSON_LINE_READY, file=sys.stderr, flush=True),
+        )
+        if args.facts_json_line
+        else load_quick_setup_facts_stdin(stream)
+    )
     parsed, profile_id = resource_from_quick_setup(facts)
     try:
         plan = plan_add_resource(
@@ -2142,6 +2190,7 @@ def _handle_resource_quick_add(args: argparse.Namespace) -> int:
     mapping = quick_setup_mapping_summary(facts, profile_id=profile_id)
     if not args.apply:
         preview = plan.preview()
+        human_preview = _quick_setup_human_preview(facts, profile_id=profile_id)
         if args.json:
             print(
                 json.dumps(
@@ -2160,6 +2209,7 @@ def _handle_resource_quick_add(args: argparse.Namespace) -> int:
                             "writes_performed": False,
                         },
                         "format": "atready-resource-quick-preview-v1",
+                        "human_preview": human_preview,
                         "mapping": mapping,
                         "preview": preview,
                         "status": "preview-ready",
@@ -2169,9 +2219,7 @@ def _handle_resource_quick_add(args: argparse.Namespace) -> int:
                 )
             )
         else:
-            print("Quick Setup mappings (bundled proposal plus user-declared facts)")
-            print(json.dumps(mapping, indent=2, sort_keys=True))
-            _print_inventory_add_preview(preview)
+            print(human_preview)
         return 0
 
     result, uncertain = _inventory_add_receipt_result(
@@ -2202,6 +2250,38 @@ def _handle_resource_quick_add(args: argparse.Namespace) -> int:
         )
         return 4 if uncertain else 0
     return _print_inventory_add_receipt(result, resource=parsed.resource, uncertain=uncertain)
+
+
+def _quick_setup_human_preview(facts: QuickSetupFacts, *, profile_id: str) -> str:
+    """Render the small, user-facing Quick Setup preview from approved facts."""
+
+    profile = resource_profile(profile_id)
+    purpose = _quick_setup_purpose(profile.capability_suggestions)
+    lines = [
+        f"{_terminal_safe(facts.name)} for {purpose}",
+        "",
+        f"Strength: {facts.strength.capitalize()}",
+        f"Available now: {'Yes' if facts.available_now else 'No'}",
+        f"Private work: {'Allowed' if facts.private_work else 'Not allowed'}",
+    ]
+    unknowns = ["Account access", "usage limits"]
+    if facts.private_work:
+        unknowns.append("permission for sensitive work")
+    lines.extend((f"Still unknown: {_quick_setup_list(unknowns)}.", "", "Nothing has been saved."))
+    return "\n".join(lines)
+
+
+def _quick_setup_purpose(suggestions: Sequence[CatalogSuggestion]) -> str:
+    labels = [_terminal_safe(suggestion.label).lower() for suggestion in suggestions]
+    return _quick_setup_list(labels)
+
+
+def _quick_setup_list(items: Sequence[str]) -> str:
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return ", ".join(items[:-1]) + f", and {items[-1]}"
 
 
 def _handle_resource_discover(args: argparse.Namespace) -> int:
@@ -2701,7 +2781,7 @@ def _handle_guided_add(args: argparse.Namespace) -> int:
             "AtReady will use only what you declare. It will not scan apps, inspect accounts, "
             "contact providers, or run this resource."
         )
-        print("Do not enter credentials or private notes.")
+        print("Do not enter credentials or private notes. Type cancel at any prompt.")
         if not _guided_yes_no("Use this inventory?", default=True):
             raise _GuidedAddCancelledError
 
@@ -2743,7 +2823,7 @@ def _handle_guided_add(args: argparse.Namespace) -> int:
             expected_plan=preview["expect_plan"],
             json_output=False,
         )
-    except _GuidedAddCancelledError:
+    except (_GuidedAddCancelledError, _GuidedCancelledError):
         print("Cancelled. No files changed.")
         return 0
     except EOFError:
@@ -3051,7 +3131,7 @@ def _handle_guided_plan(args: argparse.Namespace) -> int:
             output_format=args.format,
             width=args.width or 80,
         )
-    except _GuidedPlanCancelledError:
+    except (_GuidedPlanCancelledError, _GuidedCancelledError):
         print("Cancelled. No files changed and no resources were run.")
         return 0
     except EOFError:
@@ -3628,14 +3708,28 @@ def _handle_route(args: argparse.Namespace) -> int:
         raise ConfigurationError(
             "--max-words and --max-lines are only available with --format presentation"
         )
-    project_path = args.project.expanduser()
-    try:
-        project = project_from_path(project_path)
-    except ConfigurationError as exc:
-        if "configuration file does not exist" in str(exc):
-            exc.add_note("Use the guided resource fit check instead: atready plan")
-            exc.add_note("Or create a project brief: atready project template > project.yaml")
-        raise
+    if args.project_stdin or args.project_json_line:
+        stream = getattr(sys.stdin, "buffer", None)
+        if stream is None:
+            option = "--project-json-line" if args.project_json_line else "--project-stdin"
+            raise ConfigurationError(f"{option} requires binary standard input")
+        project = (
+            project_from_json_line(
+                stream,
+                on_ready=lambda: print(_PROJECT_JSON_LINE_READY, file=sys.stderr, flush=True),
+            )
+            if args.project_json_line
+            else project_from_stdin(stream)
+        )
+    else:
+        project_path = args.project.expanduser()
+        try:
+            project = project_from_path(project_path)
+        except ConfigurationError as exc:
+            if "configuration file does not exist" in str(exc):
+                exc.add_note("Use the guided resource fit check instead: atready plan")
+                exc.add_note("Or create a project brief: atready project template > project.yaml")
+            raise
     try:
         catalog = InventoryCatalog.from_path(_inventory_path(args.inventory), today=project.as_of)
     except ConfigurationError as exc:

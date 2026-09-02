@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import re
+import select
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import date
 from pathlib import Path
 
@@ -63,6 +66,157 @@ def _run(argv: list[str], *, expected: int = 0, input_text: str | None = None) -
             f"atready {argv!r} returned {result.returncode}, expected {expected}: {result.stderr}"
         )
     return result.stdout, result.stderr
+
+
+def _read_pty_until(descriptor: int, *, marker: bytes, timeout: float) -> bytes:
+    captured = bytearray()
+    deadline = time.monotonic() + timeout
+    while marker not in captured:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise AssertionError("installed console did not publish its PTY readiness marker")
+        readable, _, _ = select.select([descriptor], [], [], remaining)
+        if not readable:
+            continue
+        try:
+            chunk = os.read(descriptor, 65_536)
+        except OSError as exc:
+            if exc.errno == errno.EIO:
+                break
+            raise
+        if not chunk:
+            break
+        captured.extend(chunk)
+    return bytes(captured)
+
+
+def _drain_pty(descriptor: int) -> bytes:
+    captured = bytearray()
+    while True:
+        readable, _, _ = select.select([descriptor], [], [], 0.2)
+        if not readable:
+            return bytes(captured)
+        try:
+            chunk = os.read(descriptor, 65_536)
+        except OSError as exc:
+            if exc.errno == errno.EIO:
+                return bytes(captured)
+            raise
+        if not chunk:
+            return bytes(captured)
+        captured.extend(chunk)
+
+
+def _read_pty_until_exit(
+    descriptor: int,
+    *,
+    process: subprocess.Popen[bytes],
+    timeout: float,
+) -> bytes:
+    captured = bytearray()
+    deadline = time.monotonic() + timeout
+    while process.poll() is None:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise AssertionError("installed console did not exit after protected PTY input")
+        readable, _, _ = select.select([descriptor], [], [], min(remaining, 0.2))
+        if not readable:
+            continue
+        try:
+            chunk = os.read(descriptor, 65_536)
+        except OSError as exc:
+            if exc.errno == errno.EIO:
+                break
+            raise
+        if not chunk:
+            break
+        captured.extend(chunk)
+    remaining = max(0.1, deadline - time.monotonic())
+    process.wait(timeout=remaining)
+    captured.extend(_drain_pty(descriptor))
+    return bytes(captured)
+
+
+def _run_installed_pty_json_line(
+    argv: list[str],
+    *,
+    marker: bytes,
+    payload: bytes,
+    working_directory: Path,
+) -> bytes:
+    if os.name != "posix" or not hasattr(os, "openpty"):
+        raise AssertionError("installed PTY smoke requires POSIX openpty")
+
+    import termios
+
+    master, slave = os.openpty()
+    original = termios.tcgetattr(slave)
+    process: subprocess.Popen[bytes] | None = None
+    trailing = b"touch SYNTHETIC-WHEEL-PTY-MUST-NOT-EXIST\n"
+    try:
+        process = subprocess.Popen(  # noqa: S603 - fixed shell and installed console path
+            [
+                "/bin/sh",
+                "-c",
+                'exec "$@"',
+                "atready-wheel-pty",
+                _installed_atready_executable(),
+                *argv,
+            ],
+            cwd=working_directory,
+            stdin=slave,
+            stdout=slave,
+            stderr=slave,
+            close_fds=True,
+        )
+        transcript = _read_pty_until(master, marker=marker, timeout=5)
+        if marker not in transcript:
+            raise AssertionError("installed console exited before its PTY readiness marker")
+        remaining = memoryview(payload + b"\n" + trailing)
+        while remaining:
+            written = os.write(master, remaining)
+            remaining = remaining[written:]
+        transcript += _read_pty_until_exit(
+            master,
+            process=process,
+            timeout=_COMMAND_TIMEOUT_SECONDS,
+        )
+        if process.returncode != 0:
+            raise AssertionError("installed console PTY route did not succeed")
+        if payload in transcript or trailing.rstrip(b"\n") in transcript:
+            raise AssertionError("installed console reflected protected PTY input")
+        if (working_directory / "SYNTHETIC-WHEEL-PTY-MUST-NOT-EXIST").exists():
+            raise AssertionError("installed console allowed trailing PTY input to execute")
+        if termios.tcgetattr(slave) != original:
+            raise AssertionError("installed console did not restore the exact terminal state")
+        os.set_blocking(slave, False)
+        try:
+            queued = os.read(slave, 65_536)
+        except BlockingIOError:
+            queued = b""
+        if queued:
+            raise AssertionError("installed console retained trailing PTY input")
+        return transcript
+    finally:
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
+        os.close(master)
+        os.close(slave)
+
+
+def _json_from_pty_transcript(transcript: bytes, *, marker: bytes) -> dict[str, object]:
+    lines = transcript.splitlines()
+    if lines.count(marker) != 1:
+        raise AssertionError("installed console PTY transcript did not contain one exact marker")
+    body = b"\n".join(line for line in lines if line != marker).strip()
+    try:
+        payload = json.loads(body)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise AssertionError("installed console PTY did not return strict JSON") from exc
+    if not isinstance(payload, dict):
+        raise AssertionError("installed console PTY JSON was not an object")
+    return payload
 
 
 def _assert_installed_package() -> None:
@@ -150,6 +304,9 @@ def main_smoke() -> None:
             or contract.get("product") != "project-atready"
             or contract.get("runtime_version") != atready.__version__
             or contract.get("contract_version") != RUNTIME_CONTRACT_VERSION
+            or "resource.quick-setup-json-line.v1" not in contract.get("features", [])
+            or "routing.project-json-line.v1" not in contract.get("features", [])
+            or "routing.project-stdin.v1" not in contract.get("features", [])
             or contract.get("inventory_read") is not False
             or contract.get("network_accessed") is not False
             or contract.get("writes_performed") is not False
@@ -164,6 +321,114 @@ def main_smoke() -> None:
             or "private_notes" not in annotation_schema_text
         ):
             raise AssertionError("installed wheel did not expose the annotation schema")
+
+        if os.name == "posix" and hasattr(os, "openpty"):
+            quick_inventory = Path(directory) / "quick-pty-inventory.yaml"
+            _run(["init", "--path", str(quick_inventory), "--json"])
+            quick_original = quick_inventory.read_bytes()
+            quick_facts = json.dumps(
+                {
+                    "schema_version": 1,
+                    "name": "CodeRabbit",
+                    "strength": "strong",
+                    "available_now": True,
+                    "private_work": True,
+                },
+                separators=(",", ":"),
+            ).encode("utf-8")
+            quick_marker = b"ATREADY_FACTS_JSON_LINE_READY"
+            quick_state_before = _file_tree(Path(directory))
+            quick_preview_transcript = _run_installed_pty_json_line(
+                [
+                    "resource",
+                    "quick-add",
+                    "--path",
+                    str(quick_inventory),
+                    "--facts-json-line",
+                    "--json",
+                ],
+                marker=quick_marker,
+                payload=quick_facts,
+                working_directory=Path(directory),
+            )
+            quick_preview = _json_from_pty_transcript(
+                quick_preview_transcript,
+                marker=quick_marker,
+            )
+            quick_mapping = quick_preview.get("mapping")
+            if (
+                quick_preview.get("format") != "atready-resource-quick-preview-v1"
+                or quick_preview.get("status") != "preview-ready"
+                or not isinstance(quick_mapping, dict)
+                or not quick_mapping
+                or quick_preview.get("effects")
+                != {
+                    "inventory_read": True,
+                    "network_accessed": False,
+                    "provider_or_account_inspected": False,
+                    "resource_run": False,
+                    "writes_performed": False,
+                }
+                or _file_tree(Path(directory)) != quick_state_before
+                or quick_inventory.read_bytes() != quick_original
+            ):
+                raise AssertionError("installed console PTY Quick Setup preview was not no-write")
+            preview_plan = quick_preview.get("preview")
+            if not isinstance(preview_plan, dict):
+                raise AssertionError(
+                    "installed console PTY Quick Setup omitted its preview binding"
+                )
+            quick_apply_transcript = _run_installed_pty_json_line(
+                [
+                    "resource",
+                    "quick-add",
+                    "--path",
+                    str(quick_inventory),
+                    "--facts-json-line",
+                    "--apply",
+                    "--expect-revision",
+                    str(preview_plan.get("expect_revision", "")),
+                    "--expect-plan",
+                    str(preview_plan.get("expect_plan", "")),
+                    "--json",
+                ],
+                marker=quick_marker,
+                payload=quick_facts,
+                working_directory=Path(directory),
+            )
+            quick_apply = _json_from_pty_transcript(
+                quick_apply_transcript,
+                marker=quick_marker,
+            )
+            quick_receipt = quick_apply.get("receipt")
+            if (
+                quick_apply.get("format") != "atready-resource-quick-apply-v1"
+                or quick_apply.get("status") != "applied"
+                or quick_apply.get("mapping") != quick_mapping
+                or quick_apply.get("effects")
+                != {
+                    "inventory_read": True,
+                    "network_accessed": False,
+                    "provider_or_account_inspected": False,
+                    "resource_run": False,
+                    "writes_performed": True,
+                }
+                or not isinstance(quick_receipt, dict)
+                or quick_receipt.get("applied") is not True
+                or quick_receipt.get("resource_id") != "coderabbit"
+                or quick_receipt.get("replacement_verified") is not True
+                or not isinstance(quick_receipt.get("candidate_revision"), str)
+                or not quick_receipt.get("candidate_revision")
+                or quick_receipt.get("revision") != quick_receipt["candidate_revision"]
+                or quick_receipt.get("warnings") != []
+                or quick_receipt.get("candidate_revision_protection") != "nonce-v1-present"
+                or quick_receipt.get("observed_revision_protection") != "nonce-v1-present"
+                or (os.name == "posix" and quick_receipt.get("directory_synced") is not True)
+            ):
+                raise AssertionError("installed console PTY Quick Setup apply was not verified")
+            quick_resources = InventoryCatalog.from_path(quick_inventory).inventory.resources
+            if [resource.id for resource in quick_resources] != ["coderabbit"]:
+                raise AssertionError("installed console PTY Quick Setup persisted the wrong entry")
 
         private_sentinel = "SYNTHETIC-WHEEL-PRIVATE-NOTE"
         declaration = (
@@ -653,15 +918,19 @@ def main_smoke() -> None:
             "authorizes only the bounded, read-only inventory checks",
             "do not precede it with `config path` or a separate validation call",
             "inventory snapshot /absolute/path/to/inventory.yaml --format json",
-            "project template",
-            "do not run a separate project validation during the normal path",
+            "Do not invoke `project template`",
+            "--project-json-line",
+            "writable terminal session",
+            "ATREADY_PROJECT_JSON_LINE_READY",
+            "session's stdin writer",
+            "Do not run a separate project validation during the normal path",
             "If the resource is unnamed, ask only",
             "Do not read another reference or run any command",
             "Only after approval of an unchanged bundled-purpose Quick Setup recap",
-            "never offer bare `atready add`",
+            "Static `exec` is host-only",
             "invite exact `retry preview` once",
             "do not offer another retry",
-            "--format agent-summary",
+            "--format agent-summary --width 120",
             "exit `3` for a route with gaps",
             "new planning input, not implementation authorization",
             "A resource-fit plan is advice, not authorization",
@@ -698,7 +967,8 @@ def main_smoke() -> None:
         )
         if (
             "`--max-words N` and `--max-lines N`" not in output_contract
-            or "`route --format agent-summary`" not in output_contract
+            or "`route --project-json-line --format agent-summary --width 120`"
+            not in output_contract
             or "documented gap exit `3`" not in output_contract
             or "No routed project resources were contacted or run." not in output_contract
         ):
@@ -707,7 +977,8 @@ def main_smoke() -> None:
         presentation_inventory = Path(directory) / "presentation-inventory.yaml"
         presentation_project = Path(directory) / "presentation-project.yaml"
         presentation_inventory.write_text(demo_inventory(_CANONICAL_SMOKE_DATE), encoding="utf-8")
-        presentation_project.write_text(starter_project(_CANONICAL_SMOKE_DATE), encoding="utf-8")
+        presentation_project_text = starter_project(_CANONICAL_SMOKE_DATE)
+        presentation_project.write_text(presentation_project_text, encoding="utf-8")
         presentation_args = [
             "route",
             "--project",
@@ -718,6 +989,59 @@ def main_smoke() -> None:
         ]
         presentation_state_before = _file_tree(Path(directory))
         route_text, _ = _run([*presentation_args, "--format", "json"])
+        stdin_route_text, _ = _run(
+            [
+                "route",
+                "--project-stdin",
+                "--inventory",
+                str(presentation_inventory),
+                "--allow-demo",
+                "--format",
+                "json",
+            ],
+            input_text=presentation_project_text,
+        )
+        if stdin_route_text != route_text:
+            raise AssertionError("installed project stdin route differed from the file route")
+        project_json_line = (
+            json.dumps(project_from_text(presentation_project_text).model_dump(mode="json")) + "\n"
+        )
+        json_line_route_text, _ = _run(
+            [
+                "route",
+                "--project-json-line",
+                "--inventory",
+                str(presentation_inventory),
+                "--allow-demo",
+                "--format",
+                "json",
+            ],
+            input_text=project_json_line,
+        )
+        if json_line_route_text != route_text:
+            raise AssertionError("installed project JSON-line route differed from the file route")
+        if os.name == "posix" and hasattr(os, "openpty"):
+            pty_state_before = _file_tree(Path(directory))
+            pty_transcript = _run_installed_pty_json_line(
+                [
+                    "route",
+                    "--project-json-line",
+                    "--inventory",
+                    str(presentation_inventory),
+                    "--allow-demo",
+                    "--format",
+                    "agent-summary",
+                    "--width",
+                    "120",
+                ],
+                marker=b"ATREADY_PROJECT_JSON_LINE_READY",
+                payload=project_json_line.rstrip("\n").encode("utf-8"),
+                working_directory=Path(directory),
+            )
+            if b"No routed project resources were contacted or run." not in pty_transcript:
+                raise AssertionError("installed console PTY route omitted its execution boundary")
+            if _file_tree(Path(directory)) != pty_state_before:
+                raise AssertionError("installed console PTY route wrote private state")
         agent_summary_text, _ = _run([*presentation_args, "--format", "agent-summary"])
         ready_text, _ = _run(
             [
@@ -771,12 +1095,12 @@ def main_smoke() -> None:
             "after applying the project constraints.\n"
             "Uncertainty: This uses a demo inventory. Its contents are not verified as\n"
             "resources you can use.\n"
-            "Next: Review the assignments before separately authorizing implementation.\n"
+            "Next: Use this fit in Codex's plan; separately authorize implementation.\n"
             "No routed project resources were contacted or run.\n"
         )
         expected_conflict_summary = (
             "Presentation limit conflict.\n"
-            "Requested maximum: 1 word. Complete route summary requires 62 words.\n"
+            "Requested maximum: 1 word. Complete route summary requires 64 words.\n"
             "Rerun without --max-words to receive the complete route summary.\n"
             "No routed project resources were contacted or run.\n"
         )
@@ -787,7 +1111,7 @@ def main_smoke() -> None:
             or ready_payload.get("summary") != expected_ready_summary
             or agent_summary_text != expected_ready_summary
             or ready_payload.get("limits", {}).get("requested") != {"lines": 50, "words": 500}
-            or ready_payload.get("limits", {}).get("required") != {"lines": 8, "words": 62}
+            or ready_payload.get("limits", {}).get("required") != {"lines": 8, "words": 64}
         ):
             raise AssertionError("installed wheel did not expose a complete ready presentation")
         if (
@@ -796,7 +1120,7 @@ def main_smoke() -> None:
             or conflict_payload.get("route") != route_payload
             or conflict_payload.get("summary") != expected_conflict_summary
             or conflict_payload.get("limits", {}).get("requested") != {"lines": None, "words": 1}
-            or conflict_payload.get("limits", {}).get("required") != {"lines": 8, "words": 62}
+            or conflict_payload.get("limits", {}).get("required") != {"lines": 8, "words": 64}
         ):
             raise AssertionError(
                 "installed wheel did not expose a complete limit-conflict presentation"

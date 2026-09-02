@@ -121,7 +121,7 @@ is valid for readiness; whether the resource requires internet needs a yes/no an
 scan your computer, inspect accounts, contact providers, or run the resource. Quick Add shows a
 friendly recap, asks before generating the complete no-write preview, then requires a separate
 exact `save <resource-id>` confirmation before writing. Cancelling before that confirmation changes
-nothing.
+nothing; type `cancel` at any prompt to leave the guided flow cleanly.
 
 ### 3. Check resource fit for a small project
 
@@ -134,6 +134,71 @@ roster using visible defaults: public data, internet allowed, any workflow or co
 facts only. Use `atready plan --mode detailed` for private data, other eligibility limits, one to
 three steps, expected results, verification checks, or strength thresholds. Neither mode creates
 the complete project plan, writes a project file, contacts a resource, spends a credit, or runs work.
+
+## Use AtReady with Codex
+
+The Codex skill is the intended conversational experience. The CLI is its local engine and a
+standalone fallback: it stores the declared roster, validates changes, and produces the same
+inspectable resource-fit evidence. The skill can add one declared resource through a no-write
+preview and separate save approval, or match the saved roster to a rough plan before implementation.
+For a quick add, it asks for the name, three plain-language facts, and a short recap before doing any
+local roster, schema, or profile checks. Those checks begin only after you approve the recap for a
+preview. It does not replace Codex's project planning. It uses the bundled launcher only when Codex
+has approved local execution and file access; otherwise it directs the same task to `atready add`
+in a terminal. The [quick intake contract](https://github.com/stoicpickle/atready/blob/main/plugins/atready/skills/project-atready/references/quick-resource-intake.md)
+shows the exact conversational boundary.
+
+The direct, echo-suppressed Codex handshakes currently require a POSIX terminal on macOS or Linux.
+On Windows, use the standalone CLI with a user-supplied project file until native ConPTY support is
+tested.
+
+Codex discovers personal skills under `~/.agents/skills`. After installing AtReady, keep any
+existing destination unchanged by default. On macOS or Linux, this guarded setup copies the
+bundled skill only when that destination is absent:
+
+```bash
+atready_skill_dest="$HOME/.agents/skills/project-atready"
+if [ -e "$atready_skill_dest" ] || [ -L "$atready_skill_dest" ]; then
+  printf 'Keeping existing skill: %s\n' "$atready_skill_dest"
+else
+  mkdir -p "$HOME/.agents/skills"
+  cp -R "$(atready skill path)" "$atready_skill_dest"
+fi
+atready skill status
+```
+
+`atready skill status` checks standalone personal or workspace copies. Plugin-managed Codex
+installations are separate and are not inspected by that command.
+
+On Windows PowerShell, use the same keep-existing rule, including for an existing Windows link or
+reparse point:
+
+```powershell
+$skillDest = Join-Path $HOME ".agents\skills\project-atready"
+$skillParent = Split-Path -Parent $skillDest
+$existingSkill = Get-Item -LiteralPath $skillDest -Force -ErrorAction SilentlyContinue
+if ($null -ne $existingSkill) {
+  Write-Host "Keeping existing skill: $skillDest"
+} else {
+  New-Item -ItemType Directory -Force -Path $skillParent | Out-Null
+  $skillSource = atready skill path
+  Copy-Item -Recurse -LiteralPath $skillSource -Destination $skillDest
+}
+atready skill status
+```
+
+To update an existing skill, review and replace it as a separate deliberate step. After Codex
+restarts, try:
+
+```text
+$project-atready I have a rough project idea. Use my saved AtReady resources to show where they fit.
+```
+
+The skill asks at most one consolidated routing question. For a normal check, the CLI produces the
+readable response directly, so Codex does not have to rewrite the route or load the complete JSON
+evidence. It passes the brief straight to the local engine without creating a project file.
+Detailed evidence remains available only when requested. The skill stops
+before implementation. The public beta does not depend on OpenAI Plugin Directory publication.
 
 ## Reusable and scripted workflows
 
@@ -259,66 +324,6 @@ can accept, edit, or ignore.
 Your personal inventory is stored locally. Private notes are excluded from normal listings and
 routing snapshots, but sanitized routing data can still enter whichever host or model you choose to
 use. “Local-first” does not mean model processing is automatically local.
-
-## Use AtReady with Codex
-
-The Codex skill is the intended conversational experience. The CLI is its local engine and a
-standalone fallback: it stores the declared roster, validates changes, and produces the same
-inspectable resource-fit evidence. The skill can add one declared resource through a no-write
-preview and separate save approval, or match the saved roster to a rough plan before implementation.
-For a quick add, it asks for the name, three plain-language facts, and a short recap before doing any
-local roster, schema, or profile checks. Those checks begin only after you approve the recap for a
-preview. It does not replace Codex's project planning. It uses the bundled launcher only when Codex
-has approved local execution and file access; otherwise it directs the same task to `atready add`
-in a terminal. The [quick intake contract](https://github.com/stoicpickle/atready/blob/main/plugins/atready/skills/project-atready/references/quick-resource-intake.md)
-shows the exact conversational boundary.
-
-Codex discovers personal skills under `~/.agents/skills`. After installing AtReady, keep any
-existing destination unchanged by default. On macOS or Linux, this guarded setup copies the
-bundled skill only when that destination is absent:
-
-```bash
-atready_skill_dest="$HOME/.agents/skills/project-atready"
-if [ -e "$atready_skill_dest" ] || [ -L "$atready_skill_dest" ]; then
-  printf 'Keeping existing skill: %s\n' "$atready_skill_dest"
-else
-  mkdir -p "$HOME/.agents/skills"
-  cp -R "$(atready skill path)" "$atready_skill_dest"
-fi
-atready skill status
-```
-
-`atready skill status` checks standalone personal or workspace copies. Plugin-managed Codex
-installations are separate and are not inspected by that command.
-
-On Windows PowerShell, use the same keep-existing rule, including for an existing Windows link or
-reparse point:
-
-```powershell
-$skillDest = Join-Path $HOME ".agents\skills\project-atready"
-$skillParent = Split-Path -Parent $skillDest
-$existingSkill = Get-Item -LiteralPath $skillDest -Force -ErrorAction SilentlyContinue
-if ($null -ne $existingSkill) {
-  Write-Host "Keeping existing skill: $skillDest"
-} else {
-  New-Item -ItemType Directory -Force -Path $skillParent | Out-Null
-  $skillSource = atready skill path
-  Copy-Item -Recurse -LiteralPath $skillSource -Destination $skillDest
-}
-atready skill status
-```
-
-To update an existing skill, review and replace it as a separate deliberate step. After Codex
-restarts, try:
-
-```text
-$project-atready I have a rough project idea. Use my saved AtReady resources to show where they fit.
-```
-
-The skill asks at most one consolidated routing question. For a normal check, the CLI produces the
-readable response directly, so Codex does not have to rewrite the route or load the complete JSON
-evidence. Detailed evidence remains available only when requested. The skill stops
-before implementation. The public beta does not depend on OpenAI Plugin Directory publication.
 
 ## Useful commands
 

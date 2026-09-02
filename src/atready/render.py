@@ -175,6 +175,38 @@ def _primary_handoff(assignment: RouteAssignment):
     return next((handoff for handoff in assignment.handoffs if handoff.role == "primary"), None)
 
 
+_MATERIAL_PRIMARY_GATE_REASONS = (
+    ("quota-exhausted", "has no declared quota remaining"),
+    ("data-class-disallowed", "is blocked by the project's data-class rule"),
+)
+
+
+def _material_primary_gate_reason(
+    assignment: RouteAssignment, selected_resource_ids: set[str]
+) -> str | None:
+    """Return one plain, route-proven gate that materially qualifies a primary selection.
+
+    Only a candidate with exactly one hard gate can supply this compact reason. That keeps the
+    response from implying that one constraint decided a route when another gate also excluded
+    the candidate.
+    """
+
+    for gate, explanation in _MATERIAL_PRIMARY_GATE_REASONS:
+        excluded = sorted(
+            (
+                candidate
+                for candidate in assignment.candidates
+                if candidate.resource_id not in selected_resource_ids
+                and not candidate.eligible_for_role
+                and candidate.gate_codes == [gate]
+            ),
+            key=lambda candidate: (candidate.resource_id, candidate.resource_name),
+        )
+        if excluded:
+            return f"{excluded[0].resource_name} {explanation}."
+    return None
+
+
 def _next_action(plan: RoutePlan, *, has_gaps: bool) -> str:
     assignment_gates = {
         gate
@@ -560,6 +592,8 @@ def _render_complete_agent_summary(
             if selection.resource_id not in resource_order:
                 resource_order.append(selection.resource_id)
 
+    selected_resource_ids = set(resource_order)
+
     generic_primary_reason = "Best eligible match after applying the project constraints."
     generic_primary_resources: set[str] = set()
     for resource_id, assignments in primary_groups.items():
@@ -575,6 +609,10 @@ def _render_complete_agent_summary(
         if (
             not has_continuity
             and _plain_selection_reason(selection.reason) == generic_primary_reason
+            and not any(
+                _material_primary_gate_reason(assignment, selected_resource_ids)
+                for assignment in assignments
+            )
         ):
             generic_primary_resources.add(resource_id)
 
@@ -591,7 +629,17 @@ def _render_complete_agent_summary(
             clauses.append(steps)
             selection = primary_assignments[0].primary
             assert selection is not None
-            reason = _untrusted_presentation_text(_plain_selection_reason(selection.reason))
+            material_reason = next(
+                (
+                    reason
+                    for assignment in primary_assignments
+                    if (reason := _material_primary_gate_reason(assignment, selected_resource_ids))
+                ),
+                None,
+            )
+            reason = _untrusted_presentation_text(
+                material_reason or _plain_selection_reason(selection.reason)
+            )
             has_continuity = any(
                 adjustment.code == "same-primary-continuity"
                 for assignment in primary_assignments
@@ -604,7 +652,10 @@ def _render_complete_agent_summary(
                     "Best eligible match after project constraints; continuity kept related "
                     "steps together."
                 )
-            if resource_id not in generic_primary_resources or len(generic_primary_resources) == 1:
+            if resource_id not in generic_primary_resources or (
+                len(generic_primary_resources) == 1
+                and not any(assignment.support for assignment in primary_assignments)
+            ):
                 clauses.append(f"Why: {reason.rstrip('.')}")
         if support_assignments:
             steps = ", ".join(
@@ -635,10 +686,14 @@ def _render_complete_agent_summary(
         _append_wrapped(lines, text, width=width)
 
     if len(generic_primary_resources) > 1:
+        subject = (
+            "Each primary above"
+            if len(generic_primary_resources) == len(primary_groups)
+            else "Each other primary above"
+        )
         _append_wrapped(
             lines,
-            "Why: Each primary above is the best eligible match after applying the project "
-            "constraints.",
+            f"Why: {subject} is the best eligible match after applying the project constraints.",
             width=width,
         )
 
@@ -684,7 +739,7 @@ def _render_complete_agent_summary(
     elif unresolved_count:
         next_action = "Resolve the open gaps before separately authorizing implementation."
     else:
-        next_action = "Review the assignments before separately authorizing implementation."
+        next_action = "Use this fit in Codex's plan; separately authorize implementation."
     _append_wrapped(
         lines,
         _untrusted_presentation_text(next_action),

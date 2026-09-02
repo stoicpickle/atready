@@ -6,5 +6,5 @@ Synthetic CodeRabbit Seat: Independent review. Why: Best eligible match after
 applying the project constraints.
 Uncertainty: This uses a demo inventory. Its contents are not verified as
 resources you can use.
-Next: Review the assignments before separately authorizing implementation.
+Next: Use this fit in Codex's plan; separately authorize implementation.
 No routed project resources were contacted or run.

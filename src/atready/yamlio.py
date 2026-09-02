@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import os
+import select
 import stat
-from collections.abc import Mapping, Sequence
+import time
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date, datetime
 from math import isfinite
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 import yaml
 from yaml.nodes import MappingNode
@@ -36,6 +39,10 @@ MAX_FILE_BYTES = 1_048_576
 MAX_DEPTH = 32
 MAX_ITEMS = 10_000
 MAX_STRING_LENGTH = 65_536
+_STREAM_READ_BYTES = 65_536
+_TTY_JSON_LINE_TIMEOUT_SECONDS = 30.0
+_TTY_TRAILING_INPUT_QUIET_SECONDS = 0.05
+_TTY_TRAILING_INPUT_DRAIN_SECONDS = 2.0
 
 _BLOCKED_KEYS = {
     "api_key",
@@ -55,6 +62,19 @@ _BLOCKED_KEYS = {
 
 class UniqueKeySafeLoader(yaml.SafeLoader):
     """SafeLoader variant that refuses ambiguous duplicate mapping keys."""
+
+
+class _DuplicateJsonKeyError(ValueError):
+    """Internal marker for duplicate JSON object keys."""
+
+
+def _construct_unique_json_mapping(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    mapping: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in mapping:
+            raise _DuplicateJsonKeyError
+        mapping[key] = value
+    return mapping
 
 
 def _construct_unique_mapping(
@@ -219,6 +239,275 @@ def loads_yaml(text: str) -> Any:
         raise failure
     if value is None:
         raise ConfigurationError("configuration is empty")
+    _validate_tree(value)
+    return value
+
+
+def load_yaml_stdin(stream: BinaryIO, *, option: str, subject: str) -> Any:
+    """Read one bounded YAML/JSON document from explicit non-interactive stdin."""
+
+    isatty = getattr(stream, "isatty", None)
+    if callable(isatty) and isatty():
+        raise ConfigurationError(
+            f"{option} requires piped or redirected input; interactive input is refused"
+        )
+
+    chunks: list[bytes] = []
+    total = 0
+    try:
+        while total <= MAX_FILE_BYTES:
+            chunk = stream.read(min(_STREAM_READ_BYTES, MAX_FILE_BYTES + 1 - total))
+            if not chunk:
+                break
+            if not isinstance(chunk, bytes):
+                raise ConfigurationError(f"{subject} must provide bytes")
+            chunks.append(chunk)
+            total += len(chunk)
+    except ConfigurationError:
+        raise
+    except (OSError, ValueError):
+        raise ConfigurationError(f"cannot read {subject}") from None
+
+    if total > MAX_FILE_BYTES:
+        raise ConfigurationError(f"{subject} exceeds {MAX_FILE_BYTES} bytes")
+    text: str | None = None
+    try:
+        text = b"".join(chunks).decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+    if text is None:
+        raise ConfigurationError(f"{subject} must be valid UTF-8") from None
+    return loads_yaml(text)
+
+
+def _read_bounded_json_line(
+    stream: BinaryIO,
+    *,
+    subject: str,
+    max_bytes: int = MAX_FILE_BYTES,
+) -> bytes:
+    try:
+        raw = stream.readline(max_bytes + 2)
+    except KeyboardInterrupt:
+        raise ConfigurationError(f"{subject} was cancelled") from None
+    except (OSError, ValueError):
+        raise ConfigurationError(f"cannot read {subject}") from None
+    if not isinstance(raw, bytes):
+        raise ConfigurationError(f"{subject} must provide bytes")
+    if not raw.endswith(b"\n"):
+        if len(raw) > max_bytes:
+            raise ConfigurationError(f"{subject} exceeds {max_bytes} bytes")
+        raise ConfigurationError(f"{subject} must end with one newline")
+    payload = raw[:-1]
+    if len(payload) > max_bytes:
+        raise ConfigurationError(f"{subject} exceeds {max_bytes} bytes")
+    return payload
+
+
+def _read_bounded_tty_json_line(
+    descriptor: int,
+    *,
+    subject: str,
+    max_bytes: int,
+) -> bytes:
+    """Read exactly one terminal record without buffering bytes past its newline."""
+
+    payload = bytearray()
+    deadline = time.monotonic() + _TTY_JSON_LINE_TIMEOUT_SECONDS
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ConfigurationError(f"{subject} timed out before one complete line")
+        try:
+            readable, _, _ = select.select([descriptor], [], [], remaining)
+        except KeyboardInterrupt:
+            raise ConfigurationError(f"{subject} was cancelled") from None
+        except InterruptedError:
+            continue
+        except (OSError, ValueError):
+            raise ConfigurationError(f"cannot read {subject}") from None
+        if not readable:
+            raise ConfigurationError(f"{subject} timed out before one complete line")
+        try:
+            byte = os.read(descriptor, 1)
+        except KeyboardInterrupt:
+            raise ConfigurationError(f"{subject} was cancelled") from None
+        except OSError:
+            raise ConfigurationError(f"cannot read {subject}") from None
+        if byte == b"\n":
+            return bytes(payload)
+        if not byte:
+            raise ConfigurationError(f"{subject} must end with one newline")
+        payload.extend(byte)
+        if len(payload) > max_bytes:
+            raise ConfigurationError(f"{subject} exceeds {max_bytes} bytes")
+
+
+def _discard_tty_input_until_quiet(descriptor: int) -> bool:
+    """Discard protocol-violating trailing input while terminal echo remains disabled."""
+
+    hard_deadline = time.monotonic() + _TTY_TRAILING_INPUT_DRAIN_SECONDS
+    quiet_deadline = time.monotonic() + _TTY_TRAILING_INPUT_QUIET_SECONDS
+    while True:
+        now = time.monotonic()
+        remaining = min(hard_deadline, quiet_deadline) - now
+        if remaining <= 0:
+            return now < hard_deadline
+        try:
+            readable, _, _ = select.select([descriptor], [], [], remaining)
+        except (KeyboardInterrupt, InterruptedError, OSError, ValueError):
+            return False
+        if not readable:
+            return True
+        try:
+            chunk = os.read(descriptor, _STREAM_READ_BYTES)
+        except (KeyboardInterrupt, OSError):
+            return False
+        if not chunk:
+            return True
+        quiet_deadline = time.monotonic() + _TTY_TRAILING_INPUT_QUIET_SECONDS
+
+
+def _restore_tty_state(termios: Any, descriptor: int, original: list[Any]) -> None:
+    try:
+        termios.tcsetattr(descriptor, termios.TCSAFLUSH, original)
+        restored = termios.tcgetattr(descriptor)
+    except (KeyboardInterrupt, OSError, ValueError, termios.error):
+        raise ConfigurationError(
+            "cannot confirm terminal state restoration; close this terminal session "
+            "before continuing"
+        ) from None
+    if restored != original:
+        raise ConfigurationError(
+            "cannot confirm terminal state restoration; close this terminal session "
+            "before continuing"
+        ) from None
+
+
+def _read_tty_json_line_without_echo(
+    stream: BinaryIO,
+    *,
+    option: str,
+    subject: str,
+    on_ready: Callable[[], None] | None,
+    max_bytes: int,
+) -> bytes:
+    """Read one terminal line without reflecting private project text into tool output."""
+
+    try:
+        import termios
+    except ImportError:
+        raise ConfigurationError(
+            f"{option} cannot safely read terminal input on this platform; use the command's "
+            "non-terminal input mode"
+        ) from None
+
+    try:
+        descriptor = stream.fileno()
+        original = termios.tcgetattr(descriptor)
+    except KeyboardInterrupt:
+        raise ConfigurationError(f"{subject} was cancelled") from None
+    except (AttributeError, OSError, ValueError, termios.error):
+        raise ConfigurationError(
+            f"{option} cannot suppress terminal echo; input was not read"
+        ) from None
+
+    protected = original.copy()
+    protected[6] = original[6].copy()
+    protected[3] &= ~(termios.ECHO | termios.ECHONL | termios.ICANON)
+    protected[6][termios.VMIN] = 1
+    protected[6][termios.VTIME] = 0
+    try:
+        termios.tcsetattr(descriptor, termios.TCSAFLUSH, protected)
+    except KeyboardInterrupt:
+        _restore_tty_state(termios, descriptor, original)
+        raise ConfigurationError(f"{subject} was cancelled") from None
+    except (OSError, ValueError, termios.error):
+        _restore_tty_state(termios, descriptor, original)
+        raise ConfigurationError(
+            f"{option} cannot suppress terminal echo; input was not read"
+        ) from None
+
+    try:
+        applied = termios.tcgetattr(descriptor)
+    except KeyboardInterrupt:
+        _restore_tty_state(termios, descriptor, original)
+        raise ConfigurationError(f"{subject} was cancelled") from None
+    except (OSError, ValueError, termios.error):
+        _restore_tty_state(termios, descriptor, original)
+        raise ConfigurationError(
+            f"{option} cannot confirm terminal echo suppression; input was not read"
+        ) from None
+    if (
+        applied[3] & (termios.ECHO | termios.ECHONL | termios.ICANON)
+        or applied[6][termios.VMIN] != 1
+        or applied[6][termios.VTIME] != 0
+    ):
+        _restore_tty_state(termios, descriptor, original)
+        raise ConfigurationError(
+            f"{option} cannot confirm terminal echo suppression; input was not read"
+        ) from None
+
+    read_completed = False
+    try:
+        if on_ready is not None:
+            on_ready()
+        raw = _read_bounded_tty_json_line(
+            descriptor,
+            subject=subject,
+            max_bytes=max_bytes,
+        )
+        read_completed = True
+        return raw
+    finally:
+        trailing_input_quiet = _discard_tty_input_until_quiet(descriptor)
+        _restore_tty_state(termios, descriptor, original)
+        if read_completed and not trailing_input_quiet:
+            raise ConfigurationError(
+                "terminal input did not become idle; close this terminal session before continuing"
+            ) from None
+
+
+def load_json_line_stdin(
+    stream: BinaryIO,
+    *,
+    option: str,
+    subject: str,
+    on_ready: Callable[[], None] | None = None,
+    max_bytes: int = MAX_FILE_BYTES,
+) -> Any:
+    """Read one bounded JSON record from stdin, including an explicitly requested agent PTY."""
+
+    isatty = getattr(stream, "isatty", None)
+    interactive = bool(callable(isatty) and isatty())
+    if interactive:
+        raw = _read_tty_json_line_without_echo(
+            stream,
+            option=option,
+            subject=subject,
+            on_ready=on_ready,
+            max_bytes=max_bytes,
+        )
+    else:
+        if on_ready is not None:
+            on_ready()
+        raw = _read_bounded_json_line(stream, subject=subject, max_bytes=max_bytes)
+
+    try:
+        value = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_construct_unique_json_mapping,
+            parse_constant=lambda _value: (_ for _ in ()).throw(ValueError()),
+        )
+    except UnicodeDecodeError:
+        raise ConfigurationError(f"{subject} must be valid UTF-8") from None
+    except _DuplicateJsonKeyError:
+        raise ConfigurationError(f"{subject} contains a duplicate JSON mapping key") from None
+    except json.JSONDecodeError as exc:
+        raise ConfigurationError(f"invalid JSON at line {exc.lineno}, column {exc.colno}") from None
+    except (RecursionError, ValueError):
+        raise ConfigurationError(f"invalid {subject}") from None
+
     _validate_tree(value)
     return value
 

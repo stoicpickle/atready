@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import BinaryIO, Literal
 
 from pydantic import ValidationError
@@ -20,6 +21,7 @@ from atready.models import (
     StrictModel,
 )
 from atready.resource_input import ParsedResourceDeclaration, parse_resource_mapping
+from atready.yamlio import load_json_line_stdin
 
 _MAX_QUICK_SETUP_FACTS_BYTES = 4_096
 _STRENGTH_SCORES = {
@@ -97,6 +99,27 @@ def load_quick_setup_facts_stdin(stream: BinaryIO) -> QuickSetupFacts:
         ValidationError,
         ValueError,
     ):
+        raise ConfigurationError(
+            "quick setup facts are invalid; expected only schema_version, name, strength, "
+            "available_now, and private_work"
+        ) from None
+
+
+def load_quick_setup_facts_json_line(
+    stream: BinaryIO, *, on_ready: Callable[[], None] | None = None
+) -> QuickSetupFacts:
+    """Read one bounded JSON facts record from an explicitly requested agent PTY."""
+
+    value = load_json_line_stdin(
+        stream,
+        option="--facts-json-line",
+        subject="quick setup facts",
+        on_ready=on_ready,
+        max_bytes=_MAX_QUICK_SETUP_FACTS_BYTES,
+    )
+    try:
+        return QuickSetupFacts.model_validate(value)
+    except ValidationError:
         raise ConfigurationError(
             "quick setup facts are invalid; expected only schema_version, name, strength, "
             "available_now, and private_work"

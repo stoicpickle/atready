@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).parents[1]
 SCREENSHOT = ROOT / "docs" / "assets" / "atready-cli.png"
-EXPECTED_SIZE = (1728, 1242)
+EXPECTED_SIZE = (1184, 816)
 
 
 def _verify(path: Path) -> subprocess.CompletedProcess[str]:

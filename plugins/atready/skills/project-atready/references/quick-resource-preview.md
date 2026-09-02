@@ -7,32 +7,35 @@ corrected purposes, extra facts, `Not sure` answers, or complete declarations. K
 
 ## Facts envelope
 
-Encode exactly the approved facts as bounded JSON and keep the same envelope for preview and apply:
+Encode only the approved facts and reuse this bounded JSON for preview and apply:
 
 ```json
 {"schema_version":1,"name":"CodeRabbit","strength":"strong","available_now":true,"private_work":true}
 ```
 
-Allowed keys are only `schema_version`, `name`, `strength`, `available_now`, and `private_work`.
-Strength is `basic`, `solid`, `strong`, or `exceptional`; availability and private work are strict
-booleans. Never include credentials, private content, inferred provider/account state, or extra
-fields. Use only the user-approved facts.
+Allow only `schema_version`, `name`, `strength`, `available_now`, and `private_work`. Strength is
+`basic`, `solid`, `strong`, or `exceptional`; the last two fields are strict booleans. Exclude
+credentials, private content, inferred provider/account state, and extra fields.
 
 ## Preview
 
 Require approved local execution and filesystem access. Otherwise request that authorization or
-provide the exact resolved bundled-launcher command below as an inert user-run instruction; never
-offer or invoke a bare `atready add`.
-Start the exact pinned bundled launcher command with non-TTY piped stdin:
+direct the user to the standalone guided `atready add`. The `exec` command below is only for a
+disposable host session; never present it as a human-run fallback.
+Start a fresh POSIX writable terminal session with this exact static shell `exec` command and no
+facts in the command:
 
 ```bash
-"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" \
-  resource quick-add --facts-stdin --json
+exec "/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" \
+  resource quick-add --facts-json-line --json
 ```
 
-Send one bounded exact JSON line plus a newline through the host's stdin channel; the CLI consumes
-that line and exits. Never place the JSON or resource name in a shell command and never create a
-temporary file.
+Wait for exact marker `ATREADY_FACTS_JSON_LINE_READY`, then send the UTF-8 JSON as one line of
+at most 4096 bytes plus one newline through one call to the session's stdin writer within 30 seconds.
+Send nothing else. The marker means terminal echo is off. Without it,
+send no facts and stop. Never place the JSON or resource name in a shell command or temporary file.
+This handshake supports POSIX terminals (macOS/Linux) only. On Windows, use Detailed Setup's
+protected-file branch.
 
 For a user-selected roster add `--path /absolute/path/to/inventory.yaml`. The configured roster
 omits `--path`. The add request does not authorize roster creation; if the target is missing, ask
@@ -42,34 +45,34 @@ Accept a preview only with exit `0`, strict JSON, `status: preview-ready`, forma
 `atready-resource-quick-preview-v1`, and exactly these false effects: `network_accessed`,
 `provider_or_account_inspected`, `resource_run`, and `writes_performed`. `inventory_read` must be
 true. Require one canonical nested `preview` with the intended resource, exact target, expected
-revision, plan token, and no `applied` mutation claim. Treat mapping values as visible proposals,
-not provider verification. Display the actual nested preview unchanged and ask separately:
+revision, plan token, and no `applied` mutation claim. Keep that nested preview only for the exact
+apply binding. Require the CLI-owned `human_preview` string and display it verbatim. Do not show
+the nested preview, mapping, correction, effects, target, revision, plan token, defaulted fields,
+ratings, or other internal schema labels. Then ask separately:
 
 > Save exactly this entry?
 
 ## Mismatch recovery
 
-On a no-write roster/revision mismatch before a complete preview, discard old revision and plan
-tokens, retain only the latest approved facts in this task, and say the roster changed, nothing was
-saved, and the user may say `retry preview`. Exact same-task `retry preview` re-resolves the target
-and repeats the preview command with the same facts. This is the only retry. If it also mismatches,
-say the roster keeps changing and nothing was saved, and do not offer another retry in this task.
-Do not repeat intake or recap approval. A fact change returns to recap. A different task restarts
-intake.
+On a stale revision or plan mismatch before complete preview, discard old tokens but keep the latest approved facts. Exact
+same-task `retry preview` re-resolves the target and starts a fresh writable terminal preview; a
+second mismatch stops; do not offer another retry. This is the only retry. A fact change returns to recap; another task restarts intake. Never retry
+apply or waive save approval.
 
 ## Apply and verify
 
 Only a later explicit yes to `Save exactly this entry?` authorizes apply. Resend the same facts and
-the exact latest preview tokens:
+the exact latest preview tokens in a fresh POSIX writable terminal session:
 
 ```bash
-"/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" \
-  resource quick-add --facts-stdin --apply \
+exec "/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" \
+  resource quick-add --facts-json-line --apply \
   --expect-revision PREVIEW_EXPECT_REVISION --expect-plan PREVIEW_EXPECT_PLAN --json
 ```
 
-Again send the unchanged bounded JSON line plus a newline through the host's non-TTY stdin channel;
-the CLI consumes that line and exits. No shell interpolation or temporary declaration is permitted.
+Wait for `ATREADY_FACTS_JSON_LINE_READY`, then repeat that one-call transport with the unchanged
+JSON. Send nothing else. The preview session has exited and cannot be reused. No shell
+interpolation or temporary declaration is permitted.
 
 Include the same `--path` choice used for preview. Never retry apply. Accept success only with exit
 `0`, strict JSON, format `atready-resource-quick-apply-v1`, `status: applied`, the same mapping,

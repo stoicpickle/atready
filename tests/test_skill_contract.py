@@ -178,8 +178,11 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "init --path /absolute/path/to/inventory.yaml --json" in complete_contract
     assert "inventory snapshot /absolute/path/to/inventory.yaml --format json" in body
     assert "inventory snapshot --format json" in body
-    assert "project template" in body
-    assert "do not run a separate project validation during the normal path" in normalized_body
+    assert "do not invoke `project template`" in normalized_body.casefold()
+    assert (
+        "do not run a separate project validation during the normal path"
+        in normalized_body.casefold()
+    )
     assert "--inventory /absolute/path/to/inventory.yaml" in body
     assert "for the default roster, omit `--inventory`" in normalized_body.lower()
     assert (
@@ -192,8 +195,13 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "provider, account, credential, or network access" in normalized_route_section
     assert "Use it with a demo only when separately authorized" in normalized_route_section
     assert "route" in body
-    assert "--project /absolute/path/to/project.yaml" in body
-    assert body.count("--format agent-summary") >= 2
+    assert body.count("--project-json-line") >= 2
+    assert "writable terminal session" in normalized_body
+    assert "ATREADY_PROJECT_JSON_LINE_READY" in body
+    assert "session's stdin writer" in normalized_body
+    assert "send nothing else" in normalized_body
+    assert route_section.count('exec "/absolute/path/to/python3"') == 2
+    assert body.count("--format agent-summary --width 120") >= 2
     assert "[output-contract.md](references/output-contract.md)" in body
     assert "## Planning workflow" in body
     assert "AtReady handles intake and fit" in normalized_body
@@ -226,10 +234,10 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     )
     assert "inventory list /absolute/path/to/inventory.yaml --json" in complete_contract
     assert "private notes, revision nonces" in normalized_body
-    assert "fresh unpredictable temporary directory" in normalized_body
-    assert "`0700` directory" in normalized_body
-    assert "`0600` `project.yaml`" in normalized_body
-    assert "remove only the exact temporary file" in normalized_body.casefold()
+    assert "fresh unpredictable temporary directory" in normalized_contract
+    assert "directory as `0700`" in normalized_contract
+    assert "declaration exclusively as `0600`" in normalized_contract
+    assert "remove only the exact declaration" in normalized_contract.casefold()
     assert "ends with the exact successful-route boundary" in normalized_body
     assert "bounded presentation format only for an explicit word or line limit" in normalized_body
     assert "exit `3` for a route with gaps" in normalized_body
@@ -241,21 +249,24 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
     assert "detailed evidence or inert handoff packets" in normalized_body
     assert "only when the user explicitly asks" in normalized_body
     assert "A resource-fit plan is advice, not authorization" in normalized_body
-    assert "treat that as new planning input, not implementation authorization" in normalized_body
-    assert "rebuild a fresh protected project, reroute" in normalized_body
-    assert "not forced assignments" in normalized_body
+    assert "correction or conversational what-if as new planning input" in normalized_body
+    assert "start a fresh writable terminal session" in normalized_body
+    assert "For a what-if, change only the stated hypothetical" in normalized_body
+    assert "retain the prior brief" in normalized_body
+    assert "Constraints cannot force assignments" in normalized_body
     assert "never simulate a pin by changing scores" in normalized_body
     assert "preserve exact demand and unit as `capacity_demand`" in normalized_body.casefold()
     assert "never convert, aggregate, subtract, or infer spending" in normalized_body.casefold()
-    assert "exact bundled-launcher `compare` variant" in normalized_body
+    assert "Use `compare` only with a user-supplied baseline project file" in normalized_body
+    assert "exact bundled-launcher variant" in normalized_body
     assert (
-        "choose one alternative project or explicit overrides, never both"
+        "choose one alternative file or explicit overrides, never both"
         in normalized_body.casefold()
     )
     assert "it authorizes no changes" in normalized_body.casefold()
     assert 'scripts/atready.py" compare' in complete_contract
     assert "--against /absolute/path/to/alternative.yaml" in complete_contract
-    assert "Never invoke a bare `atready compare` command" in complete_contract
+    assert "Never invoke a bare `atready compare` command" in normalized_contract
     assert "use `--format json` in this host branch" in normalized_contract
     assert "after removing trailing whitespace, ends with exactly" in normalized_contract
     assert "Do not activate for ordinary project planning" in metadata["description"]
@@ -290,7 +301,9 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     name_first = "If the resource is unnamed, ask only"
     assert name_first in body_normalized
     assert body_normalized.index(name_first) < body_normalized.index("quick-resource-intake.md")
-    assert "Use no tools or filesystem access and narrate nothing" in body_normalized
+    assert (
+        "Use no tools, memory, repository, or filesystem access; narrate nothing" in body_normalized
+    )
     assert "read only [quick-resource-intake.md]" in body_normalized
     assert "Do not read another reference or run any command" in body_normalized
     assert "during the question or recap turns" in body_normalized
@@ -299,7 +312,7 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
         "Only after approval of an unchanged bundled-purpose Quick Setup recap" in body_normalized
     )
     assert "a corrected purpose, extra planning facts, any `Not sure` answer" in body_normalized
-    assert "Reuse supplied facts and ask only what remains necessary" in body_normalized
+    assert "Reuse known facts; ask only what remains" in body_normalized
     assert body_normalized.index("quick-resource-intake.md") < body_normalized.index(
         "quick-resource-preview.md"
     )
@@ -309,9 +322,11 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "only for Detailed Setup, a custom or ambiguous resource" in body_normalized
     assert "first point where local execution or filesystem access may be used" in body_normalized
     assert "recaps use no tools and expose no internal work" in body_normalized.casefold()
-    assert "user-run terminal fallback" in body_normalized
-    assert "never offer bare `atready add`" in body_normalized
-    assert "Show the actual CLI preview unchanged" in body_normalized
+    assert "direct the user to standalone `atready add`" in body_normalized
+    assert "Static `exec` is host-only; never present it as a human fallback" in body_normalized
+    assert "For Quick Setup, show only the CLI-owned `human_preview` unchanged" in body_normalized
+    assert "Detailed Setup shows the complete CLI preview" in body_normalized
+    assert "Then stop for a separate `Save exactly this entry?` approval" in body_normalized
     assert "separate `Save exactly this entry?` approval" in body_normalized
     assert "Never claim success from an uncertain apply receipt" in body_normalized
     assert "Do not use the planning output contract" in body_normalized
@@ -352,7 +367,10 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
 
     quick_preview = (SKILL / "references" / "quick-resource-preview.md").read_text(encoding="utf-8")
     quick_preview_folded = " ".join(quick_preview.split()).casefold()
-    assert "never offer or invoke a bare `atready add`" in quick_preview_folded
+    assert "direct the user to the standalone guided `atready add`" in quick_preview_folded
+    assert "never present it as a human-run fallback" in quick_preview_folded
+    assert "one call to the session's stdin writer" in quick_preview_folded
+    assert "send nothing else" in quick_preview_folded
     assert "this is the only retry" in quick_preview_folded
     assert "do not offer another retry" in quick_preview_folded
 
@@ -405,7 +423,9 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "explicitly asks for detailed evidence" in body_normalized
     assert "the user's project as the subject" in output_folded
     assert "## Normal response" in output_contract
-    assert "`route --format agent-summary`" in output_contract
+    assert "`route --project-json-line --format agent-summary --width 120`" in output_contract
+    assert "fresh POSIX writable terminal session" in output_contract
+    assert "static shell `exec`" in output_contract
     assert "return stdout verbatim" in output_folded.casefold()
     assert "Do not load full route evidence for a normal response" in output_folded
     assert "## Explicit response limits" in output_contract
@@ -431,12 +451,14 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "## No-route response" in output_contract
     assert "no more than three short sentences and 60 words" in output_folded
     assert "do not use the planning headings" in output_folded
-    assert "report the retained path before the unchanged `summary`" in output_folded
-    assert "only exception to whole-response verbatim output" in output_folded
-    assert "never hide a retained path" in output_folded
+    assert "Use `compare` only for a baseline file the user supplied" in output_folded
+    assert "never create a file from a conversational brief" in output_folded
+    assert "conversational what-if updates a fresh in-memory brief" in output_folded
     assert "never change route or mutation status" in body_normalized.casefold()
     assert "Use this branch only when the user explicitly asks" in output_folded
-    assert "Run `route --format json`" in output_folded
+    assert "`route --project-json-line --format json`" in output_folded
+    assert "Wait for `ATREADY_PROJECT_JSON_LINE_READY`" in output_folded
+    assert "send the exact in-memory brief plus one newline" in output_folded
     assert "Read `routing-rules.md` only for this branch" in output_folded
     assert "Keep scores, plan IDs, fingerprints, raw status labels" in output_folded
     assert "## Concise response" not in output_contract
@@ -545,6 +567,19 @@ def test_guided_resource_onboarding_contract_is_one_at_a_time_and_preview_first(
     assert "measured capacity" in folded
     assert "never compare or convert unlike units" in folded
     assert "one resource at a time" in folded
+
+
+def test_detailed_output_puts_decisions_before_handoffs_and_dispositions() -> None:
+    output_contract = (SKILL / "references" / "output-contract.md").read_text(encoding="utf-8")
+
+    project = output_contract.index("### 1. Project interpretation")
+    decisions = output_contract.index("### 2. Gaps, risks, and decisions")
+    assignments = output_contract.index("### 3. Assignment evidence")
+    steps = output_contract.index("### 4. Step details")
+    handoffs = output_contract.index("### 5. Handoff packets")
+    dispositions = output_contract.index("### 6. Complete resource dispositions")
+
+    assert project < decisions < assignments < steps < handoffs < dispositions
 
 
 def test_coderabbit_quick_setup_is_tailored_editable_and_nonexecuting() -> None:
@@ -817,6 +852,7 @@ def test_preview_mismatch_has_one_same_task_no_write_recovery_path() -> None:
         "waive the separate `save exactly this entry?` approval",
     ):
         assert contract in folded
+    assert "fresh writable terminal preview" in folded
 
 
 def test_quick_preview_reference_uses_one_bounded_runtime_orchestration_command() -> None:
@@ -828,9 +864,11 @@ def test_quick_preview_reference_uses_one_bounded_runtime_orchestration_command(
     assert len(quick.split()) <= 650
     assert skill.index("quick-resource-intake.md") < skill.index("quick-resource-preview.md")
     assert skill.index("quick-resource-preview.md") < skill.index("resource-onboarding.md")
-    assert quick.count("resource quick-add --facts-stdin") == 2
-    assert "resource quick-add --facts-stdin --json" in quick
-    assert "resource quick-add --facts-stdin --apply" in quick
+    assert quick.count("resource quick-add --facts-json-line") == 2
+    assert "resource quick-add --facts-json-line --json" in quick
+    assert "resource quick-add --facts-json-line --apply" in quick
+    assert "--facts-stdin" not in quick
+    assert quick.count('exec "/absolute/path/to/python3"') == 2
     assert "--expect-revision preview_expect_revision" in folded
     assert "--expect-plan preview_expect_plan" in folded
     for required in (
@@ -842,12 +880,18 @@ def test_quick_preview_reference_uses_one_bounded_runtime_orchestration_command(
         "resource_run",
         "writes_performed",
         "one canonical nested `preview`",
-        "display the actual nested preview unchanged",
+        "require the cli-owned `human_preview` string",
+        "display it verbatim",
+        "do not show the nested preview",
         "save exactly this entry?",
         "resend the same facts",
-        "host's stdin channel",
-        "one bounded exact json line plus a newline",
-        "the cli consumes that line and exits",
+        "atready_facts_json_line_ready",
+        "one line of at most 4096 bytes plus one newline",
+        "session's stdin writer",
+        "marker means terminal echo is off",
+        "send no facts and stop",
+        "fresh posix writable terminal session",
+        "preview session has exited and cannot be reused",
         "never place the json or resource name in a shell command",
         "no shell interpolation or temporary declaration",
         "atready-resource-quick-apply-v1",
@@ -855,6 +899,8 @@ def test_quick_preview_reference_uses_one_bounded_runtime_orchestration_command(
         "never retry apply",
     ):
         assert required in folded
+    assert "supports posix terminals (macos/linux) only" in folded
+    assert "on windows, use detailed setup's protected-file branch" in folded
     assert "printf" not in quick
     for detailed_only in (
         "schema resource-declaration",
@@ -913,23 +959,26 @@ def test_provider_cards_omit_questions_already_answered() -> None:
     assert "render one card with exactly three visible bullets" not in folded
 
 
-def test_planning_skill_uses_a_protected_temporary_project_and_exact_cleanup() -> None:
+def test_planning_skill_uses_echo_suppressed_project_json_line() -> None:
     body = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     output_contract = (SKILL / "references" / "output-contract.md").read_text(encoding="utf-8")
     folded = " ".join(body.split()).casefold()
     output_folded = " ".join(output_contract.split()).casefold()
 
-    assert "fresh unpredictable temporary directory" in folded
-    assert "outside every repository" in folded
-    assert "register exact cleanup for success and error paths immediately" in folded
-    assert "restrictive creation mask" in folded
-    assert "`0700` directory" in folded
-    assert "`0600` `project.yaml`" in folded
-    assert "remove only the exact temporary file" in folded
-    assert "exact empty temporary directory" in folded
-    assert "if cleanup fails, report the retained path" in output_folded
-    assert "before the unchanged `summary`" in output_folded
-    assert "only exception to whole-response verbatim output" in output_folded
+    assert "build one `projectbrief` mapping in memory" in folded
+    assert "writable terminal session" in folded
+    assert "atready_project_json_line_ready" in folded
+    assert "session's stdin writer" in folded
+    assert "static shell `exec`" in folded
+    assert "posix-only (macos/linux)" in folded
+    assert "windows uses the no-route response" in folded
+    assert "do not invoke `project template`" in folded
+    assert "do not write a temporary project file" in folded
+    assert "never place the document in command arguments" in folded
+    assert "do not use a shell pipeline" in folded
+    assert "route --project-json-line --format agent-summary --width 120" in output_folded
+    assert "route --project-json-line --format presentation" in output_folded
+    assert "route --project-json-line --format json" in output_folded
 
 
 def test_openai_metadata_matches_skill_name() -> None:

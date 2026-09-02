@@ -76,7 +76,8 @@ UI. Keep the source artwork for owner review without presenting it as a product 
 - `Read`: reads explicit project, declaration, and target-scoped backup inputs, plus either an
   explicit inventory path or AtReady's resolved default inventory when the path is omitted.
 - `Write`: creates or changes local inventory state only through explicit preview/apply contracts;
-  temporary project-brief files remain separately controlled by the host workflow.
+  the normal planning flow submits its bounded project brief as one JSON line after an
+  echo-suppressed terminal readiness marker.
 - `Interactive`: gathers project/resource declarations and presents plans for human review.
 
 These labels describe host-visible workflow needs; they do not grant authority. The plugin has no
@@ -98,7 +99,7 @@ must not include executed project-resource handoffs.
    - Prompt: `I have a loose plan for the attached synthetic project. Use AtReady before implementation to fit the attached synthetic demo resources to the provided workstreams and visibly explain constraints and gaps. Use inventory.yaml and project-godot.yaml, allow the demo inventory, and do not execute any project-resource handoff.`
    - Fixture: the complete `inventory.yaml` and `project-godot.yaml` payloads below.
    - Expected behavior: activate the AtReady skill without requiring a user-authored formal
-     brief, preserve the planner-provided workstreams, validate its temporary project brief, invoke
+     brief, preserve the planner-provided workstreams, validate its direct project brief, invoke
      the compatible local runtime with demo opt-in, and preserve the returned ordered assignments.
    - Expected result shape: one compact `Resource fit` section tied to the provided plan, material
      warnings/gaps, and an authorization-boundary statement. Full traces and inert handoff packets
@@ -547,7 +548,7 @@ workstreams:
 
 ## Future release-notes draft (not for the probe)
 
-> Initial skills-only submission of AtReady plugin 0.1.11. For a fixed normalized project brief and
+> Initial skills-only submission of AtReady plugin 0.1.12. For a fixed normalized project brief and
 > inventory snapshot, its capability router deterministically matches declared resources to
 > planner-provided workstreams. It uses
 > a user-maintained local inventory and a compatible local
@@ -601,7 +602,7 @@ Also open the four links in a signed-out browser and check the rendered text, no
 The current candidate may complete the local preparation items and a reversible portal draft probe
 only. Submission and publication items remain deliberately blocked for this nonrelease artifact.
 
-- [ ] Confirm the exact source commit and `0.1.11` plugin bundle; record the independently installed
+- [ ] Confirm the exact source commit and `0.1.12` plugin bundle; record the independently installed
       runtime version and prove its contract-and-feature handshake. Retain the available artifact
       hashes/attestations for each channel without implying their product versions must match.
 - [ ] Run the plugin/skill validators, exact-asset contract, staged-plugin smoke, clean first-user
@@ -657,7 +658,7 @@ the plugin version plus ZIP SHA-256:
 
 ```bash
 python3 scripts/build_plugin_submission.py \
-  --output dist/atready-plugin-0.1.11.zip
+  --output dist/atready-plugin-0.1.12.zip
 ```
 
 Run the repository's current-policy plugin validator, OpenAI's skill validator, and

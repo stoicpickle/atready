@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import select
 import subprocess
 import sys
 from pathlib import Path
@@ -11,7 +12,7 @@ import pytest
 
 import atready.intake as intake
 from atready.catalog import InventoryCatalog
-from atready.cli import main
+from atready.cli import build_parser, main
 
 
 class _BinaryInput:
@@ -87,6 +88,32 @@ def test_quick_setup_preview_delegates_to_exact_no_write_add_plan(
         "resource_run": False,
         "writes_performed": False,
     }
+    human_preview = result["human_preview"]
+    assert human_preview == (
+        "CodeRabbit for code review and repository analysis\n\n"
+        "Strength: Strong\n"
+        "Available now: Yes\n"
+        "Private work: Allowed\n"
+        "Still unknown: Account access, usage limits, and permission for sensitive work.\n\n"
+        "Nothing has been saved."
+    )
+    for hidden_detail in (
+        "sha256:",
+        "inventory.yaml",
+        "defaulted",
+        "rating",
+        "target",
+        "revision",
+        "token",
+        "expect_revision",
+        "expect_plan",
+        "intake_review",
+        "mapping",
+        "preview",
+        "effects",
+        "resource_id",
+    ):
+        assert hidden_detail not in human_preview.casefold()
     preview = result["preview"]
     assert isinstance(preview, dict)
     assert preview["operation"] == "add-resource"
@@ -364,6 +391,130 @@ def test_quick_setup_exits_after_one_line_without_waiting_for_stdin_close(
     result = json.loads(stdout_path.read_bytes())
     assert result["status"] == "preview-ready"
     assert stderr_path.read_bytes() == b""
+
+
+def test_quick_setup_json_line_is_exclusive_bounded_and_signals_ready(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    parser = build_parser()
+    with pytest.raises(SystemExit) as missing:
+        parser.parse_args(["resource", "quick-add"])
+    assert missing.value.code == 2
+    capsys.readouterr()
+    with pytest.raises(SystemExit) as duplicate:
+        parser.parse_args(["resource", "quick-add", "--facts-stdin", "--facts-json-line"])
+    assert duplicate.value.code == 2
+    assert "not allowed with argument --facts-stdin" in capsys.readouterr().err
+
+    inventory = tmp_path / "inventory.yaml"
+    assert main(["init", "--path", str(inventory)]) == 0
+    capsys.readouterr()
+    original = inventory.read_bytes()
+    monkeypatch.setattr(sys, "stdin", _BinaryInput(_facts()))
+    assert (
+        main(
+            [
+                "resource",
+                "quick-add",
+                "--path",
+                str(inventory),
+                "--facts-json-line",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    captured = capsys.readouterr()
+    assert captured.err == "ATREADY_FACTS_JSON_LINE_READY\n"
+    assert json.loads(captured.out)["status"] == "preview-ready"
+    assert inventory.read_bytes() == original
+
+    monkeypatch.setattr(sys, "stdin", _BinaryInput(b"{" + b"x" * 4_096 + b"\n"))
+    assert (
+        main(
+            [
+                "resource",
+                "quick-add",
+                "--path",
+                str(inventory),
+                "--facts-json-line",
+                "--json",
+            ]
+        )
+        == 2
+    )
+    captured = capsys.readouterr()
+    assert captured.err.startswith("ATREADY_FACTS_JSON_LINE_READY\n")
+    assert "exceeds 4096 bytes" in captured.err
+    assert captured.out == ""
+    assert inventory.read_bytes() == original
+
+
+@pytest.mark.skipif(not hasattr(os, "openpty"), reason="agent handshake requires a POSIX PTY")
+def test_quick_setup_json_line_launches_then_accepts_one_unreflected_facts_record(
+    tmp_path: Path,
+) -> None:
+    import termios
+
+    inventory = tmp_path / "inventory.yaml"
+    assert main(["init", "--path", str(inventory)]) == 0
+    original = inventory.read_bytes()
+    master, slave = os.openpty()
+    expected_terminal = termios.tcgetattr(slave)
+    process: subprocess.Popen[bytes] | None = None
+    try:
+        process = subprocess.Popen(  # noqa: S603 - exact current test interpreter
+            [
+                sys.executable,
+                "-c",
+                "from atready.cli import main; raise SystemExit(main())",
+                "resource",
+                "quick-add",
+                "--path",
+                str(inventory),
+                "--facts-json-line",
+                "--json",
+            ],
+            stdin=slave,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env={**os.environ, "ATREADY_HOME": str(tmp_path)},
+        )
+        os.close(slave)
+        slave = -1
+        assert process.stderr is not None
+        readable, _, _ = select.select([process.stderr], [], [], 3)
+        assert readable, "quick setup did not publish its readiness marker"
+        assert process.stderr.readline() == b"ATREADY_FACTS_JSON_LINE_READY\n"
+
+        facts = _facts()
+        facts_body = facts.rstrip(b"\n")
+        os.write(master, facts_body)
+        assert process.poll() is None
+        readable, _, _ = select.select([master], [], [], 0.1)
+        reflected = os.read(master, 8_192) if readable else b""
+        assert facts_body not in reflected
+
+        os.write(master, b"\n")
+        stdout, stderr = process.communicate(timeout=3)
+
+        assert process.returncode == 0
+        assert stderr == b""
+        assert json.loads(stdout)["status"] == "preview-ready"
+        assert inventory.read_bytes() == original
+        restored = termios.tcgetattr(master)
+        assert restored[3] == expected_terminal[3]
+        assert restored[6][termios.VMIN] == expected_terminal[6][termios.VMIN]
+        assert restored[6][termios.VTIME] == expected_terminal[6][termios.VTIME]
+    finally:
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.wait(timeout=3)
+        if slave >= 0:
+            os.close(slave)
+        os.close(master)
 
 
 def test_quick_setup_never_calls_discovery_provider_or_network_seams(

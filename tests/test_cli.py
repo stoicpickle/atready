@@ -18,6 +18,7 @@ from atready.catalog import InventoryCatalog
 from atready.cli import _WORDMARK, _capacity_number, _date_value, _welcome_text, main
 from atready.errors import ConfigurationError, StorageError
 from atready.models import DataClass
+from atready.project import project_from_text
 from atready.templates import demo_inventory, starter_inventory, starter_project
 
 
@@ -26,9 +27,18 @@ def test_bare_cli_is_a_plain_language_welcome(capsys) -> None:
     captured = capsys.readouterr()
     assert "Plan with what you have at the ready." in captured.out
     assert "Turn a rough plan and your available tools" in captured.out
+    assert "Try the safe demo   atready demo" in captured.out
     assert "Create your roster  atready init" in captured.out
     assert "Add a resource      atready add" in captured.out
-    assert "Try the safe demo   atready demo" in captured.out
+    assert "Check resource fit  atready plan" in captured.out
+    steps = (
+        "Try the safe demo   atready demo",
+        "Create your roster  atready init",
+        "Add a resource      atready add",
+        "Check resource fit  atready plan",
+        "See every command   atready --help",
+    )
+    assert list(map(captured.out.index, steps)) == sorted(map(captured.out.index, steps))
     assert "never runs a tool, spends a credit, or starts the work" in captured.out
     assert " - " not in captured.out
     assert "\033[" not in captured.out
@@ -229,6 +239,26 @@ def test_guided_add_preview_can_be_cancelled_without_writing(
     assert '"context_switch_cost":' not in output
     assert "Type 'save codex'" in output
     assert "Cancelled. No files changed." in output
+    assert target.read_bytes() == original
+    assert not (tmp_path / ".quartermaster-backups").exists()
+
+
+def test_guided_add_can_cancel_at_starter_profile_without_writing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    target = tmp_path / "inventory.yaml"
+    assert main(["init", "--path", str(target)]) == 0
+    capsys.readouterr()
+    original = target.read_bytes()
+    monkeypatch.setattr(cli, "_guided_terminal_available", lambda: True)
+    monkeypatch.setattr(sys, "stdin", _TTYInput("\ncancel\n"))
+
+    assert main(["add", "--path", str(target)]) == 0
+
+    output = capsys.readouterr().out
+    assert "Type cancel at any prompt." in output
+    assert "Cancelled. No files changed." in output
+    assert "Choose one number from the list." not in output
     assert target.read_bytes() == original
     assert not (tmp_path / ".quartermaster-backups").exists()
 
@@ -922,6 +952,28 @@ def test_schema_command_uses_pydantic_v2_schema_api(capsys) -> None:
     assert schema["additionalProperties"] is False
 
 
+def test_route_requires_exactly_one_project_input(capsys) -> None:
+    parser = cli.build_parser()
+
+    with pytest.raises(SystemExit) as missing:
+        parser.parse_args(["route"])
+    assert missing.value.code == 2
+    assert (
+        "one of the arguments --project --project-stdin --project-json-line is required"
+        in capsys.readouterr().err
+    )
+
+    with pytest.raises(SystemExit) as duplicate:
+        parser.parse_args(["route", "--project", "project.yaml", "--project-stdin"])
+    assert duplicate.value.code == 2
+    assert "not allowed with argument --project" in capsys.readouterr().err
+
+    with pytest.raises(SystemExit) as duplicate_stdin:
+        parser.parse_args(["route", "--project-stdin", "--project-json-line"])
+    assert duplicate_stdin.value.code == 2
+    assert "not allowed with argument --project-stdin" in capsys.readouterr().err
+
+
 def test_project_route_yaml_snapshot_and_all_schemas(tmp_path: Path, monkeypatch, capsys) -> None:
     home = tmp_path / "private-home"
     monkeypatch.setenv("ATREADY_HOME", str(home))
@@ -956,6 +1008,20 @@ def test_project_route_yaml_snapshot_and_all_schemas(tmp_path: Path, monkeypatch
     plan = json.loads(capsys.readouterr().out)
     assert plan["assignments"][0]["primary"]["resource_id"] == "local-coding-agent"
     assert plan["warnings"] == []
+
+    monkeypatch.setattr(sys, "stdin", _BinaryInput(project_path.read_bytes()))
+    assert main(["route", "--project-stdin", "--format", "json"]) == 0
+    assert json.loads(capsys.readouterr().out) == plan
+
+    project_json_line = (
+        json.dumps(
+            project_from_text(project_path.read_text(encoding="utf-8")).model_dump(mode="json")
+        )
+        + "\n"
+    )
+    monkeypatch.setattr(sys, "stdin", _BinaryInput(project_json_line.encode("utf-8")))
+    assert main(["route", "--project-json-line", "--format", "json"]) == 0
+    assert json.loads(capsys.readouterr().out) == plan
 
     assert main(["route", "--project", str(project_path), "--format", "presentation"]) == 0
     presentation = json.loads(capsys.readouterr().out)

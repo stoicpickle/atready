@@ -435,6 +435,10 @@ def test_help_is_progressive_and_complete_help_remains_available(capsys) -> None
     assert "Advanced command names:" in beginner
     assert "doctor  runtime  config  resource  state  skill  schema" in beginner
     assert "demo      Run a complete synthetic resource fit example" in beginner
+    get_started = beginner.split("Get started:", 1)[1].split("Manage:", 1)[0]
+    assert get_started.index("demo") < get_started.index("init")
+    assert get_started.index("init") < get_started.index("add")
+    assert get_started.index("add") < get_started.index("plan")
 
     headings = {"Get started:", "Manage:", "More:", "Advanced command names:"}
     displayed_commands: set[str] = set()

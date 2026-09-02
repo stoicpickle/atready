@@ -13,6 +13,7 @@ ROOT = Path(__file__).parents[1]
 EVAL = ROOT / "evals" / "PLAN_COMMUNICATION_EVAL.md"
 EVAL_README = ROOT / "evals" / "README.md"
 FIXTURES = ROOT / "evals" / "fixtures"
+DECISION_CHANGE_FIXTURES = ROOT / "evals" / "decision_change" / "fixtures"
 
 
 def _route_fixture(scenario: str, inventory_name: str | None = None) -> RoutePlan:
@@ -110,6 +111,40 @@ def test_plan_communication_fixtures_match_the_declared_json_evidence(monkeypatc
     )
 
 
+def test_pixel_art_requires_an_explicit_declared_capability(monkeypatch) -> None:
+    def fail_network(*_args, **_kwargs):
+        raise AssertionError("capability matching must remain offline")
+
+    monkeypatch.setattr(socket.socket, "connect", fail_network)
+    project = project_from_path(DECISION_CHANGE_FIXTURES / "project-pixel-game.yaml")
+
+    general_inventory = InventoryCatalog.from_path(
+        FIXTURES / "inventory.yaml", today=project.as_of
+    ).inventory
+    general_route = route(general_inventory, project, allow_demo=True)
+    general_art = next(
+        assignment
+        for assignment in general_route.assignments
+        if assignment.workstream_id == "pixel-art"
+    )
+    assert general_art.primary is None
+    assert general_art.gap_reason == (
+        "No verified eligible resource satisfies the required capabilities and constraints."
+    )
+
+    exact_inventory = InventoryCatalog.from_path(
+        DECISION_CHANGE_FIXTURES / "inventory-pixel-game.yaml", today=project.as_of
+    ).inventory
+    exact_route = route(exact_inventory, project, allow_demo=True)
+    exact_art = next(
+        assignment
+        for assignment in exact_route.assignments
+        if assignment.workstream_id == "pixel-art"
+    )
+    assert exact_art.primary is not None
+    assert exact_art.primary.resource_id == "retro-diffusion"
+
+
 def test_plan_communication_cli_summaries_keep_the_default_contract(monkeypatch) -> None:
     def fail_network(*_args, **_kwargs):
         raise AssertionError("plan communication fixtures must remain offline")
@@ -186,7 +221,14 @@ def test_deterministic_agent_presentations_preserve_the_cross_surface_contract(
 
     support = render_agent_summary(_route_fixture("degraded", "inventory-degraded.yaml"), width=120)
     assert support.count("Synthetic Reviewer") == 1
+    assert "Synthetic Exhausted Fast Coder has no declared quota remaining" in " ".join(
+        support.split()
+    )
     assert "covering review" in support
+    assert "Synthetic Public Architect is blocked by the project's data-class rule" in " ".join(
+        support.split()
+    )
+    assert "Why: Each primary above" not in support
 
     alternate = render_agent_summary(_route_fixture("alternate"), width=120)
     assert alternate.count("Synthetic Verifier B") == 1
@@ -195,6 +237,7 @@ def test_deterministic_agent_presentations_preserve_the_cross_surface_contract(
     web = render_agent_summary(_route_fixture("web", "inventory.yaml"), width=120)
     assert "Route: 4 steps assigned" in web
     assert "Why: Each primary above" in web
+    assert "Next: Use this fit in Codex's plan" in web
 
     for presentation in (straightforward, unverified, support, alternate, web):
         assert len(presentation.split()) <= 100

@@ -57,6 +57,13 @@ def test_first_use_form_collects_five_answers_and_requires_privacy_check() -> No
     assert fields["impact_and_improvement"]["attributes"]["label"] == (
         "5. Would you use AtReady again?"
     )
+    assert (
+        "I added a resource and completed a resource-fit check"
+        in (fields["progress"]["attributes"]["options"])
+    )
+    assert all(
+        "routed a project" not in option for option in fields["progress"]["attributes"]["options"]
+    )
 
 
 def test_public_forms_warn_about_private_data_and_route_security_reports() -> None:

@@ -1,13 +1,22 @@
 from __future__ import annotations
 
+import io
 import os
+import select
+import threading
 from pathlib import Path
 
 import pytest
 
 import atready.yamlio as yamlio
 from atready.errors import ConfigurationError
-from atready.yamlio import MAX_FILE_BYTES, load_yaml, loads_yaml
+from atready.yamlio import (
+    MAX_FILE_BYTES,
+    load_json_line_stdin,
+    load_yaml,
+    load_yaml_stdin,
+    loads_yaml,
+)
 
 
 def test_rejects_duplicate_keys() -> None:
@@ -50,6 +59,421 @@ def test_rejects_empty_oversized_and_non_string_key_input() -> None:
         loads_yaml("x" * (MAX_FILE_BYTES + 1))
     with pytest.raises(ConfigurationError, match="mapping keys must be strings"):
         loads_yaml("1: value\n")
+
+
+class _InteractiveInput(io.BytesIO):
+    def isatty(self) -> bool:
+        return True
+
+
+def test_stdin_loader_accepts_bounded_yaml_and_json() -> None:
+    assert load_yaml_stdin(
+        io.BytesIO(b'{"value": "safe"}'), option="--test-stdin", subject="test input"
+    ) == {"value": "safe"}
+    assert load_yaml_stdin(
+        io.BytesIO(b"value: safe\n"), option="--test-stdin", subject="test input"
+    ) == {"value": "safe"}
+
+
+def test_stdin_loader_refuses_tty_before_reading() -> None:
+    with pytest.raises(ConfigurationError, match="interactive input is refused"):
+        load_yaml_stdin(
+            _InteractiveInput(b"value: safe\n"),
+            option="--test-stdin",
+            subject="test input",
+        )
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (b'{"value":"safe"}', "must end with one newline"),
+        (b"x" * (MAX_FILE_BYTES + 1), "exceeds"),
+        (b"\xff\n", "valid UTF-8"),
+        (b'{"value":1,"value":2}\n', "duplicate JSON mapping key"),
+        (b'{"token":"forbidden"}\n', "secret-bearing field"),
+    ],
+)
+def test_json_line_stdin_preserves_framing_and_tree_guards(payload: bytes, message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        load_json_line_stdin(io.BytesIO(payload), option="--test-json-line", subject="test input")
+
+
+def test_json_line_stdin_accepts_one_bounded_record() -> None:
+    ready: list[bool] = []
+    assert load_json_line_stdin(
+        io.BytesIO(b'{"value":"safe"}\n'),
+        option="--test-json-line",
+        subject="test input",
+        on_ready=lambda: ready.append(True),
+    ) == {"value": "safe"}
+    assert ready == [True]
+
+
+def test_json_line_stdin_reports_cancel_without_a_traceback() -> None:
+    class _InterruptedInput(io.BytesIO):
+        def readline(self, _size: int = -1) -> bytes:
+            raise KeyboardInterrupt
+
+    with pytest.raises(ConfigurationError, match="test input was cancelled"):
+        load_json_line_stdin(_InterruptedInput(), option="--test-json-line", subject="test input")
+
+
+@pytest.mark.skipif(not hasattr(os, "openpty"), reason="terminal echo proof requires a POSIX PTY")
+def test_json_line_tty_disables_echo_before_signaling_ready() -> None:
+    import termios
+
+    master, slave = os.openpty()
+    configured = termios.tcgetattr(slave)
+    configured[6] = configured[6].copy()
+    configured[6][termios.VMIN] = 7
+    configured[6][termios.VTIME] = 9
+    termios.tcsetattr(slave, termios.TCSANOW, configured)
+    expected = termios.tcgetattr(slave)
+    stream = os.fdopen(slave, "rb", buffering=0)
+    ready = threading.Event()
+    result: dict[str, object] = {}
+    failure: list[BaseException] = []
+
+    def load() -> None:
+        try:
+            result["value"] = load_json_line_stdin(
+                stream,
+                option="--test-json-line",
+                subject="test input",
+                on_ready=ready.set,
+            )
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            failure.append(exc)
+
+    worker = threading.Thread(target=load)
+    try:
+        worker.start()
+        assert ready.wait(timeout=2)
+        sentinel = b"private-project-sentinel" + (b"x" * 8_192)
+        trailing = b"SYNTHETIC-TRAILING-INPUT\n"
+        os.write(master, b'{"value":"' + sentinel + b'"}\n' + trailing)
+        worker.join(timeout=2)
+        assert not worker.is_alive()
+        assert failure == []
+        assert result == {"value": {"value": sentinel.decode("ascii")}}
+        restored = termios.tcgetattr(stream.fileno())
+        assert restored[6][termios.VMIN] == expected[6][termios.VMIN]
+        assert restored[6][termios.VTIME] == expected[6][termios.VTIME]
+        queued, _, _ = select.select([stream.fileno()], [], [], 0.1)
+        assert queued == []
+        readable, _, _ = select.select([master], [], [], 0.1)
+        reflected = os.read(master, 4096) if readable else b""
+        assert sentinel not in reflected
+        assert trailing not in reflected
+        assert b"\a" not in reflected
+    finally:
+        stream.close()
+        os.close(master)
+
+
+@pytest.mark.skipif(not hasattr(os, "openpty"), reason="terminal drain proof requires a POSIX PTY")
+def test_json_line_tty_drains_concurrent_trailing_input_before_restoring_echo() -> None:
+    import termios
+
+    master, slave = os.openpty()
+    original = termios.tcgetattr(slave)
+    stream = os.fdopen(slave, "rb", buffering=0)
+    ready = threading.Event()
+    result: dict[str, object] = {}
+    failure: list[BaseException] = []
+    write_failure: list[BaseException] = []
+
+    def load() -> None:
+        try:
+            result["value"] = load_json_line_stdin(
+                stream,
+                option="--test-json-line",
+                subject="test input",
+                on_ready=ready.set,
+            )
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            failure.append(exc)
+
+    # Exceed a typical PTY input queue without making the writer depend on consuming
+    # several megabytes inside the production two-second drain deadline.
+    trailing = b"LATE-SYNTHETIC-INPUT" * 8_192
+
+    def write() -> None:
+        remaining = memoryview(b'{"value":"safe"}\n' + trailing)
+        try:
+            while remaining:
+                written = os.write(master, remaining)
+                remaining = remaining[written:]
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            write_failure.append(exc)
+
+    worker = threading.Thread(target=load)
+    writer = threading.Thread(target=write)
+    try:
+        worker.start()
+        assert ready.wait(timeout=2)
+        writer.start()
+        worker.join(timeout=4)
+        writer.join(timeout=4)
+        assert not worker.is_alive()
+        assert not writer.is_alive()
+        assert failure == []
+        assert write_failure == []
+        assert result == {"value": {"value": "safe"}}
+        assert termios.tcgetattr(stream.fileno()) == original
+        queued, _, _ = select.select([stream.fileno()], [], [], 0.1)
+        assert queued == []
+        readable, _, _ = select.select([master], [], [], 0.1)
+        reflected = os.read(master, 65_536) if readable else b""
+        assert b"LATE-SYNTHETIC-INPUT" not in reflected
+    finally:
+        stream.close()
+        os.close(master)
+
+
+@pytest.mark.skipif(not hasattr(os, "openpty"), reason="terminal state proof requires a POSIX PTY")
+def test_json_line_tty_reports_terminal_restoration_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import termios
+
+    master, slave = os.openpty()
+    original = termios.tcgetattr(slave)
+    stream = os.fdopen(slave, "rb", buffering=0)
+    ready = threading.Event()
+    failure: list[BaseException] = []
+    real_tcsetattr = termios.tcsetattr
+    calls: list[int] = []
+
+    def fail_restore(descriptor: int, when: int, attributes: list[object]) -> None:
+        calls.append(when)
+        if len(calls) == 2:
+            raise termios.error("synthetic restoration failure")
+        real_tcsetattr(descriptor, when, attributes)
+
+    monkeypatch.setattr(termios, "tcsetattr", fail_restore)
+
+    def load() -> None:
+        try:
+            load_json_line_stdin(
+                stream,
+                option="--test-json-line",
+                subject="test input",
+                on_ready=ready.set,
+            )
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            failure.append(exc)
+
+    worker = threading.Thread(target=load)
+    try:
+        worker.start()
+        assert ready.wait(timeout=2)
+        os.write(master, b'{"value":"safe"}\n')
+        worker.join(timeout=2)
+        assert not worker.is_alive()
+        assert len(failure) == 1
+        assert isinstance(failure[0], ConfigurationError)
+        assert str(failure[0]) == (
+            "cannot confirm terminal state restoration; close this terminal session "
+            "before continuing"
+        )
+        assert calls == [termios.TCSAFLUSH, termios.TCSAFLUSH]
+    finally:
+        monkeypatch.setattr(termios, "tcsetattr", real_tcsetattr)
+        real_tcsetattr(stream.fileno(), termios.TCSAFLUSH, original)
+        stream.close()
+        os.close(master)
+
+
+@pytest.mark.skipif(not hasattr(os, "openpty"), reason="terminal state proof requires a POSIX PTY")
+def test_json_line_tty_refuses_before_ready_when_protection_is_not_applied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import termios
+
+    master, slave = os.openpty()
+    original = termios.tcgetattr(slave)
+    stream = os.fdopen(slave, "rb", buffering=0)
+    ready: list[bool] = []
+    real_tcsetattr = termios.tcsetattr
+    calls = 0
+
+    def ignore_protection(descriptor: int, when: int, attributes: list[object]) -> None:
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            real_tcsetattr(descriptor, when, attributes)
+
+    monkeypatch.setattr(termios, "tcsetattr", ignore_protection)
+    try:
+        with pytest.raises(ConfigurationError, match="cannot confirm terminal echo suppression"):
+            load_json_line_stdin(
+                stream,
+                option="--test-json-line",
+                subject="test input",
+                on_ready=lambda: ready.append(True),
+            )
+        assert ready == []
+        assert termios.tcgetattr(stream.fileno()) == original
+    finally:
+        monkeypatch.setattr(termios, "tcsetattr", real_tcsetattr)
+        real_tcsetattr(stream.fileno(), termios.TCSAFLUSH, original)
+        stream.close()
+        os.close(master)
+
+
+@pytest.mark.skipif(not hasattr(os, "openpty"), reason="terminal state proof requires a POSIX PTY")
+def test_json_line_tty_reports_silent_restoration_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import termios
+
+    master, slave = os.openpty()
+    original = termios.tcgetattr(slave)
+    stream = os.fdopen(slave, "rb", buffering=0)
+    ready = threading.Event()
+    failure: list[BaseException] = []
+    real_tcsetattr = termios.tcsetattr
+    calls = 0
+
+    def ignore_restore(descriptor: int, when: int, attributes: list[object]) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            real_tcsetattr(descriptor, when, attributes)
+
+    monkeypatch.setattr(termios, "tcsetattr", ignore_restore)
+
+    def load() -> None:
+        try:
+            load_json_line_stdin(
+                stream,
+                option="--test-json-line",
+                subject="test input",
+                on_ready=ready.set,
+            )
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            failure.append(exc)
+
+    worker = threading.Thread(target=load)
+    try:
+        worker.start()
+        assert ready.wait(timeout=2)
+        os.write(master, b'{"value":"safe"}\n')
+        worker.join(timeout=2)
+        assert not worker.is_alive()
+        assert len(failure) == 1
+        assert isinstance(failure[0], ConfigurationError)
+        assert "cannot confirm terminal state restoration" in str(failure[0])
+    finally:
+        monkeypatch.setattr(termios, "tcsetattr", real_tcsetattr)
+        real_tcsetattr(stream.fileno(), termios.TCSAFLUSH, original)
+        stream.close()
+        os.close(master)
+
+
+@pytest.mark.skipif(
+    not hasattr(os, "openpty"),
+    reason="terminal timeout proof requires a POSIX PTY",
+)
+def test_json_line_tty_times_out_on_an_incomplete_record(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import termios
+
+    master, slave = os.openpty()
+    original = termios.tcgetattr(slave)
+    stream = os.fdopen(slave, "rb", buffering=0)
+    ready = threading.Event()
+    read_seen = threading.Event()
+    failure: list[BaseException] = []
+    real_os_read = os.read
+
+    def observed_read(descriptor: int, count: int) -> bytes:
+        value = real_os_read(descriptor, count)
+        if value:
+            read_seen.set()
+        return value
+
+    monkeypatch.setattr(yamlio, "_TTY_JSON_LINE_TIMEOUT_SECONDS", 0.5)
+    monkeypatch.setattr(yamlio.os, "read", observed_read)
+
+    def load() -> None:
+        try:
+            load_json_line_stdin(
+                stream,
+                option="--test-json-line",
+                subject="test input",
+                on_ready=ready.set,
+            )
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            failure.append(exc)
+
+    worker = threading.Thread(target=load)
+    try:
+        worker.start()
+        assert ready.wait(timeout=2)
+        os.write(master, b'{"value":"incomplete"}')
+        assert read_seen.wait(timeout=2)
+        worker.join(timeout=2)
+        assert not worker.is_alive()
+        assert len(failure) == 1
+        assert isinstance(failure[0], ConfigurationError)
+        assert str(failure[0]) == "test input timed out before one complete line"
+        assert termios.tcgetattr(stream.fileno()) == original
+        os.set_blocking(stream.fileno(), False)
+        try:
+            queued = real_os_read(stream.fileno(), 65_536)
+        except BlockingIOError:
+            queued = b""
+        assert queued == b""
+    finally:
+        stream.close()
+        os.close(master)
+
+
+@pytest.mark.skipif(not hasattr(os, "openpty"), reason="terminal cancel proof requires a POSIX PTY")
+def test_json_line_tty_reports_cancel_and_restores_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import termios
+
+    master, slave = os.openpty()
+    original = termios.tcgetattr(slave)
+    stream = os.fdopen(slave, "rb", buffering=0)
+
+    def interrupt(*_args: object) -> tuple[list[int], list[int], list[int]]:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(yamlio.select, "select", interrupt)
+    try:
+        with pytest.raises(ConfigurationError, match="test input was cancelled"):
+            load_json_line_stdin(
+                stream,
+                option="--test-json-line",
+                subject="test input",
+            )
+        assert termios.tcgetattr(stream.fileno()) == original
+    finally:
+        stream.close()
+        os.close(master)
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (b"x" * (MAX_FILE_BYTES + 1), "exceeds"),
+        (b"\xff\n", "valid UTF-8"),
+        (b"", "configuration is empty"),
+        (b"value: first\nvalue: second\n", "duplicate mapping key"),
+        (b"value: &anchor safe\n", "anchors and aliases"),
+        (b"token: forbidden\n", "secret-bearing field"),
+    ],
+)
+def test_stdin_loader_preserves_bounded_yaml_guards(payload: bytes, message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        load_yaml_stdin(io.BytesIO(payload), option="--test-stdin", subject="test input")
 
 
 @pytest.mark.parametrize(

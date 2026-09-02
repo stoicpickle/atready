@@ -273,7 +273,7 @@ def test_agent_summary_groups_resources_and_is_ready_to_return_verbatim() -> Non
     assert "Synthetic CodeRabbit Seat: Independent review." in rendered
     assert "continuity kept related steps together" in rendered
     assert "Uncertainty: This uses a demo inventory." in rendered
-    assert "Next: Review the assignments before separately authorizing implementation." in rendered
+    assert "Next: Use this fit in Codex's plan; separately authorize implementation." in rendered
     assert rendered.endswith("No routed project resources were contacted or run.\n")
     assert len(rendered.split()) <= 100
     assert plan.plan_id not in rendered
@@ -289,8 +289,18 @@ def test_agent_summary_preserves_support_alternate_and_gap_meaning() -> None:
 
     assert support.count("Synthetic Builder") == 1
     assert support.count("Synthetic Reviewer") == 1
+    assert "Synthetic Exhausted Fast Coder has no declared quota remaining" in " ".join(
+        support.split()
+    )
     assert "Supports Complementary delivery, covering review" in support
     assert "does not cover alone" in support
+    assert "Synthetic Public Architect is blocked by the project's data-class rule" in " ".join(
+        support.split()
+    )
+    assert "Why: Each primary above" not in support
+    assert len(support.split()) <= 100
+    assert len(support.splitlines()) <= 12
+    assert "Next: Use this fit in Codex's plan" in support
 
     support_plan = route(support_inventory, support_project, allow_demo=True)
     delivery = next(item for item in support_plan.assignments if item.workstream_id == "delivery")
