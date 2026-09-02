@@ -152,18 +152,40 @@ jobs:
           tests/test_route_comparison.py
           tests/test_routing.py
 
-      - name: Windows tests 7 of 7
+      - name: Windows routing property tests
         if: runner.os == 'Windows'
-        timeout-minutes: 4
+        timeout-minutes: 2
         env:
           PYTHONPATH: src
-        run: >-
-          uv run --no-sync pytest
-          tests/test_routing_properties.py
-          tests/test_routing_stress.py
-          tests/test_runtime_contract.py
-          tests/test_skill_contract.py
-          tests/test_yamlio.py
+        run: uv run --no-sync pytest tests/test_routing_properties.py
+
+      - name: Windows routing stress tests
+        if: runner.os == 'Windows'
+        timeout-minutes: 2
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync pytest tests/test_routing_stress.py
+
+      - name: Windows runtime contract tests
+        if: runner.os == 'Windows'
+        timeout-minutes: 2
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync pytest tests/test_runtime_contract.py
+
+      - name: Windows skill contract tests
+        if: runner.os == 'Windows'
+        timeout-minutes: 2
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync pytest tests/test_skill_contract.py
+
+      - name: Windows YAML input tests
+        if: runner.os == 'Windows'
+        timeout-minutes: 2
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync pytest tests/test_yamlio.py
 
       - name: Test with branch coverage
         if: runner.os == 'Linux'
