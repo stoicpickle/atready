@@ -1154,6 +1154,7 @@ def test_launcher_executes_the_exact_resolved_uv_tool_arguments(tmp_path: Path) 
             verify_runtime_contract.__globals__,
             {"_run_bounded": bounded},
         ),
+        mock.patch.object(namespace["sys"], "platform", "linux"),
         mock.patch.object(os, "execv", side_effect=RuntimeError("synthetic exec")) as execv,
         mock.patch.object(sys, "argv", ["wrapper", "route", "--format", "json"]),
         pytest.raises(RuntimeError, match="synthetic exec"),
@@ -1168,3 +1169,44 @@ def test_launcher_executes_the_exact_resolved_uv_tool_arguments(tmp_path: Path) 
         resolved_candidate,
         [resolved_candidate, "route", "--format", "json"],
     )
+
+
+def test_launcher_propagates_the_delegated_exit_code_on_windows(tmp_path: Path) -> None:
+    namespace = runpy.run_path(str(WRAPPER))
+    tool_bin = tmp_path / "uv-bin"
+    tool_bin.mkdir()
+    candidate = tool_bin / "atready.exe"
+    candidate.write_text("synthetic executable", encoding="utf-8")
+    resolved_candidate = str(candidate.resolve())
+    uv_result = subprocess.CompletedProcess(
+        args=[FAKE_UV, "--offline", "--no-config", "tool", "dir", "--bin"],
+        returncode=0,
+        stdout=f"{tool_bin.resolve()}\n",
+        stderr="",
+    )
+    matching = subprocess.CompletedProcess(
+        args=[resolved_candidate, *_doctor_arguments(namespace)],
+        returncode=0,
+        stdout=json.dumps(_doctor_payload(namespace)) + "\n",
+        stderr="",
+    )
+    delegated = subprocess.CompletedProcess(
+        args=[resolved_candidate, "inventory", "list"],
+        returncode=2,
+    )
+    verify_runtime_contract = namespace["_verify_runtime_contract"]
+    bounded = mock.Mock(side_effect=[uv_result, matching])
+    run = mock.Mock(return_value=delegated)
+
+    with (
+        mock.patch.object(namespace["shutil"], "which", return_value=FAKE_UV),
+        mock.patch.dict(verify_runtime_contract.__globals__, {"_run_bounded": bounded}),
+        mock.patch.object(namespace["subprocess"], "run", run),
+        mock.patch.object(namespace["sys"], "platform", "win32"),
+        mock.patch.object(namespace["sys"], "argv", ["wrapper", "inventory", "list"]),
+        pytest.raises(SystemExit) as stopped,
+    ):
+        namespace["main"]()
+
+    assert stopped.value.code == 2
+    run.assert_called_once_with([resolved_candidate, "inventory", "list"], check=False)

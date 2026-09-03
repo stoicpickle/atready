@@ -396,7 +396,13 @@ def _verify_runtime_contract(command: list[str]) -> None:
 def main() -> None:
     executable, command = _resolve_command()
     _verify_runtime_contract(command)
-    os.execv(executable, [*command, *sys.argv[1:]])  # noqa: S606
+    arguments = [*command, *sys.argv[1:]]
+    if sys.platform == "win32":
+        # Windows cannot replace the current process with POSIX exec semantics.
+        # Wait for the delegated CLI so its exact success or failure reaches the host.
+        completed = subprocess.run(arguments, check=False)  # noqa: S603
+        raise SystemExit(completed.returncode)
+    os.execv(executable, arguments)  # noqa: S606
 
 
 if __name__ == "__main__":
