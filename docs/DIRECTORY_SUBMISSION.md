@@ -6,7 +6,7 @@ represent it as a release candidate, or reuse its receipt as release evidence. I
 that a submission draft exists, OpenAI has approved the plugin, or the developer has published it.
 
 Official OpenAI documentation currently supports **skills-only** plugin submissions through the
-[OpenAI Platform plugin submission portal](https://platform.openai.com/apps-manage). The documented
+[OpenAI Platform plugin submission portal](https://platform.openai.com/plugins). The documented
 flow is submit, OpenAI review, developer-controlled publish after approval, then appearance in the
 Plugins Directory shared by ChatGPT and Codex. Reconfirm the
 [official submission instructions](https://developers.openai.com/plugins/deploy/submission) at the
@@ -25,7 +25,7 @@ characters each.
   "displayName": "AtReady",
   "shortDescription": "Bring resource fit to the plan",
   "longDescription": "AtReady is a small resource-fit companion for supported Codex surfaces. Add one declared tool, service, subscription, person, or agent through a conversational no-write preview and a separate exact save approval. Then bring AtReady a goal, rough plan, or written plan before implementation to match saved tools, services, subscriptions, people, and agents to planner-provided work, expose material constraints and gaps, and explain its advice without contacting or running routed project resources. Codex owns the project plan. This local-first release requires a separately installed compatible project-atready runtime and local file access.",
-  "developerName": "stoicpickle",
+  "developerName": "Russell Lane Wonsley",
   "category": "Developer Tools",
   "capabilities": ["Add declared resources with approval", "Match saved resources to project work", "Explain constraints, gaps, and omissions"],
   "websiteURL": "https://github.com/stoicpickle/atready",
@@ -42,7 +42,7 @@ characters each.
 ```
 
 Measured against current Directory limits: display name `7/30`, short description `30/30`, long
-description `642/4000`, developer name `11/80`, and starter prompts `103/128`, `69/128`, and
+description `642/4000`, developer name `20/80`, and starter prompts `103/128`, `69/128`, and
 `45/128`. `Developer Tools` is a currently supported category. Any manifest copy change invalidates
 these measurements until the check is rerun.
 
@@ -70,6 +70,8 @@ website, support process, privacy policy, and terms.
 
 Current external-state snapshot (2026-09-02): the GitHub repository is public and all four
 anonymous listing URLs above return `200` at their expected final URLs.
+Current external-state snapshot (2026-09-02): the publishing account completed individual
+verification, and the skills-only pre-upload flow displayed that verified identity for selection.
 Current external-state snapshot (2026-09-01): GitHub private vulnerability reporting is enabled
 as observed on that date.
 These are point-in-time observations, not durable launch claims. Re-run the anonymous checks and
@@ -91,6 +93,8 @@ stop clearly on unsupported surfaces rather than claiming a route or write succe
 ## Assets
 
 - `assets/icon.png`: 512 x 512 square directory logo and composer icon.
+- `docs/assets/atready-icon.svg`: editable source for the flat icon. Its cobalt, violet, and coral
+  match the CLI banner's three exact color stops.
 - `assets/logo.png`: 1200 x 300 light-surface marketing wordmark.
 - `assets/logo-dark.png`: 1200 x 300 dark-surface marketing wordmark.
 - `assets/route-overview.png`: 1440 x 900 synthetic route overview.
@@ -684,8 +688,9 @@ authorization.
       signed-out preflight immediately before submission.
 - [x] GitHub private vulnerability reporting was enabled on 2026-09-01. Reconfirm it immediately
       before submission and retain the documented security-contact fallback.
-- [ ] In the publishing organization, grant the submitter Apps Management **Write** and select a
-      verified developer/business identity that matches the public publisher identity.
+- [ ] The verified individual identity was selectable in the skills-only pre-upload flow on
+      2026-09-02. Before uploading the exact ZIP, confirm that the submitter is an organization
+      owner or has Apps Management **Write** access. Reconfirm both immediately before submission.
 - [ ] Owner chooses the countries/regions where product, support, and legal terms are ready.
 - [ ] Owner approves the initial release notes and every portal policy attestation only after checking
       the final listing, skill bundle, prompts, tests, and availability.

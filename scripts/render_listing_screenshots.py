@@ -44,9 +44,10 @@ SCREENSHOT_FILENAMES = ("route-overview.png", "safe-preview.png")
 LOGO_FILENAMES = ("logo.png", "logo-dark.png")
 OUTPUT_FILENAMES = (*SCREENSHOT_FILENAMES, *LOGO_FILENAMES)
 REPOSITORY_ASSET_DIR = Path(__file__).resolve().parents[1] / "plugins" / "atready" / "assets"
+CANONICAL_ICON_SHA256 = "7bf01f3123d3679e2187f477997b2f11470b9ea96021128a761d3fbea86aa01d"
 CANONICAL_LOGO_SHA256 = {
-    "logo.png": "4f1098b133c15a04e0c96cab15bd0139337645ec865b79e0adfc2f8b21406799",
-    "logo-dark.png": "215a633e7e95ded73fbb590691db7037066105bdaf1898c6c9dc3876a2ae5bed",
+    "logo.png": "56a4e479231fbff1ce5ffe230b393bcdcd89fd243666d4820a8879b52c9e1ff2",
+    "logo-dark.png": "93e8b27dbb8a4aed243b9bd96ab6b891442ccd0ce6df7e5e7e3aa7df5c860f6b",
 }
 
 
@@ -451,6 +452,9 @@ def verify_assets(expected_dir: Path) -> None:
             digest = hashlib.sha256((expected_dir / name).read_bytes()).hexdigest()
             if digest != expected_digest and name not in mismatches:
                 mismatches.append(name)
+        icon_digest = hashlib.sha256((expected_dir / "icon.png").read_bytes()).hexdigest()
+        if icon_digest != CANONICAL_ICON_SHA256:
+            mismatches.append("icon.png")
     if mismatches:
         joined = ", ".join(mismatches)
         raise SystemExit(f"committed listing assets differ from deterministic render: {joined}")

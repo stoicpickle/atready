@@ -2,6 +2,9 @@
 
 Effective date: 2026-08-08
 
+AtReady's public source is maintained through **Stoicpickle**. Its proposed OpenAI Plugins
+Directory listing uses verified individual publisher **Russell Lane Wonsley**.
+
 AtReady is distributed under the Apache License 2.0. Nothing in this document changes the
 permissions or conditions of that license. The software is provided subject to the warranty and
 liability terms stated in that license.
