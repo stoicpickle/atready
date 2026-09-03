@@ -31,8 +31,9 @@ maintainer availability; no response-time guarantee is offered.
 
 ## v0.1 security boundary
 
-AtReady v0.1 separates a local CLI from a ChatGPT/Codex-hosted planning workflow. The CLI makes no
-provider calls itself and does not dispatch handoffs or invoke resources for project work. Its
+AtReady v0.1 separates a local CLI from optional AI-host skill workflows. The personal skill and
+the Codex-only Directory candidate are distinct distribution surfaces. The CLI makes no provider
+calls itself and does not dispatch handoffs or invoke resources for project work. Its
 separately authorized optional version command executes one external program with fixed arguments
 and unevaluated external side effects. When the skill is
 used, project and inventory context may be processed by the configured AI host or model provider;
@@ -52,10 +53,11 @@ The v0.1 boundary is:
 - it does not invoke inventoried resources for project work or dispatch handoffs; and
 - generated handoffs and commands are advisory and display-only.
 
-The ChatGPT/Codex plugin is a separate skills-only artifact. It declares no apps, MCP servers,
-connectors, hooks, telemetry, or installer. Its launcher resolves the separately installed runtime
-without a shell and refuses a runtime-contract mismatch or missing required feature. Product
-versions may differ; compatibility is not a substitute for release provenance.
+The current Directory candidate is a separate Codex-only, skills-only artifact. It declares no
+apps, MCP servers, connectors, hooks, telemetry, or installer. Its launcher resolves the separately
+installed runtime without a shell and refuses a runtime-contract mismatch or missing required
+feature. Product versions may differ; compatibility is not a substitute for release provenance.
+It does not claim ChatGPT Chat/Work or Codex cloud/remote functionality.
 
 Use through an AI host is a separate trust boundary. Inventory and project
 context loaded into a hosted model may leave the machine under the host and

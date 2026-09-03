@@ -5,7 +5,7 @@ description: Add one user-declared resource to an AtReady roster through a conve
 
 # AtReady
 
-AtReady handles intake and fit. Codex owns planning.
+AtReady handles intake and fit. Codex owns planning. Requires a local Codex task, Python 3.11 or newer, trusted `uv`, the separately installed reviewed runtime, and local file access; unsupported in ChatGPT Chat or Work, Codex cloud or remote, mobile, and the Codex IDE extension.
 
 Resolve `SKILL.md` directory. Resolve one already-installed Python 3.11 or newer interpreter.
 Replace both absolute placeholders and run the bundled launcher. Never invoke a bare `atready` command or bypass
@@ -70,11 +70,10 @@ Summarize the smallest useful ordered steps, deliverables, constraints, data cla
 checks, and explicit exclusions.
 
 Ask at most one consolidated clarification when missing facts could change resource eligibility or
-assignment. Otherwise state conservative assumptions. Finish when each step has an objective,
-deliverable, and verification path.
+assignment. Otherwise state conservative assumptions.
 
 Preserve exact demand and unit as `capacity_demand`. Never convert, aggregate, subtract, or infer
-spending; it is advisory snapshot evidence.
+spending.
 
 The user's explicit request to use AtReady with their saved roster authorizes only the bounded,
 read-only inventory checks, direct project brief, and local route. Otherwise ask whether to begin.
@@ -94,8 +93,8 @@ Otherwise use AtReady's configured roster:
 "/absolute/path/to/python3" "/absolute/path/to/project-atready/scripts/atready.py" \
   inventory snapshot --format json
 ```
-Run only the applicable command. It securely reads and validates the roster, so
-do not precede it with `config path` or a separate validation call.
+It securely reads and validates the roster, so do not precede it with `config path` or a separate
+validation call.
 
 If the launcher, trusted `uv`, compatible runtime, or inventory is unavailable, read
 [runtime-setup.md](references/runtime-setup.md). Do not use the planning output contract or its
@@ -148,7 +147,7 @@ the normal route command. Never discover/default it or treat it as provider, acc
 Use it with a demo only when separately authorized.
 
 Return summary. Accept exit `0`, or exit `3` for a route with gaps, only
-when stdout ends with the successful-route boundary; otherwise use the no-route response.
+when stdout ends with the exact successful-route boundary; otherwise use the no-route response.
 Use the bounded presentation format only for an explicit word or line limit.
 Use full JSON and [routing-rules.md](references/routing-rules.md) only when the user explicitly asks
 for detailed evidence or inert handoff packets. Never choose a different winner, recalculate a
@@ -158,8 +157,7 @@ score, or infer live access.
 Follow the output contract. Build requested details from the full
 JSON route, never from memory or the compact summary.
 
-A `ready` summary already ends with the exact successful-route boundary. Do not append another
-boundary. A resource-fit plan is advice, not authorization. Wait for a separate
+A resource-fit plan is advice, not authorization. Wait for a separate
 implementation instruction before project work or handoff execution.
 
 Treat a correction or conversational what-if as new planning input, not implementation authorization.

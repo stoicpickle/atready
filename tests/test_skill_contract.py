@@ -168,6 +168,11 @@ def test_skill_frontmatter_and_resources_are_portable() -> None:
 
     assert metadata["name"] == "project-atready"
     assert set(metadata) == {"name", "description"}
+    assert "local Codex task" in normalized_body
+    assert "Python 3.11 or newer" in normalized_body
+    assert "trusted `uv`" in normalized_body
+    assert "separately installed reviewed runtime" in normalized_body
+    assert "unsupported in ChatGPT Chat or Work" in normalized_body
     assert "TODO" not in body
     assert body.count('"/absolute/path/to/project-atready/scripts/atready.py"') >= 3
     assert "Never invoke a bare `atready` command or bypass the launcher" in normalized_body
@@ -1003,15 +1008,18 @@ def test_openai_metadata_matches_skill_name() -> None:
     }
 
 
-def test_runtime_setup_reference_is_safe_and_self_contained() -> None:
+def test_runtime_setup_reference_is_safe_and_immutable() -> None:
     reference = (SKILL / "references" / "runtime-setup.md").read_text(encoding="utf-8")
     normalized = " ".join(reference.split())
 
     assert "uv tool install --force --no-config --no-python-downloads" in reference
-    assert "git+https://github.com/stoicpickle/atready.git@main" in reference
-    assert "moving public-source beta channel" in normalized
-    assert "not an immutable or PyPI release" in normalized
-    assert "not verified against a pinned or signed release" in normalized
+    assert (
+        "git+https://github.com/stoicpickle/atready.git@34fb4376b376bb9a26f22578a0b9e1c3aef9cc6e"
+    ) in reference
+    assert "exact reviewed public runtime commit" in normalized
+    assert "reviewed runtime `0.1.10` commit" in normalized
+    assert "not a signed release" in normalized
+    assert "does not pin or attest every third-party dependency artifact" in normalized
     assert "atready runtime contract --json" not in reference
     assert "retry there after installation" in normalized
     assert "do not invoke a bare `atready` executable" in normalized
@@ -1061,7 +1069,6 @@ def test_checkout_wrapper_ignores_an_earlier_path_atready(tmp_path: Path) -> Non
     assert installed.returncode == 0, installed.stderr
     installed_cli = tool_bin / ("atready.exe" if sys.platform == "win32" else "atready")
     assert installed_cli.is_file()
-
     fake_bin = tmp_path / "fake-bin"
     fake_bin.mkdir()
     fake_name = "atready.exe" if sys.platform == "win32" else "atready"

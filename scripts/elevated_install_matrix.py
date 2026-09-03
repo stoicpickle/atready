@@ -127,7 +127,7 @@ def _runtime_payload(
 def _invoke_staged_wrapper(
     root: Path,
     *,
-    plugin_version: str = "0.1.12",
+    plugin_version: str = "0.1.13",
     runtime_version: str = "9.9.9",
     legacy_doctor: bool = False,
     missing_feature: bool = False,
@@ -228,7 +228,10 @@ def run_matrix(root: Path) -> dict[str, Any]:
         raise AssertionError("stale runtime was not rejected before delegation")
     if "retry the AtReady preview or other request in this same task" not in stale.stderr:
         raise AssertionError("stale runtime did not provide same-task recovery")
-    if "git+https://github.com/stoicpickle/atready.git@main" not in stale.stderr:
+    if (
+        "git+https://github.com/stoicpickle/atready.git@"
+        "34fb4376b376bb9a26f22578a0b9e1c3aef9cc6e" not in stale.stderr
+    ):
         raise AssertionError("stale runtime did not provide the public-source recovery command")
     if "SYNTHETIC-DELEGATED-RUNTIME" in stale.stdout + stale.stderr:
         raise AssertionError("stale runtime delegated the requested command")

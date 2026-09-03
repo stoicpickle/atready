@@ -94,7 +94,9 @@ AtReady expands trust only after the preceding local boundary is proven.
   recommendation usefulness, and repeat use over new providers, connectors, or routing features.
 - Add a PyPI install only after the exact package/release lane is ready and independently verified.
 - Revisit a public plugin-directory submission only if users want it and the supported-surface path
-  is proven. Plugin packaging never grants broader permissions or execution authority.
+  is proven. The pilot claims only local Codex tasks and Codex CLI with a separately installed
+  runtime; it must not combine a Directory plugin with a personal-skill sideload. Plugin packaging
+  never grants broader permissions or execution authority.
 - Design and prove previewed nonce migration/rotation and safe independent-clone handling before
   claiming in-place recovery for legacy unblinded or nonce-exposed private inventories.
 

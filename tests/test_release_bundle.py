@@ -23,6 +23,7 @@ NORMALIZED_NAME = PROJECT["name"].replace("-", "_")
 REPOSITORY = "stoicpickle/atready"
 SOURCE_COMMIT = "a" * 40
 WORKFLOW_COMMIT = "b" * 40
+RUNTIME_COMMIT = "34fb4376b376bb9a26f22578a0b9e1c3aef9cc6e"
 SPEC = importlib.util.spec_from_file_location("atready_release_bundle", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 release_bundle = importlib.util.module_from_spec(SPEC)
@@ -173,6 +174,7 @@ def test_release_contract_refuses_placeholder_recovery_source(
     launcher.write_text(
         f"PLUGIN_VERSION = {PLUGIN['version']!r}\n"
         f"REVIEWED_RUNTIME_VERSION = {VERSION!r}\n"
+        f"REVIEWED_RUNTIME_COMMIT = {RUNTIME_COMMIT!r}\n"
         "PUBLIC_RUNTIME_SOURCE = 'git+https://github.com/stoicpickle/atready.git@RELEASE_VERSION'\n",
         encoding="utf-8",
     )
@@ -180,23 +182,41 @@ def test_release_contract_refuses_placeholder_recovery_source(
 
     with pytest.raises(
         release_bundle.ReleaseBundleError,
-        match="public runtime source must name the public main channel",
+        match="public runtime source must name the reviewed commit",
     ):
         release_bundle._release_contract()
 
 
-def test_release_contract_refuses_readme_recovery_command_drift(
+def test_release_contract_refuses_plugin_runtime_setup_command_drift(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    readme = tmp_path / "README.md"
-    readme.write_text("# Synthetic README\n", encoding="utf-8")
-    monkeypatch.setattr(release_bundle, "_README", readme)
+    runtime_setup = tmp_path / "runtime-setup.md"
+    runtime_setup.write_text(
+        release_bundle._RUNTIME_SETUP.read_text(encoding="utf-8") + "\n"
+        "```bash\n"
+        "uv tool install --force --no-config --no-python-downloads \\\n"
+        "  --default-index https://pypi.org/simple \\\n"
+        f"  'git+https://github.com/stoicpickle/atready.git@{'b' * 40}'\n"
+        "```\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(release_bundle, "_RUNTIME_SETUP", runtime_setup)
 
     with pytest.raises(
         release_bundle.ReleaseBundleError,
-        match="recovery command does not match README onboarding",
+        match="recovery command does not match plugin runtime setup",
     ):
         release_bundle._release_contract()
+
+
+def test_runtime_setup_parser_rejects_blank_line_in_continuation() -> None:
+    with pytest.raises(
+        release_bundle.ReleaseBundleError,
+        match="blank line in a shell continuation",
+    ):
+        release_bundle._fenced_shell_commands(
+            "```bash\nuv tool install \\\n\n  project-atready\n```\n"
+        )
 
 
 def test_release_bundle_verification_refuses_artifact_tampering(tmp_path: Path) -> None:

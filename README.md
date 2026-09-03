@@ -54,8 +54,14 @@ indexes; clear them first if you require PyPI-only dependency resolution.
 If your terminal says `atready` was not found, run `uv tool update-shell`, close and reopen the
 terminal, then try again.
 
-The CLI works on its own. To add AtReady to Codex conversations, continue to
-[Use AtReady with Codex](#use-atready-with-codex) after the demo.
+The CLI works on its own. To add its bundled skill to Codex as a personal-skill sideload, continue
+to [Use AtReady with Codex](#use-atready-with-codex) after the demo. A separate local marketplace
+lifecycle pilot for a possible future Directory release lives in
+[the local pilot guide](https://github.com/stoicpickle/atready/blob/main/docs/PLUGIN_DIRECTORY_PILOT.md).
+The
+[Directory quickstart](https://github.com/stoicpickle/atready/blob/main/docs/PLUGIN_DIRECTORY_QUICKSTART.md)
+explains the eventual beginner and
+reviewer path. Do not combine either plugin install with the personal-skill copy below.
 
 Run the demo:
 
@@ -135,6 +141,17 @@ three steps, expected results, verification checks, or strength thresholds. Neit
 the complete project plan, writes a project file, contacts a resource, spends a credit, or runs work.
 
 ## Use AtReady with Codex
+
+### Personal-skill sideload from this CLI install
+
+This section is the CLI-installed personal-skill path. It is not a Plugins Directory installation.
+If you use the local marketplace lifecycle pilot, do not copy `project-atready` into
+`~/.agents/skills`: that creates a separate skill with separate discovery, update, and removal
+behavior. The plugin also does not install or update the CLI runtime; see the
+[Directory quickstart](https://github.com/stoicpickle/atready/blob/main/docs/PLUGIN_DIRECTORY_QUICKSTART.md)
+and
+[local pilot guide](https://github.com/stoicpickle/atready/blob/main/docs/PLUGIN_DIRECTORY_PILOT.md)
+in this repository.
 
 The Codex skill is the intended conversational experience. The CLI is its local engine and a
 standalone fallback: it stores the declared roster, validates changes, and produces the same

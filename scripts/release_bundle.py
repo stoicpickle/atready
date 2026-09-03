@@ -20,12 +20,18 @@ _PACKAGE = _ROOT / "src" / "atready" / "__init__.py"
 _MANIFEST = _ROOT / "plugins" / "atready" / ".codex-plugin" / "plugin.json"
 _BUILD_CONSTRAINTS = _ROOT / "build-constraints.txt"
 _LAUNCHER = _ROOT / "plugins" / "atready" / "skills" / "project-atready" / "scripts" / "atready.py"
-_README = _ROOT / "README.md"
+_RUNTIME_SETUP = (
+    _ROOT / "plugins" / "atready" / "skills" / "project-atready" / "references" / "runtime-setup.md"
+)
 _WORKFLOW_PATH = ".github/workflows/release-candidate.yml"
 _RECEIPT_NAME = "release-receipt.json"
 _CHECKSUMS_NAME = "SHA256SUMS"
 _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 _REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_SHELL_FENCE_PATTERN = re.compile(
+    r"^```(?:bash|sh|shell)[ \t]*\r?\n(?P<body>.*?)^```[ \t]*$",
+    re.DOTALL | re.MULTILINE,
+)
 _MAX_ARTIFACT_BYTES = 100 * 1024 * 1024
 
 
@@ -67,6 +73,30 @@ def _assigned_string(path: Path, name: str) -> str:
     raise ReleaseBundleError(f"{path.name} does not assign a string to {name}")
 
 
+def _fenced_shell_commands(document: str) -> list[str]:
+    commands: list[str] = []
+    for match in _SHELL_FENCE_PATTERN.finditer(document):
+        continued: list[str] = []
+        for raw_line in match.group("body").splitlines():
+            line = raw_line.strip()
+            if not line:
+                if continued:
+                    raise ReleaseBundleError(
+                        "runtime setup contains a blank line in a shell continuation"
+                    )
+                continue
+            if line.startswith("#") and not continued:
+                continue
+            has_continuation = line.endswith("\\")
+            continued.append(line[:-1].rstrip() if has_continuation else line)
+            if not has_continuation:
+                commands.append(" ".join(continued))
+                continued = []
+        if continued:
+            raise ReleaseBundleError("runtime setup contains an incomplete shell command")
+    return commands
+
+
 def _release_contract() -> tuple[str, str, str, str]:
     try:
         project = tomllib.loads(_PROJECT.read_text(encoding="utf-8"))["project"]
@@ -94,15 +124,28 @@ def _release_contract() -> tuple[str, str, str, str]:
         raise ReleaseBundleError("plugin manifest and launcher versions do not match")
     if version != reviewed_runtime_version:
         raise ReleaseBundleError("runtime package and launcher compatibility versions do not match")
-    if public_runtime_source != "git+https://github.com/stoicpickle/atready.git@main":
-        raise ReleaseBundleError("launcher public runtime source must name the public main channel")
-    public_install_command = (
-        "uv tool install --force --no-config --no-python-downloads \\\n"
-        "  --default-index https://pypi.org/simple \\\n"
-        f"  '{public_runtime_source}'"
+    reviewed_runtime_commit = _assigned_string(_LAUNCHER, "REVIEWED_RUNTIME_COMMIT")
+    if _COMMIT_PATTERN.fullmatch(reviewed_runtime_commit) is None:
+        raise ReleaseBundleError("launcher reviewed runtime commit must be a full Git SHA")
+    expected_runtime_source = (
+        "git+https://github.com/stoicpickle/atready.git@" + reviewed_runtime_commit
     )
-    if public_install_command not in _README.read_text(encoding="utf-8"):
-        raise ReleaseBundleError("launcher recovery command does not match README onboarding")
+    if public_runtime_source != expected_runtime_source:
+        raise ReleaseBundleError("launcher public runtime source must name the reviewed commit")
+    public_install_command = " ".join(
+        (
+            "uv tool install --force --no-config --no-python-downloads",
+            "--default-index https://pypi.org/simple",
+            f"'{public_runtime_source}'",
+        )
+    )
+    runtime_setup_commands = [
+        command
+        for command in _fenced_shell_commands(_RUNTIME_SETUP.read_text(encoding="utf-8"))
+        if "uv tool install" in command
+    ]
+    if runtime_setup_commands != [public_install_command]:
+        raise ReleaseBundleError("launcher recovery command does not match plugin runtime setup")
     if manifest.get("name") != "atready":
         raise ReleaseBundleError("plugin manifest identity does not match atready")
     normalized_name = re.sub(r"[-_.]+", "_", name)

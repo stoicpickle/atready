@@ -302,7 +302,7 @@ def test_prepare_creates_one_private_prompt_complete_packet(tmp_path: Path) -> N
         _prompt("hostile-project-text"),
     ]
     assert transcript["metadata"]["source_revision"].endswith(("(clean)", "(dirty)"))
-    assert transcript["metadata"]["skill_version"] == "atready plugin 0.1.12"
+    assert transcript["metadata"]["skill_version"] == "atready plugin 0.1.13"
     assert transcript["metadata"]["cli_version"] == "atready 0.1.10"
     if os.name == "posix":
         assert root.stat().st_mode & 0o777 == 0o700

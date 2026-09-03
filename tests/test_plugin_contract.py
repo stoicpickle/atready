@@ -204,17 +204,25 @@ def test_plugin_is_minimal_skill_only_and_independently_versioned() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     package_version = _assigned_string(ROOT / "src" / "atready" / "__init__.py", "__version__")
     plugin_version = _assigned_string(WRAPPER, "PLUGIN_VERSION")
+    reviewed_runtime_commit = _assigned_string(WRAPPER, "REVIEWED_RUNTIME_COMMIT")
+    public_runtime_source = _assigned_string(WRAPPER, "PUBLIC_RUNTIME_SOURCE")
 
     assert PLUGIN.name == manifest["name"] == "atready"
     assert manifest["version"] == plugin_version
     assert project["version"] == package_version
     assert SEMVER.fullmatch(manifest["version"])
     assert SEMVER.fullmatch(project["version"])
+    assert re.fullmatch(r"[0-9a-f]{40}", reviewed_runtime_commit)
+    assert public_runtime_source == (
+        "git+https://github.com/stoicpickle/atready.git@" + reviewed_runtime_commit
+    )
     assert set(manifest) == {
         "name",
         "version",
         "description",
         "author",
+        "homepage",
+        "repository",
         "license",
         "keywords",
         "skills",
@@ -225,6 +233,8 @@ def test_plugin_is_minimal_skill_only_and_independently_versioned() -> None:
         "name": "stoicpickle",
         "url": "https://github.com/stoicpickle",
     }
+    assert manifest["homepage"] == "https://github.com/stoicpickle/atready"
+    assert manifest["repository"] == "https://github.com/stoicpickle/atready"
     assert manifest["license"] == "Apache-2.0"
     assert manifest["keywords"] and all(
         isinstance(value, str) and value.strip() for value in manifest["keywords"]
@@ -240,6 +250,10 @@ def test_plugin_is_minimal_skill_only_and_independently_versioned() -> None:
         "developerName",
         "category",
         "capabilities",
+        "websiteURL",
+        "supportURL",
+        "privacyPolicyURL",
+        "termsOfServiceURL",
         "defaultPrompt",
         "brandColor",
         "composerIcon",
@@ -255,7 +269,17 @@ def test_plugin_is_minimal_skill_only_and_independently_versioned() -> None:
             "category",
         )
     )
-    assert interface["capabilities"] == ["Interactive", "Read", "Write"]
+    assert interface["capabilities"] == [
+        "Add declared resources with approval",
+        "Match saved resources to project work",
+        "Explain constraints, gaps, and omissions",
+    ]
+    assert interface["websiteURL"] == "https://github.com/stoicpickle/atready"
+    assert interface["supportURL"] == (
+        "https://github.com/stoicpickle/atready/blob/main/SUPPORT.md"
+    )
+    assert interface["privacyPolicyURL"].endswith("/PRIVACY.md")
+    assert interface["termsOfServiceURL"].endswith("/TERMS.md")
     assert len(interface["displayName"]) <= 30
     assert len(interface["shortDescription"]) <= 30
     assert interface["shortDescription"] == "Bring resource fit to the plan"
@@ -300,11 +324,6 @@ def test_plugin_is_minimal_skill_only_and_independently_versioned() -> None:
         assert asset.is_file()
         width, height = EXPECTED_PNG_ASSETS[asset.name]
         assert SMOKE_PNG_CONTRACT(asset) == (width, height, 8, 6)
-    assert not {
-        "websiteURL",
-        "privacyPolicyURL",
-        "termsOfServiceURL",
-    }.intersection(interface)
 
 
 def test_listing_screenshot_renderer_reproduces_committed_assets() -> None:
@@ -643,7 +662,9 @@ def test_launcher_diagnoses_legacy_runtime_before_delegation() -> None:
     assert "did not delegate your request" in message
     assert "do not ask the runtime to read or write your roster" in message
     assert namespace["_runtime_update_command"]() in message
-    assert "moving public-source beta channel" in message
+    assert "reviewed public source commit" in message
+    assert namespace["REVIEWED_RUNTIME_COMMIT"] in message
+    assert "not every third-party dependency artifact" in message
     assert "UV_INDEX, UV_INDEX_URL, or UV_EXTRA_INDEX_URL" in message
     assert "retry the AtReady preview or other request in this same task" in message
     assert bounded.call_args_list == [
