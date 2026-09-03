@@ -1130,7 +1130,7 @@ def test_launcher_executes_the_exact_resolved_uv_tool_arguments(tmp_path: Path) 
     namespace = runpy.run_path(str(WRAPPER))
     tool_bin = tmp_path / "uv-bin"
     tool_bin.mkdir()
-    candidate = tool_bin / ("atready.exe" if sys.platform == "win32" else "atready")
+    candidate = tool_bin / "atready"
     candidate.write_text("synthetic executable", encoding="utf-8")
     resolved_candidate = str(candidate.resolve())
     uv_result = subprocess.CompletedProcess(
