@@ -1,6 +1,7 @@
 # AtReady open-source direction
 
-Status: product decision recorded on 2026-08-09 and updated after the first public source snapshot.
+Status: product decision recorded on 2026-08-09 and updated after the first public source snapshot
+and the 2026-09-02 public-Directory feasibility gate.
 The product and local source identity are AtReady. The public `stoicpickle/atready` repository is
 live; PyPI, directory listings, domains, and other external release channels remain separate gates.
 
@@ -20,13 +21,12 @@ accounts or store credentials.
 
 Positioning line: **Help Codex plan with what you already have.**
 
-The next distribution focus is an open-source beta of the Codex skill and its deterministic local
-CLI engine. The skill is the intended conversational experience; the CLI stores and validates the
-roster, produces inspectable resource-fit evidence, and remains a standalone fallback. A
-ChatGPT/Codex directory plugin may become a later installation and discovery surface, but
-public directory submission is not the next dependency. Resume it only after real users show that
-the resource-fit behavior is useful enough to repeat and the supported-surface/runtime path is
-proven.
+The open-source Codex skill and its deterministic local CLI engine remain the product foundation.
+The skill is the intended conversational experience; the CLI stores and validates the roster,
+produces inspectable resource-fit evidence, and remains a standalone fallback. A bounded,
+skills-only OpenAI Plugins Directory probe is now active to test installation and discovery on
+supported local Codex surfaces. The probe does not replace the hybrid architecture or authorize
+review submission or publication.
 
 ## Naming evidence
 
@@ -47,6 +47,7 @@ publishing it; registry availability can change.
 
 - Product: **AtReady**
 - Publisher-qualified name: **AtReady by Stoicpickle**
+- Proposed OpenAI Plugins Directory publisher: **Russell Lane Wonsley**, verified individual
 - Python distribution: `project-atready`
 - Python module and CLI: `atready`
 - Codex plugin: `atready`
@@ -71,7 +72,8 @@ and hidden backup names are compatibility details, not public product identifier
    on setup, resource intake, recommendation usefulness, trust, and repeat use.
 3. Prioritize confusing first-use behavior over new providers, connectors, or routing features.
 4. Add a verified PyPI install only when it materially improves the early-user path.
-5. Revisit public plugin submission only if beta users want that installation surface.
+5. Use the current skills-only portal probe to verify the installation surface before separately
+   deciding whether to submit it for public review.
 
 ## Beta success signal
 

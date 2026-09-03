@@ -11,9 +11,11 @@ import time
 import tomllib
 from pathlib import Path, PurePosixPath
 from unittest import mock
+from xml.etree import ElementTree
 
 import pytest
 
+from atready.cli import _GRADIENT_STOPS
 from atready.models import Inventory, ProjectBrief
 from atready.routing import route
 from atready.yamlio import loads_yaml
@@ -34,6 +36,10 @@ EXPECTED_PNG_ASSETS = {
     "safe-preview.png": (1440, 900),
 }
 DIRECTORY_PACKET = ROOT / "docs" / "DIRECTORY_SUBMISSION.md"
+ICON_SOURCE = ROOT / "docs" / "assets" / "atready-icon.svg"
+PUBLIC_IDENTITY_DOCS = tuple(
+    ROOT / name for name in ("README.md", "SUPPORT.md", "PRIVACY.md", "TERMS.md")
+)
 FIRST_USER_ACCEPTANCE = ROOT / "docs" / "FIRST_USER_ACCEPTANCE.md"
 REVIEW_INVENTORY = ROOT / "evals" / "fixtures" / "inventory.yaml"
 REVIEW_PROJECT = ROOT / "evals" / "fixtures" / "project-godot.yaml"
@@ -230,7 +236,7 @@ def test_plugin_is_minimal_skill_only_and_independently_versioned() -> None:
     }
     assert manifest["description"].strip()
     assert manifest["author"] == {
-        "name": "stoicpickle",
+        "name": "Russell Lane Wonsley",
         "url": "https://github.com/stoicpickle",
     }
     assert manifest["homepage"] == "https://github.com/stoicpickle/atready"
@@ -269,6 +275,7 @@ def test_plugin_is_minimal_skill_only_and_independently_versioned() -> None:
             "category",
         )
     )
+    assert interface["developerName"] == "Russell Lane Wonsley"
     assert interface["capabilities"] == [
         "Add declared resources with approval",
         "Match saved resources to project work",
@@ -342,6 +349,36 @@ def test_listing_screenshot_renderer_reproduces_committed_assets() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_plugin_icon_uses_the_flat_cli_palette() -> None:
+    root = ElementTree.parse(ICON_SOURCE).getroot()  # noqa: S314 - trusted repository asset
+    brand_color = _load_strict_json(MANIFEST)["interface"]["brandColor"]
+    expected_colors = (
+        brand_color,
+        *(f"#{red:02X}{green:02X}{blue:02X}" for red, green, blue in _GRADIENT_STOPS),
+    )
+    elements = tuple(root.iter())
+    element_names = {element.tag.rsplit("}", 1)[-1] for element in elements}
+    paints = {
+        paint
+        for element in elements
+        for attribute in ("fill", "stroke")
+        if (paint := element.get(attribute)) is not None
+    }
+
+    assert paints == set(expected_colors)
+    assert all("style" not in element.attrib for element in elements)
+    assert element_names.isdisjoint({"linearGradient", "radialGradient", "filter"})
+
+
+def test_public_trust_pages_name_the_manifest_publisher() -> None:
+    publisher = _load_strict_json(MANIFEST)["interface"]["developerName"]
+
+    for path in PUBLIC_IDENTITY_DOCS:
+        text = " ".join(path.read_text(encoding="utf-8").split())
+        assert publisher in text
+        assert "proposed OpenAI Plugins Directory listing" in text
+
+
 def test_listing_screenshot_renderer_accepts_a_fresh_output_directory(
     tmp_path: Path,
 ) -> None:
@@ -371,16 +408,30 @@ def test_listing_screenshot_renderer_accepts_a_fresh_output_directory(
 def test_directory_packet_tracks_the_official_skills_only_submission_contract() -> None:
     packet = DIRECTORY_PACKET.read_text(encoding="utf-8")
     normalized_packet = " ".join(packet.split())
+    interface = _load_strict_json(MANIFEST)["interface"]
+    prompts = interface["defaultPrompt"]
 
     assert OFFICIAL_SUBMISSION_URL in packet
     assert "Submission type: Skills only" in packet
     assert "Apps Management **Write**" in packet
-    assert "verified developer/business identity" in packet
+    assert "verified individual identity" in packet
     assert "### Positive cases\n\n1." in packet
     assert "### Negative cases\n\n1." in packet
     assert packet.count("- Prompt:") == 8
     assert packet.count("- Expected behavior:") == 5
     assert packet.count("- Expected safe behavior:") == 3
+    assert len(interface["longDescription"]) <= 4_000
+    assert len(interface["developerName"]) <= 80
+    measured_lengths = (
+        "Measured against current Directory limits: "
+        f"display name `{len(interface['displayName'])}/30`, "
+        f"short description `{len(interface['shortDescription'])}/30`, "
+        f"long description `{len(interface['longDescription'])}/4000`, "
+        f"developer name `{len(interface['developerName'])}/80`, and starter prompts "
+        + ", ".join(f"`{len(prompt)}/128`" for prompt in prompts[:-1])
+        + f", and `{len(prompts[-1])}/128`."
+    )
+    assert measured_lengths in normalized_packet
     for prompt in (
         "I have a loose plan for the attached synthetic project. Use AtReady before "
         "implementation to fit the attached synthetic demo resources to the provided workstreams "

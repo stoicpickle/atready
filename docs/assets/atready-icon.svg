@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">AtReady fitted resource mark</title>
+  <desc id="desc">A coral resource block fitted between cobalt and violet plan brackets.</desc>
+  <rect width="512" height="512" rx="112" fill="#0B172A"/>
+  <path
+    fill="#184CAE"
+    d="M150 118h80v64h-42v148h42v64h-80c-38 0-68-30-68-68V186c0-38 30-68 68-68Z"
+  />
+  <path
+    fill="#7C52B8"
+    d="M362 118h-80v64h42v148h-42v64h80c38 0 68-30 68-68V186c0-38-30-68-68-68Z"
+  />
+  <rect x="224" y="326" width="64" height="68" rx="16" fill="#E04137"/>
+</svg>

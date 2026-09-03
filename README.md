@@ -397,5 +397,8 @@ uv run pytest
 Please use synthetic fixtures in issues, tests, and examples. Do not post inventories, credentials,
 private notes, account details, or proprietary project plans.
 
+AtReady's public source is maintained through **Stoicpickle**. Its proposed OpenAI Plugins
+Directory listing uses verified individual publisher **Russell Lane Wonsley**.
+
 AtReady is licensed under the
 [Apache License 2.0](https://github.com/stoicpickle/atready/blob/main/LICENSE).

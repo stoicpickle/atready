@@ -3,6 +3,9 @@
 This document describes the privacy boundary intended for AtReady
 v0.1. It should be updated before any release changes that boundary.
 
+AtReady's public source is maintained through **Stoicpickle**. Its proposed OpenAI Plugins
+Directory listing uses verified individual publisher **Russell Lane Wonsley**.
+
 ## Short version
 
 The AtReady CLI stores inventory and preferences in files on the user's local filesystem.
