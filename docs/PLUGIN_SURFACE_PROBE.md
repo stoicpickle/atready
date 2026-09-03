@@ -1,9 +1,11 @@
 # AtReady plugin surface probe
 
-This source-controlled document is a synthetic, value-free probe contract. It is not a live
-receipt, submission, approval, publication, publisher-account record, or general-availability
-claim. Keep dated runs, commit identifiers, account permissions, portal state, and transcripts in
-the private release evidence store rather than this repository.
+This source-controlled document is a synthetic, value-free probe contract for the local marketplace
+lifecycle pilot and a possible future Directory phase. It is not a live receipt, submission,
+approval, publication, publisher-account record, or general-availability claim. Keep dated runs,
+commit identifiers, account permissions, portal state, and transcripts in the private release
+evidence store rather than this repository.
+Read [PLUGIN_DIRECTORY_PILOT.md](PLUGIN_DIRECTORY_PILOT.md) before running a probe.
 
 ## Candidate policy
 
@@ -30,30 +32,39 @@ remain unproved until a value-free external receipt demonstrates them. Submissio
 requires separate owner authorization. Later publication requires a second separate owner
 authorization.
 
-## Evidence matrix
+## Availability and evidence matrix
 
-Every live probe run must produce exactly one value-free result row for each surface below. The
-source template deliberately marks every surface hidden while it is unproved.
+Current official documentation says plugins work in Chat and Work across ChatGPT web, desktop, and
+mobile; in Codex they work in the ChatGPT desktop app, and Codex CLI provides a plugin browser. The
+Codex IDE extension does not support plugins. That is a platform matrix, not a promise that this
+local-runtime plugin works on every available surface.
 
-| Surface | Required unproved result | Evidence required for a future pass |
+Every live probe run must produce one value-free result row for each relevant surface. The candidate
+claims only local Codex and Codex CLI. All other surfaces must be hidden or safely stop before an
+actionable workflow.
+
+| Surface | Pilot status | Required result/evidence |
 | --- | --- | --- |
-| OpenAI plugin portal | Unproved; must be hidden | Draft accepts and retains the exact candidate policy without submission |
-| ChatGPT web/chat | Unproved; must be hidden | Fresh synthetic conversation proves visibility and a safe pre-invocation boundary |
-| ChatGPT desktop chat | Unproved; must be hidden | Fresh synthetic conversation proves visibility and a safe pre-invocation boundary |
-| Codex desktop local/worktree | Unproved; must be hidden | Fresh task proves explicit activation, runtime compatibility, and synthetic routing |
-| Codex CLI | Unproved; must be hidden | Fresh task proves packaged-path resolution and the bounded runtime handshake |
-| Codex IDE | Unproved; must be hidden | Supported host proves explicit activation and local-filesystem compatibility |
-| Codex cloud/Remote | Unproved; must be hidden | Surface hides AtReady or stops before local inventory/filesystem work |
+| Local repository marketplace | Automated local evidence | Isolated profile proves discover, install, exact cached copy, runtime handshake, removal, and unchanged synthetic state. |
+| OpenAI plugin portal | Unproved; not authorized | A future draft retains the exact candidate policy without submission. |
+| Codex local desktop/task | Claimed target; unproved | Fresh task proves explicit activation, compatibility before inventory access, and synthetic routing. |
+| Codex CLI | Claimed target; lifecycle automated, conversation unproved | Automated lifecycle proves packaging and compatibility; a fresh session still must prove explicit activation and synthetic routing. |
+| ChatGPT Chat/Work on web, desktop, or mobile | Platform supports plugins generally; CODEX-only AtReady is not a target | Hide AtReady or stop clearly before intake, preview, routing, or mutation. |
+| Codex remote or cloud | Unproved; not an AtReady target | Hide AtReady or stop clearly before local runtime or inventory work. |
+| Codex IDE extension | Platform unavailable | Do not claim plugin availability; record any contrary appearance as a platform finding, not support. |
 
 ## Generic probe checklist
 
-1. Obtain the required publisher identity and portal permissions outside this repository.
-2. Build a disposable probe ZIP from a clean reviewed commit.
-3. Create a draft only; do not submit it.
-4. Verify that the portal accepts and retains the exact candidate policy.
-5. Collect the evidence required by each matrix row: draft-policy retention for the portal, fresh
-   synthetic conversations for ChatGPT, fresh tasks for Codex desktop and CLI, a supported-host
-   check for Codex IDE, and the defined stop condition for Codex cloud/Remote.
-6. Record versioned host/runtime details, the exact result, and value-free evidence privately.
-7. Apply the stop/go rule without inferring support from visibility alone.
+1. Run `uv run python scripts/plugin_lifecycle_acceptance.py` with the current installed runtime.
+2. Run a fresh synthetic Codex CLI task through the locally installed plugin.
+3. Build a disposable probe ZIP and local receipt from a clean reviewed commit.
+4. Apply the stop/go rule without inferring support from visibility alone.
+5. Only after separate owner authorization, obtain the required publisher identity and portal
+   permissions, create a draft, and verify that it retains the exact candidate policy. Do not submit.
+6. Collect hide-or-safe-stop evidence for every non-target surface that exposes the candidate.
+7. Record versioned host/runtime details, the exact result, and value-free evidence privately.
 8. Build a distinct final ZIP only after every required surface passes.
+
+See OpenAI's current [plugin availability documentation](https://developers.openai.com/codex/plugins)
+and [plugin packaging documentation](https://developers.openai.com/plugins/build/plugins). Recheck
+both before a portal action.

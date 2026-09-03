@@ -30,7 +30,7 @@ def test_surface_probe_keeps_publication_fail_closed() -> None:
 
 def test_surface_probe_covers_every_claimed_probe_surface() -> None:
     receipt = PROBE.read_text(encoding="utf-8")
-    matrix = _section(receipt, "Evidence matrix")
+    matrix = _section(receipt, "Availability and evidence matrix")
     rows = [
         cells
         for line in matrix.splitlines()
@@ -41,39 +41,43 @@ def test_surface_probe_covers_every_claimed_probe_surface() -> None:
 
     expected_rows = (
         (
+            "Local repository marketplace",
+            "Automated local evidence",
+            "Isolated profile proves discover, install, exact cached copy, runtime handshake, "
+            "removal, and unchanged synthetic state.",
+        ),
+        (
             "OpenAI plugin portal",
-            "Unproved; must be hidden",
-            "Draft accepts and retains the exact candidate policy without submission",
+            "Unproved; not authorized",
+            "A future draft retains the exact candidate policy without submission.",
         ),
         (
-            "ChatGPT web/chat",
-            "Unproved; must be hidden",
-            "Fresh synthetic conversation proves visibility and a safe pre-invocation boundary",
-        ),
-        (
-            "ChatGPT desktop chat",
-            "Unproved; must be hidden",
-            "Fresh synthetic conversation proves visibility and a safe pre-invocation boundary",
-        ),
-        (
-            "Codex desktop local/worktree",
-            "Unproved; must be hidden",
-            "Fresh task proves explicit activation, runtime compatibility, and synthetic routing",
+            "Codex local desktop/task",
+            "Claimed target; unproved",
+            "Fresh task proves explicit activation, compatibility before inventory access, and "
+            "synthetic routing.",
         ),
         (
             "Codex CLI",
-            "Unproved; must be hidden",
-            "Fresh task proves packaged-path resolution and the bounded runtime handshake",
+            "Claimed target; lifecycle automated, conversation unproved",
+            "Automated lifecycle proves packaging and compatibility; a fresh session still must "
+            "prove explicit activation and synthetic routing.",
         ),
         (
-            "Codex IDE",
-            "Unproved; must be hidden",
-            "Supported host proves explicit activation and local-filesystem compatibility",
+            "ChatGPT Chat/Work on web, desktop, or mobile",
+            "Platform supports plugins generally; CODEX-only AtReady is not a target",
+            "Hide AtReady or stop clearly before intake, preview, routing, or mutation.",
         ),
         (
-            "Codex cloud/Remote",
-            "Unproved; must be hidden",
-            "Surface hides AtReady or stops before local inventory/filesystem work",
+            "Codex remote or cloud",
+            "Unproved; not an AtReady target",
+            "Hide AtReady or stop clearly before local runtime or inventory work.",
+        ),
+        (
+            "Codex IDE extension",
+            "Platform unavailable",
+            "Do not claim plugin availability; record any contrary appearance as a platform "
+            "finding, not support.",
         ),
     )
     assert all(len(row) == 3 for row in rows)

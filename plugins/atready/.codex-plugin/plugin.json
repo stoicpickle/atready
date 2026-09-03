@@ -1,11 +1,13 @@
 {
   "name": "atready",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Add declared resources through a preview-first conversation, then contribute resource-fit advice to Codex's plan.",
   "author": {
     "name": "stoicpickle",
     "url": "https://github.com/stoicpickle"
   },
+  "homepage": "https://github.com/stoicpickle/atready",
+  "repository": "https://github.com/stoicpickle/atready",
   "license": "Apache-2.0",
   "keywords": [
     "planning",
@@ -21,10 +23,14 @@
     "developerName": "stoicpickle",
     "category": "Developer Tools",
     "capabilities": [
-      "Interactive",
-      "Read",
-      "Write"
+      "Add declared resources with approval",
+      "Match saved resources to project work",
+      "Explain constraints, gaps, and omissions"
     ],
+    "websiteURL": "https://github.com/stoicpickle/atready",
+    "supportURL": "https://github.com/stoicpickle/atready/blob/main/SUPPORT.md",
+    "privacyPolicyURL": "https://github.com/stoicpickle/atready/blob/main/PRIVACY.md",
+    "termsOfServiceURL": "https://github.com/stoicpickle/atready/blob/main/TERMS.md",
     "defaultPrompt": [
       "I have a rough project idea. Use AtReady before implementation to suggest where my saved resources fit.",
       "Review this plan with AtReady and show proposed resource assignments.",

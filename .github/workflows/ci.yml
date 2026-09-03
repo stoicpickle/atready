@@ -54,13 +54,13 @@ jobs:
         if: runner.os != 'Linux'
         env:
           PYTHONPATH: src
-        run: uv run --no-sync pytest
+        run: uv run --locked --no-sync --with-editable . pytest
 
       - name: Test with branch coverage
         if: runner.os == 'Linux'
         env:
           PYTHONPATH: src
-        run: uv run --no-sync pytest --cov=atready --cov-report=term-missing
+        run: uv run --locked --no-sync --with-editable . pytest --cov=atready --cov-report=term-missing
 
       - name: Build distributions
         env:

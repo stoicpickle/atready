@@ -9,7 +9,7 @@ are easiest to review.
 uv sync --locked --all-groups --no-group release --no-group elevated --no-install-project
 uv run --no-sync ruff check .
 uv run --no-sync ruff format --check .
-PYTHONPATH=src uv run --no-sync pytest --cov=atready --cov-report=term-missing
+PYTHONPATH=src uv run --locked --no-sync --with-editable . pytest --cov=atready --cov-report=term-missing
 UV_INDEX="" UV_NO_CONFIG=1 uv build --clear --no-create-gitignore --no-sources \
   --build-constraints build-constraints.txt --require-hashes \
   --default-index https://pypi.org/simple

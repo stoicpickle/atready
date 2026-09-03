@@ -6,13 +6,16 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
+import json
 import os
 import re
 import stat
 import sys
+import unicodedata
 from pathlib import Path
 from types import ModuleType
 from typing import Any
+from urllib.parse import urlsplit
 
 import yaml
 
@@ -35,6 +38,7 @@ TRUSTED_IDENTIFIER_VALIDATION_SHA256 = (
     "a6d51ce4a9a7e8f85626ff5808a467a67574e7f8cdf1167ffb467c5f67e57223"
 )
 MAX_AGENT_BYTES = 64_000
+MAX_MANIFEST_BYTES = 256_000
 MAX_SKILLS = 100
 MAX_YAML_DEPTH = 12
 MAX_YAML_ITEMS = 1_000
@@ -61,12 +65,16 @@ LEGACY_PRODUCTS_ERROR = re.compile(
     r"^skill `(?P<skill>[^`]+)` agent field `policy\.products` "
     r"is not accepted by plugin validation$"
 )
+LEGACY_SUPPORT_URL_ERROR = (
+    "plugin.json field `interface.supportURL` is not accepted by plugin validation"
+)
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run OpenAI's installed plugin validator with current policy.products compatibility."
+            "Run OpenAI's installed plugin validator with narrow compatibility for the current "
+            "policy.products and interface.supportURL fields."
         )
     )
     parser.add_argument("plugin_path", type=Path)
@@ -219,6 +227,67 @@ def _load_agent_payload(path: Path, plugin_root: Path) -> dict[str, Any]:
     return payload
 
 
+def _official_support_url(plugin_root: Path) -> tuple[bool, list[str]]:
+    manifest_path = plugin_root / ".codex-plugin" / "plugin.json"
+    if not manifest_path.exists():
+        return False, []
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        return False, ["plugin manifest must be a regular file for supportURL validation"]
+    try:
+        if manifest_path.stat().st_size > MAX_MANIFEST_BYTES:
+            return False, ["plugin manifest exceeds the supportURL validation limit"]
+        duplicate: str | None = None
+
+        def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            nonlocal duplicate
+            result: dict[str, Any] = {}
+            for key, value in pairs:
+                if key in result and duplicate is None:
+                    duplicate = key
+                result[key] = value
+            return result
+
+        manifest = json.loads(
+            manifest_path.read_text(encoding="utf-8"),
+            object_pairs_hook=unique,
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False, ["plugin manifest must contain readable strict JSON"]
+    if duplicate is not None:
+        return False, ["plugin manifest must not contain duplicate JSON keys"]
+    if not isinstance(manifest, dict):
+        return False, ["plugin manifest must contain a JSON object"]
+    interface = manifest.get("interface")
+    if not isinstance(interface, dict) or "supportURL" not in interface:
+        return False, []
+    support_url = interface["supportURL"]
+    if (
+        not isinstance(support_url, str)
+        or not support_url.strip()
+        or len(support_url) > 1_024
+        or any(character.isspace() for character in support_url)
+        or any(
+            unicodedata.category(character) in {"Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp"}
+            for character in support_url
+        )
+    ):
+        return False, ["interface.supportURL must be an HTTPS URL of at most 1024 characters"]
+    try:
+        parsed = urlsplit(support_url)
+        _ = parsed.port
+    except ValueError:
+        return False, ["interface.supportURL must be an HTTPS URL of at most 1024 characters"]
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or "\\" in support_url
+    ):
+        return False, ["interface.supportURL must be an HTTPS URL of at most 1024 characters"]
+    return True, []
+
+
 def _official_products(plugin_root: Path) -> tuple[set[str], list[str]]:
     skills_root = plugin_root / "skills"
     if not skills_root.is_dir() or skills_root.is_symlink():
@@ -278,6 +347,9 @@ def validate(
     valid_product_skills, errors = _official_products(plugin_root)
     if errors:
         return errors
+    valid_support_url, support_errors = _official_support_url(plugin_root)
+    if support_errors:
+        return support_errors
 
     upstream_path = system_skills_dir / "plugin-creator" / "scripts" / "validate_plugin.py"
     if upstream_path.is_symlink():
@@ -319,6 +391,8 @@ def validate(
     for error in upstream_errors:
         match = LEGACY_PRODUCTS_ERROR.fullmatch(error)
         if match and match.group("skill") in valid_product_skills:
+            continue
+        if error == LEGACY_SUPPORT_URL_ERROR and valid_support_url:
             continue
         errors.append(error)
     return errors

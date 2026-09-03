@@ -6,18 +6,18 @@ installs, upgrades, or searches broadly for that runtime.
 
 ## Supported local setup
 
-The host must be able to run a local Python 3 interpreter, the bundled launcher, and an already
-installed trusted `uv`. During the public-source beta, the user may explicitly install or reinstall
-the moving public `main` channel:
+The host must be able to run a local Python 3.11 or newer interpreter, the bundled launcher, and an already
+installed trusted `uv`. For this plugin candidate, the user may explicitly install or reinstall the
+exact reviewed public runtime commit:
 
 ```bash
 uv tool install --force --no-config --no-python-downloads \
   --default-index https://pypi.org/simple \
-  'git+https://github.com/stoicpickle/atready.git@main'
+  'git+https://github.com/stoicpickle/atready.git@34fb4376b376bb9a26f22578a0b9e1c3aef9cc6e'
 ```
 
-This is a moving public-source beta channel, not an immutable or PyPI release, and it is not
-verified against a pinned or signed release. The bundled launcher
+This pins AtReady's source to the reviewed runtime `0.1.10` commit. It is not a signed release and
+does not pin or attest every third-party dependency artifact. The bundled launcher
 performs the authoritative compatibility check before every operation. Return to the AtReady
 plugin flow and retry there after installation; do not invoke a bare `atready` executable as a
 substitute for the bundled launcher. Plugin and runtime product versions may differ; compatibility

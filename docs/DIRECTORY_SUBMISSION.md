@@ -14,21 +14,51 @@ time of submission because portal fields and review requirements can change.
 
 ## Listing identity
 
-- Name: AtReady
-- Developer: stoicpickle
-- Category: Developer Tools
-- Summary: Bring AtReady a goal or rough plan before implementation. It matches a user-maintained
-  resource roster to planner-provided work, exposes material constraints and gaps, explains the
-  advice, and produces reviewable handoff text. Codex retains ownership of the project plan.
+These are the exact manifest-bound, form-ready values. Copy them from the final manifest rather
+than retyping them in the portal, then rerun the consistency check below. Current final-submission
+limits are 30 characters for display name and short description, 4,000 for long description, 80
+for developer name, 20 capability labels, and three unique one-line starter prompts of 128
+characters each.
+
+```json
+{
+  "displayName": "AtReady",
+  "shortDescription": "Bring resource fit to the plan",
+  "longDescription": "AtReady is a small resource-fit companion for supported Codex surfaces. Add one declared tool, service, subscription, person, or agent through a conversational no-write preview and a separate exact save approval. Then bring AtReady a goal, rough plan, or written plan before implementation to match saved tools, services, subscriptions, people, and agents to planner-provided work, expose material constraints and gaps, and explain its advice without contacting or running routed project resources. Codex owns the project plan. This local-first release requires a separately installed compatible project-atready runtime and local file access.",
+  "developerName": "stoicpickle",
+  "category": "Developer Tools",
+  "capabilities": ["Add declared resources with approval", "Match saved resources to project work", "Explain constraints, gaps, and omissions"],
+  "websiteURL": "https://github.com/stoicpickle/atready",
+  "supportURL": "https://github.com/stoicpickle/atready/blob/main/SUPPORT.md",
+  "privacyPolicyURL": "https://github.com/stoicpickle/atready/blob/main/PRIVACY.md",
+  "termsOfServiceURL": "https://github.com/stoicpickle/atready/blob/main/TERMS.md",
+  "defaultPrompt": [
+    "I have a rough project idea. Use AtReady before implementation to suggest where my saved resources fit.",
+    "Review this plan with AtReady and show proposed resource assignments.",
+    "Add CodeRabbit to my AtReady resource roster."
+  ],
+  "brandColor": "#0B172A"
+}
+```
+
+Measured against current Directory limits: display name `7/30`, short description `30/30`, long
+description `642/4000`, developer name `11/80`, and starter prompts `103/128`, `69/128`, and
+`45/128`. `Developer Tools` is a currently supported category. Any manifest copy change invalidates
+these measurements until the check is rerun.
+
+- Architecture: skills-only plugin plus a separately installed canonical runtime. **Not
+  self-contained.** The plugin contains no second router and never installs, updates, or repairs
+  the runtime.
 - Website: `https://github.com/stoicpickle/atready`
 - Support: `https://github.com/stoicpickle/atready/blob/main/SUPPORT.md`
 - Privacy: `https://github.com/stoicpickle/atready/blob/main/PRIVACY.md`
 - Terms: `https://github.com/stoicpickle/atready/blob/main/TERMS.md`
 - Brand color: `#0B172A`
 - Submission type: Skills only
-- Probe target: Codex surfaces with local Python, trusted `uv`, and local file access. The probe must
-  establish whether unsupported surfaces exclude AtReady or disclose incompatibility before
-  invocation; it does not claim ChatGPT Work web support.
+- Probe target: local Codex tasks and Codex CLI with local Python, trusted `uv`, and local file
+  access. The skills-only plugin does not install, update, or repair the separate CLI runtime. The
+  probe must establish whether every non-target surface hides AtReady or discloses incompatibility
+  before an actionable workflow; it does not claim ChatGPT Chat/Work or Codex remote/cloud support.
 
 OpenAI's skills-only package validator permits the four URL fields to be omitted from the manifest,
 but the public submission guide still requires website, support, privacy, and terms materials for
@@ -38,21 +68,25 @@ approval as release/legal copy before they are represented as final. The publish
 verified individual or business identity in the Platform that matches the public developer name,
 website, support process, privacy policy, and terms.
 
-Current external-state snapshot (2026-09-01): the GitHub repository is public, all four anonymous
-listing URLs above return `200` at their expected final URLs, and GitHub private vulnerability
-reporting is enabled. This is point-in-time evidence, not a durable launch claim. Re-run the
-anonymous checks and confirm vulnerability reporting immediately before opening or submitting a
-portal draft.
+Current external-state snapshot (2026-09-02): the GitHub repository is public and all four
+anonymous listing URLs above return `200` at their expected final URLs.
+Current external-state snapshot (2026-09-01): GitHub private vulnerability reporting is enabled
+as observed on that date.
+These are point-in-time observations, not durable launch claims. Re-run the anonymous checks and
+confirm vulnerability reporting immediately before opening or submitting a portal draft.
 
-The canonical manifest currently omits these optional URLs because the skills-only bundle does not
-require them. Enter the verified URLs in the portal and add them to product metadata only when the
-owner approves the exact public pages. This probe
-bundle targets only Codex surfaces with local runtime and filesystem access. Its canonical skill
-metadata uses the current documented `policy.products: [CODEX]` restriction and disables implicit
-invocation. An installed local validator may lag that official schema; record any disagreement as a
-validator-version compatibility finding rather than silently removing current metadata. Confirm the
-restriction in the real portal draft; until then, the bundled skill must stop clearly on unsupported
-surfaces rather than claiming a route or write succeeded.
+The canonical manifest and form-ready block include the same website, support, privacy, and terms
+URLs. The four URL fields remain optional for skills-only manifests under the current validation
+rules, but AtReady treats all four public pages as owner-approval gates. This probe bundle
+targets only local Codex tasks and Codex CLI with local runtime and filesystem access. Its canonical
+`agents/openai.yaml` metadata uses the current documented `policy.products: [CODEX]` restriction
+and disables implicit invocation. `SKILL.md` frontmatter remains limited to the officially supported
+`name` and `description`; runtime and filesystem prerequisites stay in the skill body and
+quickstart. The reviewed `0.152.1` local plugin validator predates the official-current
+`interface.supportURL` field, so the repository validator uses a narrow compatibility shim without
+removing the field. Record any local/portal disagreement as validator-version drift. Confirm the
+product restriction and support URL in the real portal draft; until then, the bundled skill must
+stop clearly on unsupported surfaces rather than claiming a route or write succeeded.
 
 ## Assets
 
@@ -73,17 +107,20 @@ UI. Keep the source artwork for owner review without presenting it as a product 
 
 ## Capability explanation
 
-- `Read`: reads explicit project, declaration, and target-scoped backup inputs, plus either an
-  explicit inventory path or AtReady's resolved default inventory when the path is omitted.
-- `Write`: creates or changes local inventory state only through explicit preview/apply contracts;
-  the normal planning flow submits its bounded project brief as one JSON line after an
-  echo-suppressed terminal readiness marker.
-- `Interactive`: gathers project/resource declarations and presents plans for human review.
+- `Add declared resources with approval`: gathers a declaration, shows a no-write preview, and
+  changes local inventory state only after a separate exact approval.
+- `Match saved resources to project work`: reads only the approved project and inventory inputs,
+  including an explicit inventory path or
+  AtReady's resolved default inventory when the path is omitted, and contributes resource-fit
+  advice to the planner-provided work.
+- `Explain constraints, gaps, and omissions`: presents why resources fit or do not fit without
+  contacting them, writing project files, or running work.
 
 These labels describe host-visible workflow needs; they do not grant authority. The plugin has no
 app, MCP server, connector, hook, telemetry, broad/automatic or provider discovery, or automatic
 project-resource or handoff execution. This public-plugin workflow does not locate or execute
 resource executables or inspect versions; the standalone CLI retains those separate capabilities.
+Codex retains ownership of the project plan; AtReady contributes resource-fit advice only.
 
 ## Draft reviewer test packet
 
@@ -92,6 +129,12 @@ cases. The eight cases below are self-contained: each names complete payloads in
 packet or needs no fixture beyond its prompt. Run them only with this probe bundle, an independently
 installed compatible local runtime, and synthetic fixtures. Each expected result is advisory and
 must not include executed project-resource handoffs.
+
+Before running a case, follow the quickstart's
+[exact runtime install and preflight](PLUGIN_DIRECTORY_QUICKSTART.md#1-install-the-exact-canonical-runtime),
+then install the tested skills-only bundle as described in its next section. Stop on a version,
+contract, feature, executable, or synthetic-demo mismatch; do not repair the runtime from the
+plugin or substitute a moving source branch.
 
 ### Positive cases
 
@@ -110,8 +153,9 @@ must not include executed project-resource handoffs.
    - Expected behavior: produce the fixed-input route, then cite only its returned gates, scores,
      adjustments, support evidence, alternate caveats, and dispositions; do not invent a rationale
      or change a winner.
-   - Expected result shape: concise selection/omission explanation with the original assignments
-     and execution boundary preserved.
+   - Expected result shape: a concise selection/omission explanation, organized resource by
+     resource and grounded in the returned gates, scores, adjustments, support evidence, alternate
+     caveats, and dispositions, with the original assignments and execution boundary preserved.
 3. **Conversation-only Quick Setup**
    - Prompt: `Use AtReady Quick Setup to begin adding CodeRabbit to the attached empty-inventory.yaml. Use conversation-only onboarding: do not inspect an executable, version, configuration, or account. Ask the three short human questions, then stop before any preview or write.`
    - Fixture: the complete `empty-inventory.yaml` payload below. Use no credentials or real account
@@ -170,6 +214,22 @@ must not include executed project-resource handoffs.
 
 Reviewers must be able to reproduce every case without private organizational context. Save the
 final portal-form wording separately if the form cannot import this Markdown directly.
+
+The complete installed-plugin regression set must also include direct, indirect, follow-up,
+negative, and intentional-boundary prompts. Verify that every bundled reference and script resolves
+from the installed tree, not from the source checkout. These checks follow OpenAI's complete-plugin
+test guidance and complement the eight minimum portal cases rather than replacing them.
+
+`evals/DIRECTORY_CONVERSATION_CASES.json` binds the offline acceptance helper one-to-one to these
+exact five positive and three negative portal cases, including fixture hashes, automated response
+markers, and operator-reviewed semantic expectations. `scripts/plugin_conversation_acceptance.py`
+never authenticates, contacts a network service, invokes Codex, or starts a subprocess. Transcript
+preparation and scoring both require the private clean pilot directory and bind the transcript to
+that receipt's source commit, plugin version, and verified ZIP digest. The helper preflights the
+packet, creates a private blank transcript, and scores only the operator's bounded observations. Its
+passing receipt is **operator-attested evidence**, not independent host proof. Keep the actual
+response text only in the private transcript; the value-safe receipt contains no response text or
+local path.
 
 ## Reviewer fixture payloads
 
@@ -548,7 +608,7 @@ workstreams:
 
 ## Future release-notes draft (not for the probe)
 
-> Initial skills-only submission of AtReady plugin 0.1.12. For a fixed normalized project brief and
+> Initial skills-only submission of AtReady plugin 0.1.13. For a fixed normalized project brief and
 > inventory snapshot, its capability router deterministically matches declared resources to
 > planner-provided workstreams. It uses
 > a user-maintained local inventory and a compatible local
@@ -558,7 +618,9 @@ workstreams:
 > to the user's configured host/model provider. It produces reviewable inert handoffs, performs no
 > automatic discovery, routed project-resource invocation, or handoff execution, and includes
 > synthetic reviewer fixtures. No MCP server, app, connector, hook, or telemetry component
-> is included.
+> is included. This skills-only plugin is not self-contained: reviewers must first install the
+> separately distributed canonical runtime from the exact immutable source named in the approved
+> quickstart and verify its compatibility preflight.
 
 This is technical draft copy for a later release candidate, not probe copy, an owner-approved
 policy attestation, or a submitted release note.
@@ -599,19 +661,26 @@ Also open the four links in a signed-out browser and check the rendered text, no
 
 ## Maintainer review and submission checklist
 
-The current candidate may complete the local preparation items and a reversible portal draft probe
-only. Submission and publication items remain deliberately blocked for this nonrelease artifact.
+The current candidate may complete local preparation only. A reversible portal draft, submission,
+and publication are separate external actions that remain blocked without explicit owner
+authorization.
 
-- [ ] Confirm the exact source commit and `0.1.12` plugin bundle; record the independently installed
+- [ ] Confirm the exact source commit and `0.1.13` plugin bundle; record the independently installed
       runtime version and prove its contract-and-feature handshake. Retain the available artifact
       hashes/attestations for each channel without implying their product versions must match.
-- [ ] Run the plugin/skill validators, exact-asset contract, staged-plugin smoke, clean first-user
-      harness, and all eight reviewer cases with synthetic fixtures.
+- [ ] Run the plugin/skill validators, exact-asset contract, staged-plugin smoke, isolated Codex
+      lifecycle harness, clean first-user harness, and all eight reviewer cases with synthetic
+      fixtures.
+- [ ] Follow **Prepare and score the operator-attested conversations** below: run the no-auth,
+      no-subprocess preflight; prepare the private transcript; have a reviewer exercise the exact
+      installed-plugin 5+3 packet; and score the completed operator attestation. Retain only the
+      value-safe receipt. A pass does not independently prove host behavior or replace later
+      unrelated-account acceptance.
 - [ ] Visually approve the icon and logos in actual light and dark directory/card/composer surfaces;
       approve the synthetic screenshots only as private-beta/marketing artwork.
 - [ ] Owner approves the listing copy, support process, `PRIVACY.md`, and `TERMS.md`; obtain legal
       review if the owner requires it. Do not treat automated technical review as legal approval.
-- [x] Website, support, privacy, and terms URLs were anonymously reachable on 2026-09-01. Repeat the
+- [x] Website, support, privacy, and terms URLs were anonymously reachable on 2026-09-02. Repeat the
       signed-out preflight immediately before submission.
 - [x] GitHub private vulnerability reporting was enabled on 2026-09-01. Reconfirm it immediately
       before submission and retain the documented security-contact fallback.
@@ -620,8 +689,11 @@ only. Submission and publication items remain deliberately blocked for this nonr
 - [ ] Owner chooses the countries/regions where product, support, and legal terms are ready.
 - [ ] Owner approves the initial release notes and every portal policy attestation only after checking
       the final listing, skill bundle, prompts, tests, and availability.
+- [ ] Confirm every bundled skill passes the portal's safety and security scan. OpenAI currently
+      warns that scanning can take up to two hours; do not treat package upload success as final
+      submission success.
 - [ ] Create a **Skills only** portal draft, upload the tested probe skill tree, enter the three
-      starter prompts and all eight self-contained tests, omit screenshot configuration, and retain
+      starter prompts and all eight reviewer-reproducible tests, omit screenshot configuration, and retain
       a draft receipt. Inspect whether `products: [CODEX]` is accepted or normalized and record
       visibility, invocation, and functional behavior on every surfaced product. Do not submit.
 - [ ] Submit for review only with explicit owner authorization; retain the submission and review
@@ -634,8 +706,10 @@ only. Submission and publication items remain deliberately blocked for this nonr
 1. Maintainer approves the listing copy, icon/logos, private-beta artwork, privacy notice, and terms;
    the skills-only submission omits screenshot configuration.
 2. Repository, release, policy, and support URLs are anonymously reachable over HTTPS.
-3. The exact plugin bundle and compatible attested runtime are bound to their reviewed source
-   commits; product versions need not match, but the runtime contract and required features must.
+3. The exact plugin bundle is bound to its reviewed source commit. The reviewer installs the runtime
+   from the separately reviewed pinned commit, then the launcher compatibility-checks its contract
+   and required features. This is not a signed or executable-byte attestation, and product versions
+   need not match.
 4. A clean external account proves install, fresh-task discovery, explicit activation, and removal
    using `FIRST_USER_ACCEPTANCE.md`.
 5. The actual directory card/details/composer surfaces are visually checked in light and dark mode.
@@ -646,6 +720,145 @@ only. Submission and publication items remain deliberately blocked for this nonr
 
 Do not claim directory availability, approval, publication, or general availability before the
 corresponding external gate has actually passed.
+
+## Exact metadata consistency check
+
+Run this after any manifest or submission-copy edit. It checks Directory length/count constraints
+and confirms that the JSON block under **Listing identity** is semantically equal to the manifest's
+form-bound interface fields:
+
+```bash
+python3 - <<'PY'
+import json
+import re
+import unicodedata
+from pathlib import Path
+from urllib.parse import urlsplit
+
+manifest = json.loads(
+    Path("plugins/atready/.codex-plugin/plugin.json").read_text(encoding="utf-8")
+)
+packet = Path("docs/DIRECTORY_SUBMISSION.md").read_text(encoding="utf-8")
+section = packet.split("## Listing identity", 1)[1].split("## Assets", 1)[0]
+match = re.search(r"```json\n(.*?)\n```", section, flags=re.DOTALL)
+if match is None:
+    raise SystemExit("form-ready JSON block is missing")
+documented = json.loads(match.group(1))
+keys = (
+    "displayName",
+    "shortDescription",
+    "longDescription",
+    "developerName",
+    "category",
+    "capabilities",
+    "websiteURL",
+    "supportURL",
+    "privacyPolicyURL",
+    "termsOfServiceURL",
+    "defaultPrompt",
+    "brandColor",
+)
+expected = {key: manifest["interface"][key] for key in keys}
+assert documented == expected
+assert len(expected["displayName"]) <= 30
+assert "\n" not in expected["displayName"]
+assert len(expected["shortDescription"]) <= 30
+assert "\n" not in expected["shortDescription"]
+assert len(expected["longDescription"]) <= 4_000
+assert len(expected["developerName"]) <= 80
+capabilities = expected["capabilities"]
+assert len(capabilities) <= 20
+assert all(
+    isinstance(capability, str)
+    and capability.strip()
+    and "\n" not in capability
+    and "\r" not in capability
+    and len(capability) <= 120
+    for capability in capabilities
+)
+for key in ("websiteURL", "supportURL", "privacyPolicyURL", "termsOfServiceURL"):
+    value = expected[key]
+    parsed = urlsplit(value)
+    assert len(value) <= 1_024
+    assert parsed.scheme == "https" and parsed.hostname
+    assert parsed.username is None and parsed.password is None
+prompts = expected["defaultPrompt"]
+assert len(prompts) == 3
+assert all(prompt and "\n" not in prompt and len(prompt) <= 128 for prompt in prompts)
+assert all("@" not in prompt for prompt in prompts)
+def normalize(value):
+    return unicodedata.normalize("NFKC", " ".join(value.split())).casefold()
+
+assert len({normalize(prompt) for prompt in prompts}) == len(prompts)
+assert re.fullmatch(r"#[0-9A-Fa-f]{6}", expected["brandColor"])
+print("manifest-bound Directory metadata: exact and within current limits")
+PY
+```
+
+OpenAI's final Directory submission applies stricter checks than package upload, so rerun the
+current [submission error reference](https://developers.openai.com/plugins/deploy/submission-errors)
+review immediately before portal submission.
+
+## Prepare the local marketplace lifecycle pilot
+
+Before any portal action, prove the local install/remove lifecycle and build a disposable bundle
+plus value-safe receipt from a clean reviewed commit:
+
+```bash
+uv run python scripts/plugin_lifecycle_acceptance.py
+pilot_parent="$(mktemp -d)"
+uv run python scripts/prepare_plugin_directory_pilot.py \
+  --output-dir "$pilot_parent/atready-directory-pilot"
+```
+
+The lifecycle helper uses an isolated temporary `CODEX_HOME`, a local repository marketplace, and
+synthetic private state. The preparation helper refuses dirty source by default. Its output is not
+a release artifact and must not be uploaded, submitted, or published without the later approvals in
+the checklist above.
+
+## Prepare and score the operator-attested conversations
+
+First validate that the source-controlled case contract still maps one-to-one to this packet and
+that every synthetic fixture has its recorded digest. Then create a new private transcript:
+
+```bash
+uv run python scripts/plugin_conversation_acceptance.py
+conversation_parent="$(mktemp -d)"
+chmod 700 "$conversation_parent"
+uv run python scripts/plugin_conversation_acceptance.py \
+  --candidate-pilot "$pilot_parent/atready-directory-pilot" \
+  --prepare "$conversation_parent/atready-directory-conversations"
+```
+
+Using the exact installed probe bundle and quickstart preflight, a human reviewer runs each prompt
+in `transcript.json` with the named synthetic fixtures. For each case, the reviewer copies the
+observed response, reviews its meaning, sets that case's `semantic_reviewed` to `true`, records only
+the enumerated actions and bounded observation fields, and finally sets `operator_attested` to
+`true`. Do not add credentials, normal private inventory, account data, or unbounded logs. Score the
+completed private file without invoking a host or model:
+
+```bash
+uv run python scripts/plugin_conversation_acceptance.py \
+  --candidate-pilot "$pilot_parent/atready-directory-pilot" \
+  --transcript "$conversation_parent/atready-directory-conversations/transcript.json"
+```
+
+Retain the scorer's value-safe JSON receipt. Its `candidate_binding` repeats only the verified ZIP
+digest, plugin version, and clean pilot source commit; it never emits the candidate or transcript
+path. The helper rejects a development-only receipt, a changed ZIP, a receipt/manifest version
+mismatch, or a transcript prepared for another candidate. It also checks packet/fixture drift,
+prompt identity, prohibited side-effect observations, required terms, question count where
+applicable, and obvious contradictory commitments. Those automated response checks are only lexical
+and structural; the operator attests response meaning. The helper cannot establish that the reviewer
+reported host behavior correctly, so label the result operator-attested and keep independent
+first-user acceptance as a separate gate.
+
+On POSIX, the helper also verifies current-user ownership and rejects group/world access on the
+candidate directory and transcript. On Windows, Python mode bits do not establish the equivalent
+ACL privacy; use a current-user-only directory and treat that ACL boundary as operator-managed and
+unproved. The receipt reports whether POSIX owner/mode checks were applied. All cases remain
+synthetic, and cross-platform symlink, type, size, archive-integrity, and candidate-binding checks
+still apply.
 
 ## Build the portal ZIP
 
@@ -658,7 +871,7 @@ the plugin version plus ZIP SHA-256:
 
 ```bash
 python3 scripts/build_plugin_submission.py \
-  --output dist/atready-plugin-0.1.12.zip
+  --output dist/atready-plugin-0.1.13.zip
 ```
 
 Run the repository's current-policy plugin validator, OpenAI's skill validator, and
@@ -671,6 +884,10 @@ python3 scripts/validate_plugin_contract.py plugins/atready \
 python3 "$CODEX_SYSTEM_SKILLS_DIR/skill-creator/scripts/quick_validate.py" \
   plugins/atready/skills/project-atready
 uv run pytest -q tests/test_plugin_submission_bundle.py
+uv run pytest -q tests/test_plugin_lifecycle_acceptance.py \
+  tests/test_plugin_directory_pilot.py
+uv run python scripts/plugin_conversation_acceptance.py
+uv run pytest -q tests/test_plugin_conversation_acceptance.py
 ```
 
 Record the emitted digest, exact source commit, runtime compatibility evidence, and portal draft

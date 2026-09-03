@@ -11,16 +11,17 @@ service, or remote resource-invocation service. It does include a separately aut
 exact-profile local executable check; that check never contacts the provider or verifies an
 account.
 
-When the ChatGPT or Codex skill is used, project details and an inventory snapshot without private notes may
-enter the configured host or model provider's context. Resource names, access state, costs, quotas,
-and capabilities may still be sensitive. Local storage is therefore not a promise of local-only or
-offline model processing.
+When a personal AtReady skill or the Codex-only plugin is used, project details and an inventory
+snapshot without private notes may enter the configured host or model provider's context. Resource
+names, access state, costs, quotas, and capabilities may still be sensitive. Local storage is
+therefore not a promise of local-only or offline model processing.
 
-The ChatGPT/Codex plugin contains only the workflow skill and installs no Python package, connector,
-app, MCP server, hook, or telemetry component. The separately installed runtime may use a different
-product version; the launcher requires the same runtime contract version and every feature declared
-by the plugin. Installing either artifact does not upload an inventory, but later host/model
-processing remains subject to the boundary above.
+The current public-Directory candidate is a Codex-only, skills-only plugin. It installs no Python
+package, connector, app, MCP server, hook, or telemetry component. The separately installed runtime
+may use a different product version; the launcher requires the same runtime contract version and
+every feature declared by the plugin. Installing either artifact does not upload an inventory, but
+later host/model processing remains subject to the boundary above. Personal-skill installations are
+a separate distribution surface and are not proof of Directory behavior.
 
 ## Data AtReady handles
 
@@ -172,12 +173,12 @@ supported in-place injection or rotation in v0.1. Initialize a new path if prote
 is missing or may have been exposed, and do not reuse one raw initialized inventory
 as an independent private clone.
 
-When the hosted AtReady skill is used on a supported surface, the host may read the minimum project-relevant
-files needed to prepare the plan. The skill creates its project brief in a
-fresh OS temporary/private directory with owner-only controls (`0700` for the
-directory and `0600` for the file on POSIX), then removes that exact temporary
-directory after routing. It does not place the brief in the project checkout.
-Equivalent platform-native access controls apply where POSIX modes do not.
+When the AtReady skill is used on a supported surface, the host may read the minimum
+project-relevant files needed to prepare the plan. The skill keeps its project brief in memory and,
+for the normal POSIX routing path, sends one bounded JSON line to the local runtime through
+echo-suppressed standard input. It does not write that brief to a temporary file or the project
+checkout. The host, model provider, terminal session, and local process can still observe or retain
+the data under their own controls.
 
 Inventory backups remain until the user deliberately deletes one exact ID.
 AtReady performs no automatic, age-based, chronological, bulk, or
@@ -211,9 +212,9 @@ manual local inspection before supported listing or deletion is available again.
 Local files remain until the user edits or deletes them. Deleting local
 AtReady files does not delete copies retained by an AI host, model
 provider, backup system, source-control remote, or sync service. Those systems
-have their own controls and retention policies. The same limit applies when
-the skill removes its temporary brief: project content may already exist in
-the host/model context, logs, or provider retention systems.
+have their own controls and retention policies. Keeping the project brief in memory and sending it
+through standard input does not remove project content that may already exist in the host/model
+context, process memory, terminal session, logs, or provider retention systems.
 
 Real inventory, preference, history, and export files should not be committed
 to a public repository. Public examples must use synthetic data.

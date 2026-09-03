@@ -13,7 +13,7 @@ and resource-fit evidence without broadening the CLI's permissions.
 | Optional Codex skill package | `atready` | `.codex-plugin/plugin.json` and the canonical `project-atready` skill | The Python package, hooks, apps, MCP servers, connectors, telemetry, or an implicit installer |
 
 The CLI runtime currently uses product version `0.1.10`, while the optional Codex plugin uses
-product version `0.1.12`, but product-version equality is no longer the compatibility boundary. The plugin
+product version `0.1.13`, but product-version equality is no longer the compatibility boundary. The plugin
 declares runtime contract version `1` and its required stable
 feature IDs. Its launcher resolves the already-required `uv` executable through the caller's
 `PATH`, asks it offline and with configuration files disabled for the absolute tool-bin directory,
@@ -30,8 +30,9 @@ tools. A trusted `uv` executable and startup environment remain prerequisites, a
 report does not prove who supplied the executable. Users remain responsible for installing both
 artifacts from intended release channels.
 
-The plugin manifest's `Read`, `Write`, and `Interactive` capability labels describe the host
-workflow candidly. They are not grants. The skill's narrower contract still limits reads to
+The plugin manifest describes three user-facing outcomes: adding declared resources with approval,
+matching saved resources to project work, and explaining constraints, gaps, and omissions. Those
+Directory labels are not permission grants. The skill's narrower contract still limits reads to
 approved project and inventory inputs, supplies its normal project brief as one bounded JSON line
 only after an echo-suppressed terminal readiness marker, and keeps every inventory mutation
 preview-first and separately authorized.
@@ -64,10 +65,12 @@ once their anonymous URLs are verified.
 ## Source and private-release validation
 
 The canonical plugin is [`plugins/atready`](../plugins/atready). The repository
-marketplace is [`.agents/plugins/marketplace.json`](../.agents/plugins/marketplace.json). The host
-must already have a trusted `uv` on the Codex process's `PATH`, a plugin-capable Codex release, and
-a directly invocable Python 3 interpreter for the stdlib-only launcher. `uv tool install` may use
-an isolated managed Python and does not by itself satisfy that launcher prerequisite. Before
+marketplace is [`.agents/plugins/marketplace.json`](../.agents/plugins/marketplace.json). It is a
+maintainer/local testing surface and the source for the isolated local marketplace lifecycle pilot,
+not a Directory install or a public first-user path. The host must already have a trusted `uv` on
+the Codex process's `PATH`, a plugin-capable Codex release, and a directly invocable Python 3.11 or
+newer interpreter for the stdlib-only launcher. `uv tool install` may use an isolated managed Python and
+does not by itself satisfy that launcher prerequisite. Before
 installation, verify `python3 --version` on POSIX or `py -3 --version` on Windows from the
 environment that will start Codex; do not install an interpreter implicitly during skill use.
 
@@ -120,22 +123,42 @@ records plugin and runtime product versions separately; the contract/feature han
 equality, is the compatibility gate. This path does not claim PyPI publication, OpenAI review,
 public provenance, or general availability.
 
-## Deferred plugin install contract
+## Future Directory phase
 
-The following is retained as a possible later path. It is not part of the first open-source beta
-and is not a claim that either channel is live today:
+The following is a possible later, controlled external probe. It is not part of the first
+open-source beta and is not a claim that Directory installation, review, or publication is live
+today. Read
+[`PLUGIN_DIRECTORY_QUICKSTART.md`](PLUGIN_DIRECTORY_QUICKSTART.md) for the first-user path and
+[`PLUGIN_DIRECTORY_PILOT.md`](PLUGIN_DIRECTORY_PILOT.md) for the isolated maintainer lifecycle
+with this contract:
 
-1. Install the version of the local runtime named by the release notes from the official PyPI
-   project. This is supporting infrastructure; normal use begins in the plugin rather than the
-   terminal.
-2. Install AtReady from the universal Plugins Directory in a supported ChatGPT or Codex
-   surface.
-3. Ask AtReady to check runtime compatibility, and follow its specific remediation command only if
-   the check fails. After a user-run update, retry the preview or other request in that same task;
-   the launcher re-checks before any roster operation.
+1. On a local Codex task or Codex CLI that can access Python, trusted `uv`, and a local inventory,
+   install the separately distributed canonical runtime yourself from the exact immutable reviewed
+   source named in the approved quickstart. This does not install the plugin.
+2. Install the skills-only AtReady plugin from the Directory only on that claimed local target. Do
+   not combine it with a personal-skill sideload or the earlier local marketplace lifecycle pilot.
+3. Start a fresh task and explicitly activate AtReady. It must verify runtime compatibility before
+   inventory access, preview, routing, or mutation. A non-target surface must hide AtReady or stop
+   before an actionable workflow.
 
-The same trusted `uv`, directly invocable Python 3, and startup-environment prerequisites apply.
-The current public-source beta command is deliberately aligned with the README and launcher:
+The same trusted `uv`, directly invocable Python 3.11 or newer, and startup-environment prerequisites apply.
+General plugin availability in ChatGPT Chat/Work on web, desktop, or mobile does not make those
+surfaces AtReady targets. Codex remote/cloud remains unproved, and the Codex IDE extension does not
+support plugins. The plugin is CODEX-only.
+
+The Directory architecture is deliberately hybrid, not self-contained. The skills-only plugin
+contains the conversation, references, and guarded launcher; the separately installed canonical
+runtime remains the single implementation of inventory parsing, deterministic routing, preview
+binding, backups, and atomic writes. A smaller bundled router is not an acceptable fallback.
+
+The current candidate immutable public-runtime ref is
+`34fb4376b376bb9a26f22578a0b9e1c3aef9cc6e`. The release owner must independently verify and
+approve that exact ref before submission. The form, release notes, launcher recovery command, and
+quickstart must all name the same approved ref; a moving `main` command is not acceptable for the
+Directory reviewer path.
+
+The current moving public-source beta command remains aligned with the README. It is separate from
+the Directory candidate's pinned runtime recovery command:
 
 ```bash
 uv tool install --force --no-config --no-python-downloads \
@@ -150,7 +173,8 @@ command can still honor explicitly inherited `UV_INDEX`, `UV_INDEX_URL`, or
 `UV_EXTRA_INDEX_URL`; clear those variables first when PyPI-only dependency resolution is required.
 The future exact PyPI or tag lane remains separate and must name an actually published,
 reviewed artifact. The plugin must never silently install or upgrade the runtime; it diagnoses
-compatibility, presents the public-source command, and verifies the result after the user runs it.
+compatibility, presents the pinned reviewed-commit command, and verifies the result after the user
+runs it.
 
 ## Later package and plugin gates
 
@@ -161,9 +185,9 @@ compatibility, presents the public-source command, and verifies the result after
 - Confirm ownership of the `project-atready` PyPI name, configure a protected Trusted
   Publisher for the actual private source repository and workflow, publish only after explicit
   owner approval, and independently install the exact wheel and source distribution from PyPI.
-- Replace the reserved private GitHub website/support/privacy/terms URLs with anonymously reachable
-  HTTPS pages that match the verified publisher identity. Then update the plugin manifest, PyPI
-  project URLs, and directory packet together.
+- Reconfirm anonymously that the website, support, privacy, and terms URLs return the intended
+  public copy over HTTPS and match the verified publisher identity. Reconfirm the owner-approved
+  copy in the plugin manifest and directory packet together.
 - Maintainer-review the source-complete public-directory metadata, privacy/terms copy, and synthetic
   artwork in [`DIRECTORY_SUBMISSION.md`](DIRECTORY_SUBMISSION.md). Skills-only plugins are submitted
   through the OpenAI Platform plugin submission portal documented in

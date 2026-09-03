@@ -15,9 +15,12 @@ import threading
 import time
 from pathlib import Path
 
-PLUGIN_VERSION = "0.1.12"
+PLUGIN_VERSION = "0.1.13"
 REVIEWED_RUNTIME_VERSION = "0.1.10"
-PUBLIC_RUNTIME_SOURCE = "git+https://github.com/stoicpickle/atready.git@main"
+REVIEWED_RUNTIME_COMMIT = "34fb4376b376bb9a26f22578a0b9e1c3aef9cc6e"
+PUBLIC_RUNTIME_SOURCE = (
+    "git+https://github.com/stoicpickle/atready.git@34fb4376b376bb9a26f22578a0b9e1c3aef9cc6e"
+)
 REQUIRED_RUNTIME_CONTRACT_VERSION = 1
 REQUIRED_RUNTIME_FEATURE_IDS = (
     "inventory.mutate-preview-apply.v1",
@@ -279,8 +282,10 @@ def _runtime_remediation(command: list[str], summary: str) -> str:
         "request; these compatibility probes do not ask the runtime to read or write your "
         "roster. Run this exact update yourself:\n\n"
         f"{_runtime_update_command()}\n\n"
-        f"This reinstalls from AtReady's moving public-source beta channel. This plugin was "
-        f"reviewed with runtime {REVIEWED_RUNTIME_VERSION}. uv may still honor inherited "
+        f"This reinstalls AtReady from its reviewed public source commit "
+        f"{REVIEWED_RUNTIME_COMMIT}. This plugin was reviewed with runtime "
+        f"{REVIEWED_RUNTIME_VERSION}. The commit pins AtReady's source, not every third-party "
+        f"dependency artifact. uv may still honor inherited "
         "UV_INDEX, UV_INDEX_URL, or UV_EXTRA_INDEX_URL values; clear them first for PyPI-only "
         "dependency resolution. Then "
         "retry the AtReady preview or other request in this same task; the launcher will re-check "
@@ -391,7 +396,13 @@ def _verify_runtime_contract(command: list[str]) -> None:
 def main() -> None:
     executable, command = _resolve_command()
     _verify_runtime_contract(command)
-    os.execv(executable, [*command, *sys.argv[1:]])  # noqa: S606
+    arguments = [*command, *sys.argv[1:]]
+    if sys.platform == "win32":
+        # Windows cannot replace the current process with POSIX exec semantics.
+        # Wait for the delegated CLI so its exact success or failure reaches the host.
+        completed = subprocess.run(arguments, check=False)  # noqa: S603
+        raise SystemExit(completed.returncode)
+    os.execv(executable, arguments)  # noqa: S606
 
 
 if __name__ == "__main__":

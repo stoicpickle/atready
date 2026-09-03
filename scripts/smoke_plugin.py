@@ -171,8 +171,18 @@ def _run(wrapper: Path, argv: list[str], *, environment: dict[str, str]) -> str:
     return result.stdout
 
 
-def main_smoke() -> None:
-    repository_root = Path(__file__).resolve().parents[1]
+def main_smoke(
+    *,
+    repository_root: Path | None = None,
+    expected_png_assets: dict[str, tuple[int, int]] | None = None,
+    atready_executable: Path | None = None,
+) -> None:
+    if repository_root is None:
+        repository_root = Path(__file__).resolve().parents[1]
+    else:
+        repository_root = repository_root.resolve()
+    if expected_png_assets is None:
+        expected_png_assets = _EXPECTED_PNG_ASSETS
     canonical_plugin = repository_root / "plugins" / "atready"
     manifest = json.loads(
         (canonical_plugin / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
@@ -187,7 +197,7 @@ def main_smoke() -> None:
     }:
         raise AssertionError("plugin artifact contains components outside the skills-only contract")
     assets = canonical_plugin / "assets"
-    if {path.name for path in assets.iterdir()} != set(_EXPECTED_PNG_ASSETS):
+    if {path.name for path in assets.iterdir()} != set(expected_png_assets):
         raise AssertionError("plugin assets do not match the exact release allowlist")
     if "screenshots" in manifest["interface"]:
         raise AssertionError("skills-only plugin manifest must not declare screenshots")
@@ -196,7 +206,7 @@ def main_smoke() -> None:
     }
     if declared_assets != {"assets/icon.png"}:
         raise AssertionError("plugin manifest does not declare the expected install-surface assets")
-    for name, dimensions in _EXPECTED_PNG_ASSETS.items():
+    for name, dimensions in expected_png_assets.items():
         if _png_contract(assets / name) != (*dimensions, 8, 6):
             raise AssertionError(f"plugin asset has unexpected PNG properties: {name}")
 
@@ -212,13 +222,17 @@ def main_smoke() -> None:
         staged_plugin = staging_root / "atready"
         shutil.copytree(canonical_plugin, staged_plugin)
         wrapper = staged_plugin / "skills" / "project-atready" / "scripts" / "atready.py"
-        installed_cli = shutil.which("atready")
-        if installed_cli is None:
+        if atready_executable is None:
+            found = shutil.which("atready")
+            installed_cli = Path(found) if found is not None else None
+        else:
+            installed_cli = atready_executable
+        if installed_cli is None or not installed_cli.is_file():
             raise AssertionError("isolated plugin smoke did not provide the atready command")
         environment = os.environ.copy()
         environment.pop("PYTHONPATH", None)
         environment["ATREADY_HOME"] = str(staging_root / "private-state")
-        environment["UV_TOOL_BIN_DIR"] = str(Path(installed_cli).parent)
+        environment["UV_TOOL_BIN_DIR"] = str(installed_cli.resolve().parent)
 
         launcher_version, launcher_contract, launcher_features = _launcher_requirements(wrapper)
         repository_version = _repository_version(

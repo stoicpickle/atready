@@ -144,7 +144,7 @@ jobs:
           test "$actual_version" = "$RELEASE_VERSION"
           uv run --no-sync ruff check .
           uv run --no-sync ruff format --check .
-          uv run --no-sync pytest --cov=atready --cov-report=term-missing
+          uv run --locked --no-sync --with-editable . pytest --cov=atready --cov-report=term-missing
 
       - name: Bind timestamps and build twice through hash-constrained backend
         env:

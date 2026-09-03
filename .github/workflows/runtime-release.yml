@@ -155,7 +155,7 @@ jobs:
       - name: Test with branch coverage
         env:
           PYTHONPATH: src
-        run: uv run --no-sync pytest --cov=atready --cov-report=term-missing
+        run: uv run --locked --no-sync --with-editable . pytest --cov=atready --cov-report=term-missing
 
       - name: Require unchanged source before build
         run: |

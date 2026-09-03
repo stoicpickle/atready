@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import runpy
 import sys
@@ -52,6 +53,15 @@ def _write_upstream_source(tmp_path: Path, source: str) -> Path:
     return system_skills
 
 
+def _write_support_manifest(plugin: Path, support_url: object) -> None:
+    manifest = plugin / ".codex-plugin" / "plugin.json"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(
+        json.dumps({"interface": {"supportURL": support_url}}),
+        encoding="utf-8",
+    )
+
+
 def _validate(plugin: Path, system_skills: Path) -> list[str]:
     upstream = system_skills / "plugin-creator" / "scripts" / "validate_plugin.py"
     return validate(
@@ -74,6 +84,49 @@ def test_current_products_field_can_bridge_one_legacy_validator_error(tmp_path: 
     errors = _validate(plugin, system_skills)
 
     assert errors == []
+
+
+def test_current_support_url_can_bridge_one_reviewed_validator_error(tmp_path: Path) -> None:
+    plugin = _write_candidate(tmp_path, ["CODEX"])
+    _write_support_manifest(plugin, "https://github.com/stoicpickle/atready/blob/main/SUPPORT.md")
+    system_skills = _write_upstream(
+        tmp_path,
+        ["plugin.json field `interface.supportURL` is not accepted by plugin validation"],
+    )
+
+    errors = _validate(plugin, system_skills)
+
+    assert errors == []
+
+
+@pytest.mark.parametrize(
+    "support_url",
+    [
+        "http://example.com/support",
+        "https://user:password@example.com/support",
+        "https://example.com/\ncontrol",
+        "x" * 1_025,
+        42,
+    ],
+)
+def test_invalid_support_url_is_rejected_before_legacy_compatibility(
+    tmp_path: Path, support_url: object
+) -> None:
+    plugin = _write_candidate(tmp_path, ["CODEX"])
+    _write_support_manifest(plugin, support_url)
+    marker = tmp_path / "validator-ran"
+    system_skills = _write_upstream_source(
+        tmp_path,
+        "from pathlib import Path\n"
+        "def validate_plugin(plugin_root):\n"
+        f"    Path({str(marker)!r}).write_text('ran', encoding='utf-8')\n"
+        "    return []\n",
+    )
+
+    errors = _validate(plugin, system_skills)
+
+    assert errors == ["interface.supportURL must be an HTTPS URL of at most 1024 characters"]
+    assert not marker.exists()
 
 
 def test_production_validator_digest_is_bound_to_an_immutable_official_artifact() -> None:
