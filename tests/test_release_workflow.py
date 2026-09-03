@@ -133,6 +133,7 @@ def test_release_candidate_workflow_is_manual_private_and_least_privilege() -> N
     assert "pytest" in coverage_command
     assert "--cov=atready" in coverage_command
     assert "--cov-report=term-missing" in coverage_command
+    assert coverage_command.startswith("uv run --locked --no-sync --with-editable . pytest")
     for required in (
         "GITHUB_TRIGGERING_ACTOR",
         "actions/workflows/ci.yml/runs",
@@ -270,6 +271,7 @@ def test_runtime_release_workflow_is_private_source_reviewed_and_pypi_only() -> 
     assert "pytest" in coverage_command
     assert "--cov=atready" in coverage_command
     assert "--cov-report=term-missing" in coverage_command
+    assert coverage_command.startswith("uv run --locked --no-sync --with-editable . pytest")
     for required in (
         'GITHUB_REPOSITORY" != "stoicpickle/atready-dev"',
         'gh api "repos/$GITHUB_REPOSITORY" --jq .visibility',
@@ -471,6 +473,7 @@ def test_public_release_workflow_is_manual_split_and_human_gated() -> None:
     assert validate["env"] == {"RELEASE_VERSION": "${{ inputs.version }}"}
     assert 'test "$actual_version" = "$RELEASE_VERSION"' in validate["run"]
     assert "${{ inputs.version }}" not in validate["run"]
+    assert "uv run --locked --no-sync --with-editable . pytest" in validate["run"]
     timestamp_build = _step(
         build,
         "Bind timestamps and build twice through hash-constrained backend",
@@ -891,7 +894,10 @@ def test_build_backend_and_sdist_are_explicitly_bounded() -> None:
     assert _step(ci_job, "Install locked dependencies")["run"] == (
         "uv sync --locked --all-groups --no-group release --no-group elevated --no-install-project"
     )
-    assert "uv run --no-sync pytest" in "\n".join(step.get("run", "") for step in ci_job["steps"])
+    assert _step(ci_job, "Test")["run"] == ("uv run --locked --no-sync --with-editable . pytest")
+    assert _step(ci_job, "Test with branch coverage")["run"] == (
+        "uv run --locked --no-sync --with-editable . pytest --cov=atready --cov-report=term-missing"
+    )
     ci_build = _step(ci_job, "Build distributions")
     assert "--build-constraints build-constraints.txt --require-hashes" in ci_build["run"]
     assert ci_build["env"] == {

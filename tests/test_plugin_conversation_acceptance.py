@@ -173,6 +173,48 @@ def test_acceptance_helper_remains_network_and_subprocess_free() -> None:
     assert "os.popen" not in source
 
 
+def test_utf8_fixture_hashes_are_newline_portable_but_content_exact(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fixture = tmp_path / "evals" / "fixtures" / "inventory.yaml"
+    fixture.parent.mkdir(parents=True)
+    canonical = (ROOT / "evals" / "fixtures" / "inventory.yaml").read_text(encoding="utf-8")
+    fixture.write_bytes(canonical.replace("\n", "\r\n").encode("utf-8"))
+    monkeypatch.setattr(conversation, "ROOT", tmp_path)
+    contract = {
+        "fixture_sources": {
+            "inventory": {
+                "kind": "utf8-text",
+                "path": "evals/fixtures/inventory.yaml",
+                "sha256": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+            }
+        }
+    }
+
+    assert (
+        conversation._fixture_hashes(contract)["inventory"]
+        == contract["fixture_sources"]["inventory"]["sha256"]
+    )
+
+    fixture.write_text(
+        canonical.replace("Synthetic Codex Seat", "Changed Codex Seat", 1), encoding="utf-8"
+    )
+    with pytest.raises(conversation.ConversationAcceptanceError, match="fixture hash changed"):
+        conversation._fixture_hashes(contract)
+
+    fixture.write_text(canonical.removesuffix("\n"), encoding="utf-8")
+    with pytest.raises(conversation.ConversationAcceptanceError, match="fixture hash changed"):
+        conversation._fixture_hashes(contract)
+
+    fixture.write_bytes(canonical.encode("utf-8") + b"\x00")
+    with pytest.raises(conversation.ConversationAcceptanceError, match="NUL bytes"):
+        conversation._fixture_hashes(contract)
+
+    fixture.write_bytes(b"\xff\xfe")
+    with pytest.raises(conversation.ConversationAcceptanceError, match="valid UTF-8"):
+        conversation._fixture_hashes(contract)
+
+
 def test_acceptance_binding_accepts_exact_clean_pilot_preparer_output(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

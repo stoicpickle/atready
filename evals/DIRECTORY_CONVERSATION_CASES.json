@@ -1,8 +1,8 @@
 {
   "contract_version": 2,
   "fixture_sources": {
-    "inventory": {"kind": "file", "path": "evals/fixtures/inventory.yaml", "sha256": "bb24f4a8581e1aa949d88d1f62cbfa3912d6c581641248afa0ef083207f78e59"},
-    "project-godot": {"kind": "file", "path": "evals/fixtures/project-godot.yaml", "sha256": "f6a3a8e22bb7502d2e4d88bba335ac3008a4f8e74cd1e063112720125f72e01b"},
+    "inventory": {"kind": "utf8-text", "path": "evals/fixtures/inventory.yaml", "sha256": "bb24f4a8581e1aa949d88d1f62cbfa3912d6c581641248afa0ef083207f78e59"},
+    "project-godot": {"kind": "utf8-text", "path": "evals/fixtures/project-godot.yaml", "sha256": "f6a3a8e22bb7502d2e4d88bba335ac3008a4f8e74cd1e063112720125f72e01b"},
     "empty-inventory": {"kind": "markdown-yaml", "path": "docs/DIRECTORY_SUBMISSION.md", "heading": "empty-inventory.yaml", "sha256": "eee1130c2b3df94b242adf52b03ae50a001af031eec11ae99dcd9abc338abfe4"},
     "alternate-inventory": {"kind": "markdown-yaml", "path": "docs/DIRECTORY_SUBMISSION.md", "heading": "alternate-inventory.yaml", "sha256": "9f345ee88d609328a758d0803a79504a3fc73a4a8f26d6b73954da52e56ad6b4"},
     "alternate-project": {"kind": "markdown-yaml", "path": "docs/DIRECTORY_SUBMISSION.md", "heading": "alternate-project.yaml", "sha256": "1739db7c6f0ac50d4f59398c89f4c555740783137943376dd57b00e4728e51ec"},

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import runpy
-import shutil
 import subprocess
 import sys
 import tomllib
@@ -75,9 +74,10 @@ def test_first_user_acceptance_runs_through_staged_plugin_launcher(
     expected_version = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))[
         "project"
     ]["version"]
-    installed_cli = shutil.which("atready")
-    assert installed_cli is not None
-    monkeypatch.setenv("UV_TOOL_BIN_DIR", str(Path(installed_cli).parent))
+    executable_name = "atready.exe" if os.name == "nt" else "atready"
+    installed_cli = Path(sys.executable).with_name(executable_name)
+    assert installed_cli.is_file()
+    monkeypatch.setenv("UV_TOOL_BIN_DIR", str(installed_cli.parent))
     receipt = namespace["_run_acceptance_command"](
         (sys.executable, str(wrapper)), expected_version=expected_version
     )

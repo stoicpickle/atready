@@ -175,6 +175,7 @@ def main_smoke(
     *,
     repository_root: Path | None = None,
     expected_png_assets: dict[str, tuple[int, int]] | None = None,
+    atready_executable: Path | None = None,
 ) -> None:
     if repository_root is None:
         repository_root = Path(__file__).resolve().parents[1]
@@ -221,13 +222,17 @@ def main_smoke(
         staged_plugin = staging_root / "atready"
         shutil.copytree(canonical_plugin, staged_plugin)
         wrapper = staged_plugin / "skills" / "project-atready" / "scripts" / "atready.py"
-        installed_cli = shutil.which("atready")
-        if installed_cli is None:
+        if atready_executable is None:
+            found = shutil.which("atready")
+            installed_cli = Path(found) if found is not None else None
+        else:
+            installed_cli = atready_executable
+        if installed_cli is None or not installed_cli.is_file():
             raise AssertionError("isolated plugin smoke did not provide the atready command")
         environment = os.environ.copy()
         environment.pop("PYTHONPATH", None)
         environment["ATREADY_HOME"] = str(staging_root / "private-state")
-        environment["UV_TOOL_BIN_DIR"] = str(Path(installed_cli).parent)
+        environment["UV_TOOL_BIN_DIR"] = str(installed_cli.resolve().parent)
 
         launcher_version, launcher_contract, launcher_features = _launcher_requirements(wrapper)
         repository_version = _repository_version(

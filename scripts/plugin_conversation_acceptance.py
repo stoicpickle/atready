@@ -301,6 +301,17 @@ def _markdown_yaml(path: Path, heading: str) -> bytes:
     return (match.group(1) + "\n").encode()
 
 
+def _utf8_text_bytes(path: Path) -> bytes:
+    try:
+        with path.open("r", encoding="utf-8", newline=None) as handle:
+            content = handle.read()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ConversationAcceptanceError("text fixture is not valid UTF-8") from exc
+    if "\x00" in content:
+        raise ConversationAcceptanceError("text fixture must not contain NUL bytes")
+    return content.encode("utf-8")
+
+
 def _fixture_hashes(contract: dict[str, Any]) -> dict[str, str]:
     sources = contract.get("fixture_sources")
     if not isinstance(sources, dict) or not sources:
@@ -310,13 +321,13 @@ def _fixture_hashes(contract: dict[str, Any]) -> dict[str, str]:
         if not isinstance(identifier, str) or not isinstance(source, dict):
             raise ConversationAcceptanceError("conversation fixture definition is invalid")
         kind, location, expected = source.get("kind"), source.get("path"), source.get("sha256")
-        if kind not in {"file", "markdown-yaml"} or not isinstance(location, str):
+        if kind not in {"utf8-text", "markdown-yaml"} or not isinstance(location, str):
             raise ConversationAcceptanceError("conversation fixture source is invalid")
         if not isinstance(expected, str) or re.fullmatch(r"[0-9a-f]{64}", expected) is None:
             raise ConversationAcceptanceError("conversation fixture hash is invalid")
         path = _repository_file(location)
-        if kind == "file":
-            content = path.read_bytes()
+        if kind == "utf8-text":
+            content = _utf8_text_bytes(path)
         else:
             heading = source.get("heading")
             if not isinstance(heading, str) or not heading.endswith(".yaml"):

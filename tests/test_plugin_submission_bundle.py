@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import runpy
 import shutil
 import subprocess
@@ -212,9 +213,11 @@ def test_submission_zip_round_trips_through_staged_plugin_smoke(tmp_path: Path) 
     shutil.copytree(ROOT / "evals" / "fixtures", shadow / "evals" / "fixtures")
     shutil.copytree(plugin, shadow / "plugins" / "atready")
     smoke = runpy.run_path(str(ROOT / "scripts" / "smoke_plugin.py"))
+    executable_name = "atready.exe" if os.name == "nt" else "atready"
     smoke["main_smoke"](
         repository_root=shadow,
         expected_png_assets={"icon.png": (512, 512)},
+        atready_executable=Path(sys.executable).with_name(executable_name),
     )
 
 
