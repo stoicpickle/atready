@@ -29,7 +29,7 @@ _CHECKSUMS_NAME = "SHA256SUMS"
 _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 _REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _SHELL_FENCE_PATTERN = re.compile(
-    r"^```(?:bash|sh|shell)[ \t]*\r?\n(?P<body>.*?)^```[ \t]*$",
+    r"^```(?:bash|sh|shell)[ \t]*\r?\n(?P<body>.*?)^```[ \t]*\r?$",
     re.DOTALL | re.MULTILINE,
 )
 _MAX_ARTIFACT_BYTES = 100 * 1024 * 1024

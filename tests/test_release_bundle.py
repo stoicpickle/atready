@@ -219,6 +219,12 @@ def test_runtime_setup_parser_rejects_blank_line_in_continuation() -> None:
         )
 
 
+def test_runtime_setup_parser_accepts_crlf_fences() -> None:
+    assert release_bundle._fenced_shell_commands(
+        "```bash\r\nuv tool install \\\r\n  project-atready\r\n```\r\n"
+    ) == ["uv tool install project-atready"]
+
+
 def test_release_bundle_verification_refuses_artifact_tampering(tmp_path: Path) -> None:
     dist, wheel, _ = _seed_dist(tmp_path)
     assert _run("create", dist).returncode == 0

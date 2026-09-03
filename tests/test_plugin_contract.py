@@ -278,8 +278,12 @@ def test_plugin_is_minimal_skill_only_and_independently_versioned() -> None:
     assert interface["supportURL"] == (
         "https://github.com/stoicpickle/atready/blob/main/SUPPORT.md"
     )
-    assert interface["privacyPolicyURL"].endswith("/PRIVACY.md")
-    assert interface["termsOfServiceURL"].endswith("/TERMS.md")
+    assert interface["privacyPolicyURL"] == (
+        "https://github.com/stoicpickle/atready/blob/main/PRIVACY.md"
+    )
+    assert interface["termsOfServiceURL"] == (
+        "https://github.com/stoicpickle/atready/blob/main/TERMS.md"
+    )
     assert len(interface["displayName"]) <= 30
     assert len(interface["shortDescription"]) <= 30
     assert interface["shortDescription"] == "Bring resource fit to the plan"
