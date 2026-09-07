@@ -55,7 +55,7 @@ elevated = [
   "mutmut>=3.3,<4",
 ]
 release = [
-  "readme-renderer[md]>=45,<46",
+  "readme-renderer[md]>=45,<47",
   "twine>=7,<8",
 ]
 
