@@ -45,7 +45,7 @@ Terms = "https://github.com/stoicpickle/atready/blob/main/TERMS.md"
 dev = [
   "build>=1.2,<2",
   "hypothesis>=6.135,<7",
-  "pillow==12.3.0",
+  "pillow==13.0.0",
   "pytest>=8.3,<10",
   "pytest-cov>=6,<8",
   "pytest-timeout>=2.4,<3",
